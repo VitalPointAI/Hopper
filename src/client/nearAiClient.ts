@@ -8,6 +8,7 @@
  */
 
 import OpenAI from 'openai';
+import type { NearAiModel, NearAiModelsResponse } from './types';
 
 /** NEAR AI Cloud API endpoint */
 const NEAR_AI_BASE_URL = 'https://cloud-api.near.ai/v1';
@@ -30,4 +31,26 @@ export function createNearAiClient(apiKey: string): OpenAI {
  */
 export function getNearAiBaseUrl(): string {
   return NEAR_AI_BASE_URL;
+}
+
+/**
+ * Fetch available models from NEAR AI Cloud
+ *
+ * @param apiKey - API key from cloud.near.ai dashboard
+ * @returns Array of available models with pricing and metadata
+ */
+export async function fetchNearAiModels(apiKey: string): Promise<NearAiModel[]> {
+  const response = await fetch(`${NEAR_AI_BASE_URL}/model/list`, {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models: ${response.status}`);
+  }
+
+  const data: NearAiModelsResponse = await response.json();
+  return data.models ?? [];
 }
