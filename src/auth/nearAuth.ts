@@ -1,62 +1,39 @@
 /**
- * NEAR AI Authentication Module
+ * NEAR AI Cloud Auth Module
  *
- * Handles reading auth credentials from ~/.nearai/config.json
- * This matches the nearai CLI behavior for seamless integration.
+ * Users get API keys from https://cloud.near.ai/ dashboard.
+ * Keys are stored in VSCode SecretStorage (handled by extension).
+ * This module provides utilities for the extension to use.
  *
  * Note: This module is pure Node.js with no VSCode dependencies
  * to maintain testability and reusability.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import type { NearAiConfig } from '../client/types';
+/** Secret storage key name for VSCode SecretStorage */
+export const NEAR_AI_API_KEY_SECRET = 'nearai.apiKey';
 
 /**
- * Get auth signature from ~/.nearai/config.json
+ * Validate API key format (basic check)
+ * NEAR AI keys appear to be standard format
  *
- * NEAR AI expects the auth object to be JSON-stringified and used
- * as the API key in requests.
- *
- * @returns JSON-stringified auth object, or null if unavailable
+ * @param key - The API key to validate
+ * @returns true if key has valid format
  */
-export function getAuthFromConfigFile(): string | null {
-  try {
-    const configPath = path.join(os.homedir(), '.nearai', 'config.json');
-    const configContent = fs.readFileSync(configPath, 'utf-8');
-    const config: NearAiConfig = JSON.parse(configContent);
-
-    if (!config.auth) {
-      return null;
-    }
-
-    // NEAR AI expects JSON-stringified auth object as API key
-    return JSON.stringify(config.auth);
-  } catch {
-    return null;
-  }
+export function isValidApiKeyFormat(key: string): boolean {
+  return typeof key === 'string' && key.length > 0 && !key.includes(' ');
 }
 
 /**
- * Check if NEAR AI auth is configured
+ * Get instructions for obtaining API key
  *
- * @returns true if valid auth credentials exist
+ * @returns User-friendly instructions for getting a NEAR AI API key
  */
-export function isAuthConfigured(): boolean {
-  return getAuthFromConfigFile() !== null;
+export function getApiKeyInstructions(): string {
+  return `To get your NEAR AI API key:
+1. Go to https://cloud.near.ai/
+2. Sign in or create an account
+3. Purchase credits in the "Credits" section
+4. Go to "API Keys" section
+5. Generate a new key
+6. Copy the key and paste it when prompted`;
 }
-
-/**
- * Get config file path for user guidance
- *
- * @returns Path to the NEAR AI config file
- */
-export function getConfigFilePath(): string {
-  return path.join(os.homedir(), '.nearai', 'config.json');
-}
-
-// TODO: Future enhancement - Store auth in VSCode SecretStorage
-// This would provide better security and allow users to authenticate
-// without needing the nearai CLI installed. For now, config file
-// auth maintains parity with the nearai CLI experience.
