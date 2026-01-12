@@ -36,16 +36,12 @@ export function getNearAiBaseUrl(): string {
 /**
  * Fetch available models from NEAR AI Cloud
  *
- * @param apiKey - API key from cloud.near.ai dashboard
+ * The /v1/model/list endpoint is public and does not require authentication.
+ *
  * @returns Array of available models with pricing and metadata
  */
-export async function fetchNearAiModels(apiKey: string): Promise<NearAiModel[]> {
-  const response = await fetch(`${NEAR_AI_BASE_URL}/model/list`, {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-  });
+export async function fetchNearAiModels(): Promise<NearAiModel[]> {
+  const response = await fetch(`${NEAR_AI_BASE_URL}/model/list`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch models: ${response.status}`);
