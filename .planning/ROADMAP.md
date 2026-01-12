@@ -17,6 +17,7 @@ None
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Foundation** - Extension scaffolding, NEAR AI model registration in VSCode
+- [ ] **Phase 1.5: Licensing** - INSERTED - NEAR license contract, Stripe subscription, x402 crypto payments
 - [ ] **Phase 2: Chat Participant** - @specflow agent with command routing
 - [ ] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
 - [ ] **Phase 4: Execution Commands** - PLAN.md execution, verification, git integration
@@ -36,9 +37,22 @@ Plans:
 - [ ] 01-02: NEAR AI API client implementation
 - [ ] 01-03: VSCode Language Model provider registration
 
+### Phase 1.5: Licensing (INSERTED)
+**Goal**: Freemium license system with on-chain storage and dual payment rails (Stripe + crypto)
+**Depends on**: Phase 1 (extension must work before monetizing)
+**Research**: Likely (NEAR contracts, x402 protocol, NEAR Intents)
+**Research topics**: NEAR smart contract for license storage, Stripe subscription webhooks, x402 payment protocol, NEAR Intents for crypto-to-USDC conversion
+**Plans**: TBD
+
+Plans:
+- [ ] 01.5-01: NEAR license contract (account_id → subscription_expiry)
+- [ ] 01.5-02: Stripe subscription integration + webhook handler
+- [ ] 01.5-03: x402 + NEAR Intents crypto payment flow
+- [ ] 01.5-04: Extension license validation (check before Phase 2+ execution)
+
 ### Phase 2: Chat Participant
 **Goal**: @specflow chat participant responding to mentions with slash command routing
-**Depends on**: Phase 1
+**Depends on**: Phase 1.5 (license check integrated)
 **Research**: Likely (VSCode Chat API)
 **Research topics**: Chat Participants API registration, slash command definition, ChatResponseStream handling, context variables
 **Plans**: TBD
@@ -84,11 +98,12 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/3 | Not started | - |
+| 1.5 Licensing | 0/4 | Not started | - |
 | 2. Chat Participant | 0/3 | Not started | - |
 | 3. Planning Commands | 0/3 | Not started | - |
 | 4. Execution Commands | 0/3 | Not started | - |
