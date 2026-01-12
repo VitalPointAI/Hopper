@@ -11,7 +11,7 @@ Researched the VSCode extension ecosystem for building a custom Language Model p
 
 The standard approach uses:
 1. VSCode's `LanguageModelChatProvider` interface to register models
-2. NEAR AI's OpenAI-compatible API (`https://api.near.ai/v1`) for inference
+2. NEAR AI Cloud's OpenAI-compatible API (`https://cloud-api.near.ai/v1`) for inference
 3. Standard VSCode extension scaffolding via Yeoman generator
 
 **Critical constraint discovered:** Models provided through the Language Model Chat Provider API are currently only available to users on individual GitHub Copilot plans (Free, Pro, Pro+). This is a platform limitation that affects all custom model providers.
@@ -165,24 +165,29 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
 }
 ```
 
-### Pattern 3: NEAR AI Client Setup with OpenAI SDK
-**What:** Configure OpenAI client for NEAR AI's compatible endpoint
+### Pattern 3: NEAR AI Cloud Client Setup with OpenAI SDK
+**What:** Configure OpenAI client for NEAR AI Cloud's compatible endpoint
 **When to use:** API client initialization
 **Example:**
 ```typescript
 // src/client/nearAiClient.ts
 import OpenAI from 'openai';
 
-export function createNearAiClient(authSignature: string): OpenAI {
+export function createNearAiClient(apiKey: string): OpenAI {
   return new OpenAI({
-    baseURL: 'https://api.near.ai/v1',
-    apiKey: authSignature,  // JSON-encoded auth object
+    baseURL: 'https://cloud-api.near.ai/v1',
+    apiKey: apiKey,  // Bearer token from cloud.near.ai dashboard
     defaultHeaders: {
       'Content-Type': 'application/json'
     }
   });
 }
 ```
+
+**Authentication:**
+- Users generate API keys at https://cloud.near.ai/ (API Keys section)
+- Standard Bearer token authentication (like OpenAI)
+- Store in VSCode SecretStorage for security
 
 ### Pattern 4: package.json Contribution Points
 **What:** Register the provider and management command in manifest
@@ -260,11 +265,15 @@ export function createNearAiClient(authSignature: string): OpenAI {
 **How to avoid:** Report each chunk immediately via `progress.report()`
 **Warning signs:** Long delay then full response appears
 
-### Pitfall 5: NEAR AI Authentication Format
-**What goes wrong:** 401/403 errors from NEAR AI API
-**Why it happens:** Auth signature must be JSON-stringified auth object, not just API key
-**How to avoid:** Read `~/.nearai/config.json` and pass `JSON.stringify(auth)` as API key
-**Warning signs:** Authentication errors despite valid config
+### Pitfall 5: NEAR AI Cloud Authentication
+**What goes wrong:** 401/403 errors from NEAR AI Cloud API
+**Why it happens:** Using wrong authentication method or endpoint
+**How to avoid:**
+- Use `https://cloud-api.near.ai/v1` as base URL (NOT api.near.ai)
+- Get API key from cloud.near.ai dashboard (API Keys section)
+- Use standard Bearer token authentication (like OpenAI)
+**Warning signs:** Authentication errors, endpoint not found errors
+**Note:** Old nearai CLI used `~/.nearai/config.json` with JSON-stringified auth - this is DEPRECATED for the Cloud API
 
 ### Pitfall 6: Token Cancellation Ignored
 **What goes wrong:** Streaming continues after user cancels, wasting API calls
@@ -306,17 +315,18 @@ export function deactivate() {}
 ### Model Information Response
 ```typescript
 // Source: VSCode API docs - LanguageModelChatInformation interface
+// Model info from https://cloud-api.near.ai/v1/model/list
 const modelInfo: vscode.LanguageModelChatInformation = {
-  id: 'near-ai.fireworks-qwen-72b',
-  name: 'Qwen 2.5 72B Instruct',
-  family: 'qwen',
-  version: '2.5',
-  maxInputTokens: 32768,
+  id: 'near-ai.deepseek-v3.1',
+  name: 'DeepSeek V3.1',
+  family: 'deepseek',
+  version: '3.1',
+  maxInputTokens: 128000,  // From metadata.contextLength
   maxOutputTokens: 8192,
-  tooltip: 'High-performance open model via NEAR AI',
-  detail: 'Fireworks-hosted Qwen model',
+  tooltip: 'DeepSeek V3.1 via NEAR AI Cloud',
+  detail: '$1.05/M input, $3.10/M output',
   capabilities: {
-    toolCalling: true,
+    toolCalling: false,
     imageInput: false
   }
 };
@@ -354,7 +364,7 @@ async provideLanguageModelChatResponse(
 
   try {
     const stream = await this.client.chat.completions.create({
-      model: 'fireworks::accounts/fireworks/models/qwen2p5-72b-instruct',
+      model: 'deepseek-ai/DeepSeek-V3.1',  // Or any model from /v1/model/list
       messages: convertedMessages,
       stream: true
     });
@@ -377,26 +387,43 @@ async provideLanguageModelChatResponse(
 }
 ```
 
-### NEAR AI Client Configuration
+### NEAR AI Cloud Client Configuration
 ```typescript
-// Source: NEAR AI docs - OpenAI-compatible endpoint
+// Source: NEAR AI Cloud docs (https://docs.near.ai/cloud/quickstart)
 import OpenAI from 'openai';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
-export function createNearAiClient(): OpenAI {
-  // Read auth from ~/.nearai/config.json
-  const configPath = path.join(os.homedir(), '.nearai', 'config.json');
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const authSignature = JSON.stringify(config.auth);
-
+export function createNearAiClient(apiKey: string): OpenAI {
+  // API key from cloud.near.ai dashboard - standard Bearer token auth
   return new OpenAI({
-    baseURL: 'https://api.near.ai/v1',
-    apiKey: authSignature
+    baseURL: 'https://cloud-api.near.ai/v1',
+    apiKey: apiKey
   });
 }
+
+// Fetch available models dynamically
+export async function fetchModels(client: OpenAI): Promise<ModelInfo[]> {
+  // GET https://cloud-api.near.ai/v1/model/list
+  const response = await fetch('https://cloud-api.near.ai/v1/model/list', {
+    headers: { 'Authorization': `Bearer ${client.apiKey}` }
+  });
+  const data = await response.json();
+
+  // Returns: modelId, inputCostPerToken, outputCostPerToken,
+  //          metadata.modelDisplayName, metadata.contextLength, etc.
+  return data;
+}
 ```
+
+**Available Models (as of 2026-01-12):**
+| Model ID | Display Name | Context | Input $/M | Output $/M |
+|----------|--------------|---------|-----------|------------|
+| deepseek-ai/DeepSeek-V3.1 | DeepSeek V3.1 | 128K | $1.05 | $3.10 |
+| openai/gpt-oss-120b | GPT OSS 120B | 131K | $0.15 | $0.55 |
+| Qwen/Qwen3-30B-A3B-Instruct-2507 | Qwen3 30B | 262K | $0.15 | $0.55 |
+| zai-org/GLM-4.6 | GLM-4.6 | 200K | $0.85 | $3.30 |
+| zai-org/GLM-4.7 | GLM 4.7 | 131K | $0.85 | $3.30 |
+
+**Note:** Fetch models from `/v1/model/list` endpoint rather than hardcoding - models change over time.
 
 ### Package.json Configuration
 ```json
@@ -462,20 +489,21 @@ export function createNearAiClient(): OpenAI {
 
 Things that couldn't be fully resolved:
 
-1. **NEAR AI Model Catalog**
-   - What we know: Uses `provider::model-path` format (e.g., `fireworks::accounts/fireworks/models/qwen2p5-72b-instruct`)
-   - What's unclear: Complete list of available models and their capabilities
-   - Recommendation: Implement model listing via `client.models.list()` at runtime; hardcode known models initially
+1. **NEAR AI Cloud Model Catalog**
+   - What we know: Models available at `/v1/model/list` endpoint with full metadata
+   - What we know: Model IDs are simple format (e.g., `deepseek-ai/DeepSeek-V3.1`)
+   - What's unclear: How often model list changes; best caching strategy
+   - Recommendation: Fetch models dynamically; cache for session duration
 
 2. **Tool Calling Support**
    - What we know: VSCode API supports tool calling via `LanguageModelToolCallPart`
-   - What's unclear: Whether NEAR AI's OpenAI-compatible endpoint supports function calling
+   - What's unclear: Whether NEAR AI Cloud models support function calling
    - Recommendation: Start without tool calling; add if NEAR AI confirms support
 
 3. **Authentication UX**
-   - What we know: Auth requires NEAR wallet signature stored in `~/.nearai/config.json`
-   - What's unclear: Best UX for users who haven't used nearai CLI
-   - Recommendation: Provide setup wizard command; link to nearai CLI for initial auth
+   - What we know: Standard Bearer token auth via API key from cloud.near.ai dashboard
+   - What's unclear: Best UX for prompting user to enter API key
+   - Recommendation: Store in VSCode SecretStorage; provide management command to add/update key
 
 4. **Copilot Plan Workaround**
    - What we know: Language Model providers require Copilot subscription
@@ -491,15 +519,15 @@ Things that couldn't be fully resolved:
 - [VSCode Chat Extension API](https://code.visualstudio.com/api/extension-guides/ai/chat) - Chat participant registration
 - [chat-model-provider-sample](https://github.com/microsoft/vscode-extension-samples/tree/main/chat-model-provider-sample) - Official sample implementation
 - [VSCode Extension Generator](https://github.com/microsoft/vscode-generator-code) - Official scaffolding tool
+- [NEAR AI Cloud Quickstart](https://docs.near.ai/cloud/quickstart) - Authentication, API setup
+- [NEAR AI Cloud Models](https://docs.near.ai/cloud/models/overview) - Available models, pricing
 
 ### Secondary (MEDIUM confidence)
-- [NEAR AI Inference docs](https://docs.near.ai/) - OpenAI-compatible API (docs structure is incomplete)
+- [NEAR AI API Reference](https://docs.near.ai/api) - API endpoints including `/v1/model/list`
 - [Bring Your Own Key Blog](https://code.visualstudio.com/blogs/2025/10/22/bring-your-own-key) - Context on model provider ecosystem
-- WebSearch results on NEAR AI API format - Verified against multiple sources
 
 ### Tertiary (LOW confidence - needs validation)
-- NEAR AI model list - Needs runtime verification via API
-- Tool calling support in NEAR AI - Requires testing
+- Tool calling support in NEAR AI Cloud - Requires testing
 </sources>
 
 <metadata>
