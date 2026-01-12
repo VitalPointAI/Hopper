@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 1 of 5 (Foundation)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-12 — Completed 01-01-PLAN.md
+Last activity: 2026-01-12 — Completed 01-02-PLAN.md
 
-Progress: █░░░░░░░░░░░░░░░░░░ 5%
+Progress: ██░░░░░░░░░░░░░░░░░ 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
+- Total plans completed: 2
 - Average duration: 2 min
-- Total execution time: 2 min
+- Total execution time: 4 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 1 | 2 min | 2 min |
+| 01-foundation | 2 | 4 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min)
+- Last 5 plans: 01-01 (2 min), 01-02 (2 min)
 - Trend: —
 
 ## Accumulated Context
@@ -44,6 +44,8 @@ Recent decisions affecting current work:
 |-------|----------|-----------|
 | 01-01 | esbuild over webpack | Faster builds, VSCode recommended |
 | 01-01 | engine ^1.104.0 | Required for Language Model Chat Provider API |
+| 01-02 | OpenAI SDK for NEAR AI | NEAR AI is OpenAI-compatible |
+| 01-02 | Config file auth | Matches nearai CLI behavior |
 
 ### Deferred Issues
 
@@ -56,5 +58,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-12
-Stopped at: Completed 01-01-PLAN.md
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
