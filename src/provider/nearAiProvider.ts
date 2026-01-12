@@ -11,7 +11,7 @@
 import * as vscode from 'vscode';
 import OpenAI from 'openai';
 import { createNearAiClient, fetchNearAiModels } from '../client/nearAiClient';
-import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat, getApiKeyInstructions } from '../auth/nearAuth';
+import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat } from '../auth/nearAuth';
 import { convertMessages } from './messageConverter';
 import type { NearAiModel } from '../client/types';
 
@@ -88,8 +88,11 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
       maxInputTokens: model.metadata.contextLength || 32768,
       maxOutputTokens: Math.min(model.metadata.contextLength || 32768, 8192),
       tooltip: model.metadata.modelDescription || `NEAR AI: ${model.modelId}`,
+      detail: this.formatPricing(model),
       capabilities: {
-        toolCalling: false,
+        // Enable tool calling - many NEAR AI models support it
+        // This is required for models to appear in agent mode
+        toolCalling: this.supportsToolCalling(model),
         imageInput: false
       }
     }));
@@ -191,5 +194,31 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
 
     // Fallback: reverse the sanitization
     return sanitizedId.replace(/-/g, '/');
+  }
+
+  /**
+   * Format pricing info for model detail
+   */
+  private formatPricing(model: NearAiModel): string {
+    const inputCost = model.inputCostPerToken.amount / Math.pow(10, model.inputCostPerToken.scale - 6);
+    const outputCost = model.outputCostPerToken.amount / Math.pow(10, model.outputCostPerToken.scale - 6);
+    return `$${inputCost.toFixed(2)}/M input, $${outputCost.toFixed(2)}/M output`;
+  }
+
+  /**
+   * Check if model supports tool calling based on description
+   * Many NEAR AI models support function calling/tool use
+   */
+  private supportsToolCalling(model: NearAiModel): boolean {
+    const desc = model.metadata.modelDescription?.toLowerCase() || '';
+    const name = model.modelId.toLowerCase();
+    // Models that mention tool calling, function calling, or agent capabilities
+    return desc.includes('tool') ||
+           desc.includes('function call') ||
+           desc.includes('agent') ||
+           name.includes('deepseek') ||
+           name.includes('glm') ||
+           name.includes('qwen') ||
+           name.includes('gpt');
   }
 }
