@@ -16,7 +16,7 @@ None
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Extension scaffolding, NEAR AI model registration in VSCode
+- [x] **Phase 1: Foundation** - Extension scaffolding, NEAR AI model registration in VSCode
 - [ ] **Phase 1.5: Licensing** - INSERTED - NEAR license contract, Stripe subscription, x402 crypto payments
 - [ ] **Phase 2: Chat Participant** - @specflow agent with command routing
 - [ ] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01: Extension scaffolding and build setup
 - [x] 01-02: NEAR AI API client implementation
-- [ ] 01-03: VSCode Language Model provider registration
+- [x] 01-03: VSCode Language Model provider registration
 
 ### Phase 1.5: Licensing (INSERTED)
 **Goal**: Freemium license system with on-chain storage and dual payment rails (Stripe + crypto)
@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 2/3 | In progress | - |
+| 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 0/4 | Not started | - |
 | 2. Chat Participant | 0/3 | Not started | - |
 | 3. Planning Commands | 0/3 | Not started | - |
