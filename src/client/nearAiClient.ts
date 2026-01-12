@@ -1,68 +1,33 @@
 /**
- * NEAR AI Client using OpenAI SDK
+ * NEAR AI Cloud Client using OpenAI SDK
  *
- * NEAR AI provides an OpenAI-compatible API endpoint.
- * Authentication uses a JSON-stringified auth object from ~/.nearai/config.json
+ * NEAR AI Cloud provides an OpenAI-compatible API endpoint.
+ * Authentication uses standard Bearer token (API key from cloud.near.ai dashboard).
+ *
+ * API Reference: https://docs.near.ai/cloud/quickstart
  */
 
 import OpenAI from 'openai';
-import type { NearAiModel } from './types';
 
-/** NEAR AI API endpoint */
-const NEAR_AI_BASE_URL = 'https://api.near.ai/v1';
-
-/**
- * Available NEAR AI models
- *
- * Model ID format: provider::accounts/provider/models/model-name
- */
-export const NEAR_AI_MODELS: NearAiModel[] = [
-  {
-    id: 'fireworks::accounts/fireworks/models/qwen2p5-72b-instruct',
-    name: 'Qwen 2.5 72B Instruct',
-    provider: 'fireworks',
-    maxInputTokens: 32768,
-    maxOutputTokens: 4096,
-  },
-  {
-    id: 'fireworks::accounts/fireworks/models/llama-v3p1-70b-instruct',
-    name: 'Llama 3.1 70B Instruct',
-    provider: 'fireworks',
-    maxInputTokens: 131072,
-    maxOutputTokens: 4096,
-  },
-  {
-    id: 'fireworks::accounts/fireworks/models/llama-v3p1-8b-instruct',
-    name: 'Llama 3.1 8B Instruct',
-    provider: 'fireworks',
-    maxInputTokens: 131072,
-    maxOutputTokens: 4096,
-  },
-];
+/** NEAR AI Cloud API endpoint */
+const NEAR_AI_BASE_URL = 'https://cloud-api.near.ai/v1';
 
 /**
- * Create a NEAR AI client configured for the NEAR AI endpoint
+ * Create a NEAR AI client configured for the NEAR AI Cloud endpoint
  *
- * @param authSignature - JSON-stringified auth object from config file
- * @returns Configured OpenAI client pointing to NEAR AI
+ * @param apiKey - API key from cloud.near.ai dashboard (standard Bearer token)
+ * @returns Configured OpenAI client pointing to NEAR AI Cloud
  */
-export function createNearAiClient(authSignature: string): OpenAI {
+export function createNearAiClient(apiKey: string): OpenAI {
   return new OpenAI({
-    apiKey: authSignature,
+    apiKey: apiKey,
     baseURL: NEAR_AI_BASE_URL,
   });
 }
 
 /**
- * Get model by ID
+ * Get the NEAR AI Cloud base URL
  */
-export function getModelById(modelId: string): NearAiModel | undefined {
-  return NEAR_AI_MODELS.find((model) => model.id === modelId);
-}
-
-/**
- * Get default model
- */
-export function getDefaultModel(): NearAiModel {
-  return NEAR_AI_MODELS[0];
+export function getNearAiBaseUrl(): string {
+  return NEAR_AI_BASE_URL;
 }

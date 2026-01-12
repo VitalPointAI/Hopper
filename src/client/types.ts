@@ -1,32 +1,49 @@
 /**
- * Type definitions for NEAR AI client
+ * Type definitions for NEAR AI Cloud client
  */
 
 /**
- * Structure of ~/.nearai/config.json
+ * Token cost from NEAR AI API
  */
-export interface NearAiConfig {
-  auth: {
-    account_id: string;
-    public_key: string;
-    signature: string;
-    // May have additional fields like message, nonce, recipient
-    [key: string]: unknown;
-  };
+export interface TokenCost {
+  amount: number;
+  scale: number;
+  currency: string;
 }
 
 /**
- * NEAR AI model definition
+ * Model metadata from NEAR AI API /v1/model/list endpoint
+ */
+export interface NearAiModelMetadata {
+  modelDisplayName: string;
+  modelDescription: string;
+  contextLength: number;
+  verifiable: boolean;
+  modelIcon?: string;
+  ownedBy: string;
+  aliases?: string[];
+}
+
+/**
+ * NEAR AI model definition from /v1/model/list API response
  */
 export interface NearAiModel {
-  /** Full model ID, e.g., "fireworks::accounts/fireworks/models/qwen2p5-72b-instruct" */
-  id: string;
-  /** Display name for UI */
-  name: string;
-  /** Provider name, e.g., "fireworks" */
-  provider: string;
-  /** Maximum input tokens supported */
-  maxInputTokens: number;
-  /** Maximum output tokens supported */
-  maxOutputTokens: number;
+  /** Model ID, e.g., "deepseek-ai/DeepSeek-V3.1" */
+  modelId: string;
+  /** Cost per input token */
+  inputCostPerToken: TokenCost;
+  /** Cost per output token */
+  outputCostPerToken: TokenCost;
+  /** Model metadata */
+  metadata: NearAiModelMetadata;
+}
+
+/**
+ * Response from /v1/model/list endpoint
+ */
+export interface NearAiModelsResponse {
+  models?: NearAiModel[];
+  limit?: number;
+  offset?: number;
+  total?: number;
 }
