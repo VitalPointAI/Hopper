@@ -6,9 +6,18 @@
 
 ## Open Issues
 
-[None]
-
 ## Resolved Issues
+
+### UAT-004: fetchNearAiModels requires apiKey but endpoint is public
+
+**Discovered:** 2026-01-12
+**Resolved:** 2026-01-12 (quick fix)
+**Phase/Plan:** 01-02-FIX
+**Severity:** Minor
+**Feature:** NEAR AI client module (fetchNearAiModels function)
+**Description:** The `fetchNearAiModels(apiKey: string)` function requires an API key parameter and sends a Bearer token header, but the `/v1/model/list` endpoint is actually public and returns data without authentication.
+**Resolution:** Removed apiKey parameter and Authorization header from fetchNearAiModels()
+**Commit:** ef8b44d
 
 ### UAT-001: Auth module uses wrong authentication method
 
