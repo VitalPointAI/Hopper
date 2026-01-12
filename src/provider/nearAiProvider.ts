@@ -108,6 +108,32 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
     progress: vscode.Progress<vscode.LanguageModelResponsePart>,
     token: vscode.CancellationToken
   ): Promise<void> {
+    // Check if API key is configured - prompt user if not
+    const isConfigured = await this.isApiKeyConfigured();
+    if (!isConfigured) {
+      const action = await vscode.window.showWarningMessage(
+        'NEAR AI API key required to use this model.',
+        'Set Up API Key',
+        'Get API Key'
+      );
+
+      if (action === 'Set Up API Key') {
+        await vscode.commands.executeCommand('specflow.manageNearAi');
+      } else if (action === 'Get API Key') {
+        await vscode.env.openExternal(vscode.Uri.parse('https://cloud.near.ai/'));
+      }
+
+      // Return a helpful message instead of throwing
+      progress.report(new vscode.LanguageModelTextPart(
+        '⚠️ **NEAR AI API key not configured.**\n\n' +
+        'To use NEAR AI models:\n' +
+        '1. Run command: `SpecFlow: Manage NEAR AI Connection`\n' +
+        '2. Or get an API key at [cloud.near.ai](https://cloud.near.ai/)\n\n' +
+        '_After setting up your API key, try your request again._'
+      ));
+      return;
+    }
+
     const client = await this.getClient();
     const convertedMessages = convertMessages(messages);
 
