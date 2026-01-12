@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: TBD
 
 Plans:
-- [ ] 01-01: Extension scaffolding and build setup
+- [x] 01-01: Extension scaffolding and build setup
 - [ ] 01-02: NEAR AI API client implementation
 - [ ] 01-03: VSCode Language Model provider registration
 
@@ -102,7 +102,7 @@ Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/3 | Not started | - |
+| 1. Foundation | 1/3 | In progress | - |
 | 1.5 Licensing | 0/4 | Not started | - |
 | 2. Chat Participant | 0/3 | Not started | - |
 | 3. Planning Commands | 0/3 | Not started | - |
