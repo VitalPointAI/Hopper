@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from './types';
+import { handleScheduled } from './handlers/cron-handler';
 
 // Create Hono app with typed Env
 const app = new Hono<{ Bindings: Env }>();
@@ -104,5 +105,11 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal Server Error' }, 500);
 });
 
-// Export for Cloudflare Workers
-export default app;
+// Export for Cloudflare Workers with scheduled handler
+export default {
+  fetch: app.fetch,
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    const result = await handleScheduled(event, env, ctx);
+    console.log('Cron summary:', JSON.stringify(result));
+  },
+};
