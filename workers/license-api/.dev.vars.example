@@ -8,5 +8,10 @@ NEAR_PRIVATE_KEY=ed25519:xxx
 LICENSE_CONTRACT_ID=license.specflow.near
 NEAR_NETWORK=testnet
 
+# NEAR RPC URL (optional override)
+# Default in wrangler.toml: https://rpc.mainnet.near.org
+# For testnet, uncomment and use:
+# NEAR_RPC_URL=https://rpc.testnet.fastnear.com
+
 # Note: These are development values
 # For production, use wrangler secret put <NAME>
