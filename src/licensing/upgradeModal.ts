@@ -87,6 +87,8 @@ export class UpgradeModalPanel {
     const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://license-api.specflow.workers.dev';
 
     try {
+      vscode.window.showInformationMessage('Starting Stripe checkout...');
+
       const response = await fetch(`${apiUrl}/api/checkout`, {
         method: 'POST',
         headers: {
@@ -105,8 +107,10 @@ export class UpgradeModalPanel {
       const data = await response.json() as { url: string };
       await vscode.env.openExternal(vscode.Uri.parse(data.url));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Stripe checkout error:', errorMessage);
       vscode.window.showErrorMessage(
-        `Failed to start checkout: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to start checkout: ${errorMessage}. Make sure the license API is deployed.`
       );
     }
   }
@@ -119,6 +123,8 @@ export class UpgradeModalPanel {
     const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://license-api.specflow.workers.dev';
 
     try {
+      vscode.window.showInformationMessage('Starting crypto checkout...');
+
       const response = await fetch(`${apiUrl}/api/crypto-checkout`, {
         method: 'POST',
         headers: {
@@ -137,8 +143,10 @@ export class UpgradeModalPanel {
       const data = await response.json() as { url: string };
       await vscode.env.openExternal(vscode.Uri.parse(data.url));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Crypto checkout error:', errorMessage);
       vscode.window.showErrorMessage(
-        `Failed to start crypto checkout: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to start crypto checkout: ${errorMessage}. Make sure the license API is deployed.`
       );
     }
   }
@@ -380,7 +388,7 @@ export class UpgradeModalPanel {
   <div class="container">
     <div class="header">
       <h1>Upgrade to SpecFlow Pro</h1>
-      <p>Unlock unlimited phases and the full GSD workflow</p>
+      <p>Unlock unlimited phases and the full SpecFlow workflow</p>
     </div>
 
     <div class="account-info">
@@ -392,7 +400,7 @@ export class UpgradeModalPanel {
         <div class="card-header">
           <div class="card-title">Credit Card</div>
           <div class="card-subtitle">Pay with Stripe</div>
-          <div class="price">$10</div>
+          <div class="price">$5</div>
           <div class="price-period">per month</div>
         </div>
         <div class="features">
@@ -402,7 +410,7 @@ export class UpgradeModalPanel {
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
-            <span>Full GSD workflow</span>
+            <span>Full SpecFlow workflow</span>
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
@@ -423,7 +431,7 @@ export class UpgradeModalPanel {
         <div class="card-header">
           <div class="card-title">Crypto</div>
           <div class="card-subtitle">Pay with NEAR or USDC</div>
-          <div class="price">$8</div>
+          <div class="price">$4</div>
           <div class="price-period">per month</div>
           <div class="discount">20% OFF</div>
         </div>
@@ -434,7 +442,7 @@ export class UpgradeModalPanel {
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
-            <span>Full GSD workflow</span>
+            <span>Full SpecFlow workflow</span>
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
