@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import { NearAiChatModelProvider } from './provider/nearAiProvider';
 import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat, getApiKeyInstructions } from './auth/nearAuth';
+import { LicenseValidator } from './licensing/validator';
+import { checkPhaseAccess, showUpgradeModal } from './licensing/phaseGate';
+
+// Export license validator for use by chat participant
+let licenseValidator: LicenseValidator | undefined;
 
 /**
  * Called when the extension is activated.
@@ -8,6 +13,9 @@ import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat, getApiKeyInstructions } fr
  */
 export function activate(context: vscode.ExtensionContext): void {
   console.log('SpecFlow extension activated');
+
+  // Initialize license validator
+  licenseValidator = new LicenseValidator(context);
 
   // Create and register the NEAR AI language model provider
   const provider = new NearAiChatModelProvider(context);
@@ -46,6 +54,17 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
   context.subscriptions.push(manageCommand);
+
+  // Register the upgrade modal command
+  const upgradeCommand = vscode.commands.registerCommand(
+    'specflow.showUpgradeModal',
+    async () => {
+      if (licenseValidator) {
+        await showUpgradeModal(licenseValidator, context);
+      }
+    }
+  );
+  context.subscriptions.push(upgradeCommand);
 }
 
 /**
@@ -104,3 +123,32 @@ async function promptForApiKey(
 export function deactivate(): void {
   // Cleanup handled by disposables
 }
+
+/**
+ * Get the license validator instance
+ * For use by chat participant to check phase access
+ */
+export function getLicenseValidator(): LicenseValidator | undefined {
+  return licenseValidator;
+}
+
+/**
+ * Check if user has access to a specific phase
+ * Convenience export for chat participant integration
+ *
+ * @param phaseNumber - Phase to check access for (1 is always free, 2+ requires license)
+ * @param context - Extension context for showing upgrade modal
+ */
+export async function checkPhaseAccessFromExtension(
+  phaseNumber: number,
+  context: vscode.ExtensionContext
+): Promise<boolean> {
+  if (!licenseValidator) {
+    console.error('License validator not initialized');
+    return false;
+  }
+  return checkPhaseAccess(phaseNumber, licenseValidator, context);
+}
+
+// Re-export checkPhaseAccess for direct import
+export { checkPhaseAccess } from './licensing/phaseGate';

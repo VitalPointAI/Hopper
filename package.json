@@ -27,6 +27,11 @@
         "command": "specflow.manageNearAi",
         "title": "Manage NEAR AI Connection",
         "category": "SpecFlow"
+      },
+      {
+        "command": "specflow.showUpgradeModal",
+        "title": "Upgrade to Pro",
+        "category": "SpecFlow"
       }
     ],
     "configuration": {
@@ -42,6 +47,16 @@
           "enum": ["mainnet", "testnet"],
           "default": "mainnet",
           "description": "NEAR network for license contract"
+        },
+        "specflow.nearAccountId": {
+          "type": "string",
+          "default": "",
+          "description": "Your NEAR account ID for license lookup (e.g., myaccount.near)"
+        },
+        "specflow.licenseApiUrl": {
+          "type": "string",
+          "default": "https://license-api.specflow.workers.dev",
+          "description": "License API URL for checkout endpoints"
         }
       }
     }
