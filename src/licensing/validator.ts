@@ -162,19 +162,11 @@ export class LicenseValidator {
   }
 
   /**
-   * Get the NEAR account ID (authenticated or from settings as fallback)
-   * Prefers authenticated account over settings
-   * @returns NEAR account ID or undefined if not available
+   * Get the authenticated NEAR account ID
+   * @returns NEAR account ID or undefined if not authenticated
    */
   getNearAccountId(): string | undefined {
-    // Prefer authenticated account
-    const authAccount = this.walletAuth.getAccountId();
-    if (authAccount) {
-      return authAccount;
-    }
-    // Fallback to settings (for upgrade modal before auth)
-    const config = vscode.workspace.getConfiguration('specflow');
-    return config.get<string>('nearAccountId');
+    return this.walletAuth.getAccountId();
   }
 
   /**

@@ -58,11 +58,6 @@
           "default": "mainnet",
           "description": "NEAR network for license contract"
         },
-        "specflow.nearAccountId": {
-          "type": "string",
-          "default": "",
-          "description": "Your NEAR account ID for license lookup (e.g., myaccount.near)"
-        },
         "specflow.licenseApiUrl": {
           "type": "string",
           "default": "https://license-api.specflow.workers.dev",

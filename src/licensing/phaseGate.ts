@@ -91,7 +91,7 @@ export async function showUpgradeModal(
   validator: LicenseValidator,
   context: vscode.ExtensionContext
 ): Promise<void> {
-  // If authenticated, use that account
+  // Must be authenticated to show upgrade modal
   if (validator.isAuthenticated()) {
     const accountId = validator.getAuthenticatedAccountId();
     if (accountId) {
@@ -100,26 +100,17 @@ export async function showUpgradeModal(
     }
   }
 
-  // Not authenticated - prompt to connect wallet or use settings fallback
-  const nearAccountId = validator.getNearAccountId();
+  // Not authenticated - prompt to connect wallet
+  const action = await vscode.window.showWarningMessage(
+    'Please connect your NEAR wallet to view upgrade options.',
+    'Connect Wallet',
+    'Learn More'
+  );
 
-  if (nearAccountId) {
-    // Has account in settings, but not authenticated
-    // Show modal with that account, but note they need to authenticate after purchase
-    UpgradeModalPanel.show(context, nearAccountId);
-  } else {
-    // No account at all
-    const action = await vscode.window.showWarningMessage(
-      'Please connect your NEAR wallet or configure your account ID.',
-      'Connect Wallet',
-      'Configure Account ID'
-    );
-
-    if (action === 'Connect Wallet') {
-      await validator.startAuth();
-    } else if (action === 'Configure Account ID') {
-      await vscode.commands.executeCommand('workbench.action.openSettings', 'specflow.nearAccountId');
-    }
+  if (action === 'Connect Wallet') {
+    await validator.startAuth();
+  } else if (action === 'Learn More') {
+    await vscode.env.openExternal(vscode.Uri.parse('https://specflow.dev/pro'));
   }
 }
 
