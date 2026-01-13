@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 1.5 of 5 (Licensing)
-Plan: 2 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-13 — Completed 01.5-02-PLAN.md
+Last activity: 2026-01-13 — Completed 01.5-03-PLAN.md
 
-Progress: █████░░░░░░░░░░░░░░ 26%
+Progress: ███████░░░░░░░░░░░░ 35%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 5.2 min
-- Total execution time: 31 min
+- Total plans completed: 7
+- Average duration: 8.0 min
+- Total execution time: 56 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 4 | 15 min | 3.8 min |
-| 01.5-licensing | 2 | 22 min | 11 min |
+| 01.5-licensing | 3 | 47 min | 15.7 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (2 min), 01-02-FIX (3 min), 01-03 (8 min), 01.5-01 (4 min), 01.5-02 (9 min)
+- Last 5 plans: 01-02-FIX (3 min), 01-03 (8 min), 01.5-01 (4 min), 01.5-02 (9 min), 01.5-03 (25 min)
 - Trend: —
 
 ## Accumulated Context
@@ -55,6 +55,8 @@ Recent decisions affecting current work:
 | 01.5-02 | Cloudflare Workers + Hono | Auditable serverless, globally distributed, edge-native |
 | 01.5-02 | Direct NEAR JSON-RPC | near-api-js incompatible with Workers edge runtime |
 | 01.5-02 | KV for idempotency/state | Fast lookups, TTL for automatic cleanup |
+| 01.5-03 | ANY_INPUT swap for recurring payments | NEAR Intents SDK lacks subscription pre-auth |
+| 01.5-03 | Date-indexed KV storage | Efficient cron queries without full scan |
 
 ### Deferred Issues
 
@@ -67,5 +69,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-13
-Stopped at: Completed 01.5-02-PLAN.md
+Stopped at: Completed 01.5-03-PLAN.md
 Resume file: None
