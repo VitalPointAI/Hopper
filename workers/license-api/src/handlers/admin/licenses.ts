@@ -5,6 +5,7 @@
 
 import type { Context } from 'hono';
 import type { Env, SubscriptionRecord, CryptoSubscription } from '../../types';
+import { licensesFragment } from './ui';
 
 interface LicenseInfo {
   nearAccountId: string;
@@ -155,6 +156,13 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
           contractLicense,
         });
       }
+    }
+
+    // Check if request is from htmx
+    const isHtmx = c.req.header('HX-Request') === 'true';
+
+    if (isHtmx) {
+      return c.html(licensesFragment(licenses));
     }
 
     return c.json({

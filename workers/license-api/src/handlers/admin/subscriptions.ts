@@ -5,6 +5,7 @@
 
 import type { Context } from 'hono';
 import type { Env, SubscriptionRecord, CryptoSubscription } from '../../types';
+import { subscriptionsFragment } from './ui';
 
 interface SubscriptionInfo {
   nearAccountId: string;
@@ -120,6 +121,25 @@ export async function handleAdminSubscriptions(
     subscriptions.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+
+    // Check if request is from htmx
+    const isHtmx = c.req.header('HX-Request') === 'true';
+
+    if (isHtmx) {
+      // Transform to format expected by fragment
+      const fragmentData = subscriptions.map((sub) => ({
+        nearAccountId: sub.nearAccountId,
+        type: sub.type,
+        status: sub.status,
+        nextChargeDate:
+          sub.type === 'crypto'
+            ? sub.nextCharge || null
+            : sub.currentPeriodEnd
+              ? new Date(sub.currentPeriodEnd * 1000).toISOString()
+              : null,
+      }));
+      return c.html(subscriptionsFragment(fragmentData));
+    }
 
     return c.json({
       success: true,

@@ -193,6 +193,50 @@ adminApi.post('/subscriptions/cancel', async (c) => {
 // Mount admin API router
 app.route('/admin/api', adminApi);
 
+// ============================================================================
+// Admin UI Routes (public pages - auth handled client-side via localStorage JWT)
+// ============================================================================
+
+/**
+ * Admin root redirect
+ */
+app.get('/admin', async (c) => {
+  const { handleAdminRoot } = await import('./handlers/admin/ui');
+  return handleAdminRoot(c);
+});
+
+/**
+ * Admin login page
+ */
+app.get('/admin/login', async (c) => {
+  const { handleAdminLogin } = await import('./handlers/admin/ui');
+  return handleAdminLogin(c);
+});
+
+/**
+ * Admin dashboard page
+ */
+app.get('/admin/dashboard', async (c) => {
+  const { handleAdminDashboard } = await import('./handlers/admin/ui');
+  return handleAdminDashboard(c);
+});
+
+/**
+ * Admin licenses page
+ */
+app.get('/admin/licenses', async (c) => {
+  const { handleAdminLicensesPage } = await import('./handlers/admin/ui');
+  return handleAdminLicensesPage(c);
+});
+
+/**
+ * Admin subscriptions page
+ */
+app.get('/admin/subscriptions', async (c) => {
+  const { handleAdminSubscriptionsPage } = await import('./handlers/admin/ui');
+  return handleAdminSubscriptionsPage(c);
+});
+
 // 404 handler
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, 404);
