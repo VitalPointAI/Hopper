@@ -2,9 +2,15 @@ name = "specflow-license-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
+# Cron Triggers for recurring subscription processing
+# Runs daily at 6 AM UTC to process due crypto subscriptions
+[triggers]
+crons = ["0 6 * * *"]
+
 # KV Namespace bindings
 # Create with: wrangler kv:namespace create "PROCESSED_EVENTS"
 # Create with: wrangler kv:namespace create "SUBSCRIPTIONS"
+# Create with: wrangler kv:namespace create "CRYPTO_SUBSCRIPTIONS"
 # Note: For production, replace these placeholder IDs with actual KV namespace IDs
 [[kv_namespaces]]
 binding = "PROCESSED_EVENTS"
@@ -16,10 +22,18 @@ binding = "SUBSCRIPTIONS"
 id = "placeholder_subscriptions_id"
 preview_id = "preview_subscriptions_id"
 
+[[kv_namespaces]]
+binding = "CRYPTO_SUBSCRIPTIONS"
+id = "placeholder_crypto_subscriptions_id"
+preview_id = "preview_crypto_subscriptions_id"
+
 # Environment variables (non-secret)
 [vars]
 NEAR_RPC_URL = "https://rpc.mainnet.fastnear.com"
 LICENSE_DURATION_DAYS = "30"
+CRYPTO_MONTHLY_USD = "4.00"
+NEAR_INTENTS_API_URL = "https://1click.chaindefuser.com"
+SETTLEMENT_ACCOUNT = "vitalpointai.near"
 
 # Secrets (set with: wrangler secret put <NAME>)
 # STRIPE_SECRET_KEY - Stripe API key
@@ -29,3 +43,4 @@ LICENSE_DURATION_DAYS = "30"
 # LICENSE_CONTRACT_ID - NEAR contract account ID (e.g., license.specflow.near)
 # NEAR_NETWORK - "mainnet" or "testnet"
 # FASTNEAR_API_KEY - FastNEAR API key for RPC access
+# NEAR_INTENTS_API_KEY - NEAR Intents 1Click API key for subscription processing

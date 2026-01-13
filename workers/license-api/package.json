@@ -9,10 +9,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@defuse-protocol/one-click-sdk-typescript": "^0.1.15",
     "@near-js/crypto": "^2.5.1",
     "@near-js/signers": "^2.5.1",
     "@near-js/transactions": "^2.5.1",
     "@noble/ed25519": "^3.0.0",
+    "@x402/core": "^2.2.0",
     "borsh": "^2.0.0",
     "hono": "^4.6.0",
     "stripe": "^17.0.0"
