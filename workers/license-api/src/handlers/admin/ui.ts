@@ -110,7 +110,7 @@ function navHeader(activePage: string): string {
 
 /**
  * Login page HTML
- * Uses Meteor Wallet for NEAR authentication
+ * Uses Meteor Wallet's injected provider for NEAR authentication
  */
 export function loginPage(): string {
   const content = `
@@ -121,17 +121,17 @@ export function loginPage(): string {
           Admin Login
         </h2>
         <p class="mt-2 text-center text-sm text-gray-600">
-          Connect with Meteor Wallet to authenticate
+          Sign in with your NEAR wallet
         </p>
       </div>
 
       <div id="login-container">
-        <!-- Initial State: Connect Wallet -->
+        <!-- Initial State: Login Button -->
         <div id="step-connect" class="space-y-4">
           <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h3 class="text-sm font-medium text-blue-800">Connect Your Wallet</h3>
+            <h3 class="text-sm font-medium text-blue-800">Wallet Authentication</h3>
             <p class="mt-1 text-sm text-blue-700">
-              Click the button below to connect with Meteor Wallet and sign the authentication challenge.
+              Click Login to connect your Meteor Wallet and sign an authentication challenge.
             </p>
           </div>
           <button
@@ -141,7 +141,7 @@ export function loginPage(): string {
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
             </svg>
-            Connect with Meteor Wallet
+            Login
           </button>
           <p class="text-xs text-center text-gray-500">
             Don't have Meteor Wallet? <a href="https://meteorwallet.app" target="_blank" class="text-indigo-600 hover:text-indigo-500">Get it here</a>
@@ -153,8 +153,8 @@ export function loginPage(): string {
           <div class="flex justify-center py-8">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
-          <p class="text-center text-sm text-gray-600">
-            Please sign the message in your Meteor Wallet...
+          <p class="text-center text-sm text-gray-600" id="signing-message">
+            Connecting to wallet...
           </p>
         </div>
 
@@ -174,56 +174,80 @@ export function loginPage(): string {
     </div>
   </div>
 
-  <!-- NEAR Wallet Selector -->
-  <script src="https://cdn.jsdelivr.net/npm/@near-wallet-selector/core@8.9.13/lib/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@8.9.13/lib/index.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@near-wallet-selector/meteor-wallet@8.9.13/lib/index.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@8.9.13/lib/styles.css">
-
-  <script type="module">
-    // Import from CDN modules
-    import { setupWalletSelector } from 'https://cdn.jsdelivr.net/npm/@near-wallet-selector/core@8.9.13/+esm';
-    import { setupModal } from 'https://cdn.jsdelivr.net/npm/@near-wallet-selector/modal-ui@8.9.13/+esm';
-    import { setupMeteorWallet } from 'https://cdn.jsdelivr.net/npm/@near-wallet-selector/meteor-wallet@8.9.13/+esm';
-
-    let selector = null;
-    let modal = null;
-    let currentChallenge = '';
-
-    // Initialize wallet selector
-    async function initWalletSelector() {
-      try {
-        selector = await setupWalletSelector({
-          network: 'testnet',
-          modules: [
-            setupMeteorWallet(),
-          ],
-        });
-
-        modal = setupModal(selector, {
-          contractId: 'specflow-license.testnet',
-          description: 'Sign in to SpecFlow Admin Dashboard',
-        });
-
-        // Listen for sign in
-        selector.on('signedIn', handleSignIn);
-
-        return true;
-      } catch (err) {
-        console.error('Failed to initialize wallet selector:', err);
-        return false;
+  <script>
+    // Detect Meteor Wallet injected provider
+    function getMeteorWallet() {
+      // Meteor Wallet injects window.meteorWallet
+      if (window.meteorWallet) {
+        return window.meteorWallet;
       }
+      // Also check window.near for compatibility
+      if (window.near && window.near.isMeteorWallet) {
+        return window.near;
+      }
+      return null;
     }
 
-    // Handle wallet connection and signing
-    async function handleSignIn() {
-      const accounts = selector.store.getState().accounts;
-      if (accounts.length === 0) return;
+    // Wait for wallet to be injected (with timeout)
+    async function waitForWallet(timeout = 3000) {
+      const start = Date.now();
+      while (Date.now() - start < timeout) {
+        const wallet = getMeteorWallet();
+        if (wallet) return wallet;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      return null;
+    }
 
-      const accountId = accounts[0].accountId;
+    // Main login flow
+    async function handleLogin() {
       showStep('signing');
+      setSigningMessage('Looking for Meteor Wallet...');
 
       try {
+        // Check for Meteor Wallet
+        const wallet = await waitForWallet();
+
+        if (!wallet) {
+          throw new Error('Meteor Wallet not detected. Please install Meteor Wallet extension and refresh the page.');
+        }
+
+        setSigningMessage('Connecting to Meteor Wallet...');
+
+        // Request connection if not already connected
+        let accountId;
+        try {
+          // Try to get current account
+          const accounts = await wallet.getAccounts();
+          if (accounts && accounts.length > 0) {
+            accountId = accounts[0].accountId;
+          }
+        } catch {
+          // Not connected yet
+        }
+
+        if (!accountId) {
+          // Request connection
+          const result = await wallet.requestSignIn({
+            contractId: 'specflow-license.testnet',
+          });
+          if (result && result.accountId) {
+            accountId = result.accountId;
+          } else {
+            // Try getting accounts again after sign in
+            const accounts = await wallet.getAccounts();
+            if (accounts && accounts.length > 0) {
+              accountId = accounts[0].accountId;
+            }
+          }
+        }
+
+        if (!accountId) {
+          throw new Error('Failed to connect wallet. Please try again.');
+        }
+
+        setSigningMessage('Getting authentication challenge...');
+
         // Get challenge from server
         const challengeResponse = await fetch('/admin/auth/challenge');
         const challengeData = await challengeResponse.json();
@@ -231,32 +255,35 @@ export function loginPage(): string {
         if (!challengeData.challenge) {
           throw new Error('Failed to get challenge from server');
         }
-        currentChallenge = challengeData.challenge;
 
-        // Get the wallet and sign the message
-        const wallet = await selector.wallet();
+        setSigningMessage('Please sign the message in your wallet...');
 
-        // Sign message using NEP-413
+        // Create nonce for NEP-413
         const nonce = new Uint8Array(32);
         crypto.getRandomValues(nonce);
-        const nonceBase64 = btoa(String.fromCharCode(...nonce));
 
-        const signedMessage = await wallet.signMessage({
-          message: currentChallenge,
-          nonce: nonce,
+        // Sign the message
+        const signResult = await wallet.signMessage({
+          message: challengeData.challenge,
           recipient: 'specflow-admin',
+          nonce: Array.from(nonce),
         });
+
+        if (!signResult || !signResult.signature) {
+          throw new Error('Signing was cancelled or failed');
+        }
+
+        setSigningMessage('Verifying signature...');
 
         // Submit to server for verification
         const verifyResponse = await fetch('/admin/auth/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            nearAccountId: accountId,
-            signature: signedMessage.signature,
-            publicKey: signedMessage.publicKey,
-            message: currentChallenge,
-            nonce: nonceBase64,
+            nearAccountId: signResult.accountId || accountId,
+            signature: signResult.signature,
+            publicKey: signResult.publicKey,
+            message: challengeData.challenge,
           })
         });
 
@@ -272,40 +299,10 @@ export function loginPage(): string {
           throw new Error(verifyData.error || 'Verification failed');
         }
       } catch (err) {
-        console.error('Sign in error:', err);
+        console.error('Login error:', err);
         showError(err.message || 'Failed to authenticate');
-
-        // Sign out on error
-        try {
-          const wallet = await selector.wallet();
-          await wallet.signOut();
-        } catch {}
       }
     }
-
-    // Connect wallet button handler
-    document.getElementById('connect-wallet-btn').addEventListener('click', async function() {
-      if (!selector) {
-        const initialized = await initWalletSelector();
-        if (!initialized) {
-          showError('Failed to initialize wallet. Please refresh and try again.');
-          return;
-        }
-      }
-
-      // Check if already signed in
-      const accounts = selector.store.getState().accounts;
-      if (accounts.length > 0) {
-        await handleSignIn();
-      } else {
-        modal.show();
-      }
-    });
-
-    // Retry button handler
-    document.getElementById('retry-btn').addEventListener('click', function() {
-      showStep('connect');
-    });
 
     // UI helpers
     function showStep(step) {
@@ -327,6 +324,10 @@ export function loginPage(): string {
       }
     }
 
+    function setSigningMessage(msg) {
+      document.getElementById('signing-message').textContent = msg;
+    }
+
     function showError(message) {
       document.getElementById('error-message').textContent = message;
       document.getElementById('step-connect').classList.add('hidden');
@@ -334,8 +335,11 @@ export function loginPage(): string {
       document.getElementById('error-display').classList.remove('hidden');
     }
 
-    // Initialize on load
-    initWalletSelector();
+    // Event handlers
+    document.getElementById('connect-wallet-btn').addEventListener('click', handleLogin);
+    document.getElementById('retry-btn').addEventListener('click', function() {
+      showStep('connect');
+    });
   </script>`;
 
   return baseLayout('Login', content, false);
