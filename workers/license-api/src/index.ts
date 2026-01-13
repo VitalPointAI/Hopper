@@ -174,6 +174,22 @@ adminApi.get('/subscriptions', async (c) => {
   return handleAdminSubscriptions(c);
 });
 
+// Admin action endpoints
+adminApi.post('/licenses/grant', async (c) => {
+  const { handleAdminGrantLicense } = await import('./handlers/admin/actions');
+  return handleAdminGrantLicense(c);
+});
+
+adminApi.post('/licenses/revoke', async (c) => {
+  const { handleAdminRevokeLicense } = await import('./handlers/admin/actions');
+  return handleAdminRevokeLicense(c);
+});
+
+adminApi.post('/subscriptions/cancel', async (c) => {
+  const { handleAdminCancelSubscription } = await import('./handlers/admin/actions');
+  return handleAdminCancelSubscription(c);
+});
+
 // Mount admin API router
 app.route('/admin/api', adminApi);
 
