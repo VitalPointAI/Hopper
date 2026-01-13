@@ -57,6 +57,42 @@ app.get('/api/subscription/status', async (c) => {
   return handleGetSubscriptionStatus(c);
 });
 
+/**
+ * Create crypto subscription with NEAR Intents
+ * Body: { nearAccountId: string, billingDay?: number }
+ */
+app.post('/api/crypto/subscribe', async (c) => {
+  const { handleCryptoSubscribe } = await import('./handlers/crypto-subscribe');
+  return handleCryptoSubscribe(c);
+});
+
+/**
+ * Confirm crypto subscription after first payment
+ * Body: { intentId: string }
+ */
+app.post('/api/crypto/subscribe/confirm', async (c) => {
+  const { handleCryptoSubscribeConfirm } = await import('./handlers/crypto-subscribe');
+  return handleCryptoSubscribeConfirm(c);
+});
+
+/**
+ * Get crypto subscription status
+ * Query: ?nearAccountId=xxx
+ */
+app.get('/api/crypto/subscription/status', async (c) => {
+  const { handleCryptoSubscriptionStatus } = await import('./handlers/crypto-subscribe');
+  return handleCryptoSubscriptionStatus(c);
+});
+
+/**
+ * Cancel crypto subscription
+ * Body: { nearAccountId: string }
+ */
+app.post('/api/crypto/subscription/cancel', async (c) => {
+  const { handleCryptoSubscriptionCancel } = await import('./handlers/crypto-subscribe');
+  return handleCryptoSubscriptionCancel(c);
+});
+
 // 404 handler
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, 404);
