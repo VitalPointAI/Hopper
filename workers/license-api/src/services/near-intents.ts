@@ -14,10 +14,10 @@
 import { OneClickService, OpenAPI, QuoteRequest, QuoteResponse, GetExecutionStatusResponse } from '@defuse-protocol/one-click-sdk-typescript';
 import type { Env } from '../types';
 
-// USDC on NEAR for settlement
-const USDC_NEAR_ASSET_ID = 'near:mainnet:usdc.tether-token.near';
-// USDC on Base (common source for crypto payments)
-const USDC_BASE_ASSET_ID = 'base:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+// USDC on NEAR for settlement (NEP-141 format required by 1Click API)
+const USDC_NEAR_ASSET_ID = 'nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
+// USDC on Base (common source for crypto payments, NEP-141 bridged format)
+const USDC_BASE_ASSET_ID = 'nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near';
 
 /**
  * Configure the 1Click API with the provided environment
