@@ -9,6 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@near-js/crypto": "^2.5.1",
+    "@near-js/signers": "^2.5.1",
+    "@near-js/transactions": "^2.5.1",
+    "@noble/ed25519": "^3.0.0",
+    "borsh": "^2.0.0",
     "hono": "^4.6.0",
     "stripe": "^17.0.0"
   },
