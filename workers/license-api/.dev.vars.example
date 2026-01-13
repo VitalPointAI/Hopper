@@ -1,0 +1,12 @@
+# Stripe configuration
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_ID=price_xxx
+
+# NEAR configuration
+NEAR_PRIVATE_KEY=ed25519:xxx
+LICENSE_CONTRACT_ID=license.specflow.near
+NEAR_NETWORK=testnet
+
+# Note: These are development values
+# For production, use wrangler secret put <NAME>
