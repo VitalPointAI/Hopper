@@ -67,7 +67,7 @@ export async function createSubscriptionIntent(
     swapType: QuoteRequest.swapType.ANY_INPUT,
     slippageTolerance: 100, // 1%
     originAsset: USDC_BASE_ASSET_ID, // Accept USDC from Base
-    depositType: QuoteRequest.depositType.ORIGIN_CHAIN,
+    depositType: QuoteRequest.depositType.INTENTS,
     destinationAsset: USDC_NEAR_ASSET_ID, // Settle as USDC on NEAR
     amount: usdcAmount,
     refundTo: nearAccountId, // Refund to user's NEAR account
