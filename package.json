@@ -32,6 +32,16 @@
         "command": "specflow.showUpgradeModal",
         "title": "Upgrade to Pro",
         "category": "SpecFlow"
+      },
+      {
+        "command": "specflow.connectWallet",
+        "title": "Connect NEAR Wallet",
+        "category": "SpecFlow"
+      },
+      {
+        "command": "specflow.disconnectWallet",
+        "title": "Disconnect Wallet",
+        "category": "SpecFlow"
       }
     ],
     "configuration": {

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { NearAiChatModelProvider } from './provider/nearAiProvider';
 import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat, getApiKeyInstructions } from './auth/nearAuth';
 import { LicenseValidator } from './licensing/validator';
-import { checkPhaseAccess, showUpgradeModal } from './licensing/phaseGate';
+import { checkPhaseAccess, showUpgradeModal, connectWallet, disconnectWallet } from './licensing/phaseGate';
 
 // Export license validator for use by chat participant
 let licenseValidator: LicenseValidator | undefined;
@@ -65,6 +65,61 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
   context.subscriptions.push(upgradeCommand);
+
+  // Register connect wallet command
+  const connectCommand = vscode.commands.registerCommand(
+    'specflow.connectWallet',
+    async () => {
+      if (licenseValidator) {
+        await connectWallet(licenseValidator);
+      }
+    }
+  );
+  context.subscriptions.push(connectCommand);
+
+  // Register disconnect wallet command
+  const disconnectCommand = vscode.commands.registerCommand(
+    'specflow.disconnectWallet',
+    async () => {
+      if (licenseValidator) {
+        await disconnectWallet(licenseValidator);
+      }
+    }
+  );
+  context.subscriptions.push(disconnectCommand);
+
+  // Register URI handler for wallet auth callback
+  const uriHandler = vscode.window.registerUriHandler({
+    handleUri: async (uri: vscode.Uri) => {
+      console.log('Received URI callback:', uri.toString());
+
+      if (uri.path === '/auth-callback') {
+        // Parse query parameters
+        const params = new URLSearchParams(uri.query);
+        const accountId = params.get('account_id');
+        const signature = params.get('signature');
+        const publicKey = params.get('public_key');
+
+        if (accountId && signature && publicKey && licenseValidator) {
+          const success = await licenseValidator.handleAuthCallback(
+            accountId,
+            signature,
+            publicKey
+          );
+
+          if (success) {
+            // Refresh license status after authentication
+            await licenseValidator.checkLicense();
+          }
+        } else {
+          vscode.window.showErrorMessage(
+            'Invalid authentication callback. Missing required parameters.'
+          );
+        }
+      }
+    }
+  });
+  context.subscriptions.push(uriHandler);
 }
 
 /**
