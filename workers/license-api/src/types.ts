@@ -16,6 +16,7 @@ export interface Env {
   NEAR_NETWORK: string;
   FASTNEAR_API_KEY: string;
   NEAR_INTENTS_API_KEY: string;
+  ADMIN_SECRET: string; // JWT signing key for admin sessions
 
   // Environment variables
   NEAR_RPC_URL: string;
@@ -23,6 +24,7 @@ export interface Env {
   CRYPTO_MONTHLY_USD: string;
   NEAR_INTENTS_API_URL: string;
   SETTLEMENT_ACCOUNT: string;
+  ADMIN_WALLET: string; // Admin NEAR account ID (contract admin)
 }
 
 /**
@@ -167,4 +169,13 @@ export interface CryptoSubscriptionStatusResponse {
 export interface CryptoSubscriptionCancelResponse {
   cancelledAt: string;
   activeUntil: string;
+}
+
+/**
+ * Admin session from JWT verification
+ */
+export interface AdminSession {
+  nearAccountId: string;
+  issuedAt: number;
+  expiresAt: number;
 }

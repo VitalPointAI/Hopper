@@ -34,6 +34,8 @@ LICENSE_DURATION_DAYS = "30"
 CRYPTO_MONTHLY_USD = "4.00"
 NEAR_INTENTS_API_URL = "https://1click.chaindefuser.com"
 SETTLEMENT_ACCOUNT = "vitalpointai.near"
+# Set to contract admin account (e.g., specflow.testnet or admin.specflow.near)
+ADMIN_WALLET = "admin.specflow.near"
 
 # Secrets (set with: wrangler secret put <NAME>)
 # STRIPE_SECRET_KEY - Stripe API key
@@ -44,3 +46,4 @@ SETTLEMENT_ACCOUNT = "vitalpointai.near"
 # NEAR_NETWORK - "mainnet" or "testnet"
 # FASTNEAR_API_KEY - FastNEAR API key for RPC access
 # NEAR_INTENTS_API_KEY - NEAR Intents 1Click API key for subscription processing
+# ADMIN_SECRET - Secret key for signing admin JWT tokens
