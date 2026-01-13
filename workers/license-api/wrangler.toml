@@ -1,0 +1,30 @@
+name = "specflow-license-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# KV Namespace bindings
+# Create with: wrangler kv:namespace create "PROCESSED_EVENTS"
+# Create with: wrangler kv:namespace create "SUBSCRIPTIONS"
+# Note: For production, replace these placeholder IDs with actual KV namespace IDs
+[[kv_namespaces]]
+binding = "PROCESSED_EVENTS"
+id = "placeholder_processed_events_id"
+preview_id = "preview_processed_events_id"
+
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "placeholder_subscriptions_id"
+preview_id = "preview_subscriptions_id"
+
+# Environment variables (non-secret)
+[vars]
+NEAR_RPC_URL = "https://rpc.mainnet.near.org"
+LICENSE_DURATION_DAYS = "30"
+
+# Secrets (set with: wrangler secret put <NAME>)
+# STRIPE_SECRET_KEY - Stripe API key
+# STRIPE_WEBHOOK_SECRET - Stripe webhook signing secret
+# STRIPE_PRICE_ID - Stripe price ID for subscription
+# NEAR_PRIVATE_KEY - NEAR account private key for signing transactions
+# LICENSE_CONTRACT_ID - NEAR contract account ID (e.g., license.specflow.near)
+# NEAR_NETWORK - "mainnet" or "testnet"
