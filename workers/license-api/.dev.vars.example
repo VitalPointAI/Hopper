@@ -6,12 +6,14 @@ STRIPE_PRICE_ID=price_xxx
 # NEAR configuration
 NEAR_PRIVATE_KEY=ed25519:xxx
 LICENSE_CONTRACT_ID=license.specflow.near
-NEAR_NETWORK=testnet
+NEAR_NETWORK=mainnet
+FASTNEAR_API_KEY=xxx
 
 # NEAR RPC URL (optional override)
-# Default in wrangler.toml: https://rpc.mainnet.near.org
-# For testnet, uncomment and use:
+# Default in wrangler.toml: https://rpc.mainnet.fastnear.com
+# For testnet development, uncomment:
 # NEAR_RPC_URL=https://rpc.testnet.fastnear.com
+# NEAR_NETWORK=testnet
 
 # Note: These are development values
 # For production, use wrangler secret put <NAME>

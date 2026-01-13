@@ -13,6 +13,7 @@ export interface Env {
   NEAR_PRIVATE_KEY: string;
   LICENSE_CONTRACT_ID: string;
   NEAR_NETWORK: string;
+  FASTNEAR_API_KEY: string;
 
   // Environment variables
   NEAR_RPC_URL: string;

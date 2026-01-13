@@ -6,9 +6,9 @@
 
 import type { Env } from '../types';
 
-// NEAR RPC endpoints
-const MAINNET_RPC = 'https://rpc.mainnet.near.org';
-const TESTNET_RPC = 'https://rpc.testnet.near.org';
+// NEAR RPC endpoints (FastNEAR for production)
+const MAINNET_RPC = 'https://rpc.mainnet.fastnear.com';
+const TESTNET_RPC = 'https://rpc.testnet.fastnear.com';
 
 // Gas and deposit constants
 const DEFAULT_GAS = '30000000000000'; // 30 TGas
@@ -32,18 +32,26 @@ function getRpcUrl(env: Env): string {
 }
 
 /**
- * Make a NEAR RPC call
+ * Make a NEAR RPC call with FastNEAR API key authentication
  */
 async function rpcCall<T>(
   rpcUrl: string,
   method: string,
-  params: unknown
+  params: unknown,
+  apiKey?: string
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add FastNEAR API key as Bearer token if provided
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
   const response = await fetch(rpcUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 'dontcare',
@@ -175,7 +183,8 @@ interface AccessKeyInfo {
 async function getAccessKey(
   rpcUrl: string,
   accountId: string,
-  publicKey: string
+  publicKey: string,
+  apiKey?: string
 ): Promise<AccessKeyInfo> {
   const result = await rpcCall<{ nonce: number; block_hash: string }>(
     rpcUrl,
@@ -185,7 +194,8 @@ async function getAccessKey(
       finality: 'final',
       account_id: accountId,
       public_key: publicKey,
-    }
+    },
+    apiKey
   );
 
   return result;
@@ -302,6 +312,7 @@ export async function grantLicense(
   try {
     const rpcUrl = getRpcUrl(env);
     const contractId = env.LICENSE_CONTRACT_ID;
+    const apiKey = env.FASTNEAR_API_KEY;
 
     // Parse the private key to get signer info
     const { publicKey, secretKey } = parsePrivateKey(env.NEAR_PRIVATE_KEY);
@@ -314,7 +325,7 @@ export async function grantLicense(
     const signerId = contractId;
 
     // Get access key info (nonce and recent block hash)
-    const accessKeyInfo = await getAccessKey(rpcUrl, signerId, publicKeyBase58);
+    const accessKeyInfo = await getAccessKey(rpcUrl, signerId, publicKeyBase58, apiKey);
     const nonce = accessKeyInfo.nonce + 1;
     const blockHash = base58Decode(accessKeyInfo.block_hash);
 
@@ -369,7 +380,8 @@ export async function grantLicense(
     const result = await rpcCall<{ transaction: { hash: string } }>(
       rpcUrl,
       'broadcast_tx_commit',
-      [signedTxBase64]
+      [signedTxBase64],
+      apiKey
     );
 
     console.log(`License granted to ${nearAccountId} for ${durationDays} days, tx: ${result.transaction.hash}`);

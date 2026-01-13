@@ -18,7 +18,7 @@ preview_id = "preview_subscriptions_id"
 
 # Environment variables (non-secret)
 [vars]
-NEAR_RPC_URL = "https://rpc.mainnet.near.org"
+NEAR_RPC_URL = "https://rpc.mainnet.fastnear.com"
 LICENSE_DURATION_DAYS = "30"
 
 # Secrets (set with: wrangler secret put <NAME>)
@@ -28,3 +28,4 @@ LICENSE_DURATION_DAYS = "30"
 # NEAR_PRIVATE_KEY - NEAR account private key for signing transactions
 # LICENSE_CONTRACT_ID - NEAR contract account ID (e.g., license.specflow.near)
 # NEAR_NETWORK - "mainnet" or "testnet"
+# FASTNEAR_API_KEY - FastNEAR API key for RPC access

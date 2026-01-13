@@ -53,6 +53,7 @@ wrangler secret put STRIPE_PRICE_ID
 wrangler secret put NEAR_PRIVATE_KEY
 wrangler secret put LICENSE_CONTRACT_ID
 wrangler secret put NEAR_NETWORK
+wrangler secret put FASTNEAR_API_KEY
 ```
 
 ### Local Development
@@ -161,7 +162,8 @@ Receives Stripe webhook events. Do not call directly.
 | NEAR_PRIVATE_KEY | NEAR account private key for signing transactions |
 | LICENSE_CONTRACT_ID | NEAR license contract account ID |
 | NEAR_NETWORK | NEAR network (mainnet or testnet) |
-| NEAR_RPC_URL | NEAR RPC endpoint (defaults based on network) |
+| FASTNEAR_API_KEY | FastNEAR API key for RPC access |
+| NEAR_RPC_URL | NEAR RPC endpoint (default: https://rpc.mainnet.fastnear.com) |
 | LICENSE_DURATION_DAYS | License duration per billing period (default: 30) |
 
 ## License
