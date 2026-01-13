@@ -30,6 +30,7 @@ export class UpgradeModalPanel {
     // Handle messages from the webview
     this.panel.webview.onDidReceiveMessage(
       async (message) => {
+        console.log('UpgradeModal received message:', message);
         switch (message.command) {
           case 'stripe-checkout':
             await this.handleStripeCheckout();
@@ -40,6 +41,8 @@ export class UpgradeModalPanel {
           case 'close':
             this.dispose();
             break;
+          default:
+            console.log('Unknown command:', message.command);
         }
       },
       null,
@@ -383,7 +386,7 @@ export class UpgradeModalPanel {
   </style>
 </head>
 <body>
-  <button class="close-btn" onclick="closeModal()" title="Close">&times;</button>
+  <button class="close-btn" id="close-btn" title="Close">&times;</button>
 
   <div class="container">
     <div class="header">
@@ -421,7 +424,7 @@ export class UpgradeModalPanel {
             <span>Cancel anytime</span>
           </div>
         </div>
-        <button class="checkout-btn secondary" onclick="stripeCheckout()">
+        <button class="checkout-btn secondary" id="stripe-btn">
           Subscribe with Card
         </button>
       </div>
@@ -453,7 +456,7 @@ export class UpgradeModalPanel {
             <span>No card required</span>
           </div>
         </div>
-        <button class="checkout-btn primary" onclick="cryptoCheckout()">
+        <button class="checkout-btn primary" id="crypto-btn">
           Pay with Crypto
         </button>
       </div>
@@ -465,19 +468,25 @@ export class UpgradeModalPanel {
   </div>
 
   <script nonce="${nonce}">
-    const vscode = acquireVsCodeApi();
+    (function() {
+      const vscode = acquireVsCodeApi();
+      console.log('Webview script loaded, vscode API acquired');
 
-    function stripeCheckout() {
-      vscode.postMessage({ command: 'stripe-checkout' });
-    }
+      document.getElementById('stripe-btn').addEventListener('click', function() {
+        console.log('stripeCheckout called');
+        vscode.postMessage({ command: 'stripe-checkout' });
+      });
 
-    function cryptoCheckout() {
-      vscode.postMessage({ command: 'crypto-checkout' });
-    }
+      document.getElementById('crypto-btn').addEventListener('click', function() {
+        console.log('cryptoCheckout called');
+        vscode.postMessage({ command: 'crypto-checkout' });
+      });
 
-    function closeModal() {
-      vscode.postMessage({ command: 'close' });
-    }
+      document.getElementById('close-btn').addEventListener('click', function() {
+        console.log('closeModal called');
+        vscode.postMessage({ command: 'close' });
+      });
+    })();
   </script>
 </body>
 </html>`;
