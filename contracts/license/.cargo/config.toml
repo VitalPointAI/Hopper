@@ -1,0 +1,19 @@
+# Configuration for building NEAR smart contracts
+#
+# This disables bulk memory operations in the generated WASM to ensure compatibility
+# with cargo-near's wasm-opt validator. Starting with Rust 1.82+ (LLVM 20), the compiler
+# generates bulk memory operations (memory.copy, memory.fill) by default for wasm32 targets.
+# Older versions of wasm-opt (used by cargo-near < 0.16.0) don't support these operations
+# without the --enable-bulk-memory flag.
+#
+# See: https://github.com/rust-lang/rust/issues/141080
+#
+# NOTE: cargo-near overrides RUSTFLAGS during its build process. This config.toml works
+# for regular `cargo build --target wasm32-unknown-unknown` but NOT for `cargo near build`.
+# For cargo-near builds, use the --env flag:
+#   cargo near build non-reproducible-wasm --env 'RUSTFLAGS=-C target-feature=-bulk-memory'
+#
+# Alternatively, upgrade cargo-near to version 0.16.0+ which has bulk memory support built-in.
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=-bulk-memory", "-C", "link-arg=-s"]

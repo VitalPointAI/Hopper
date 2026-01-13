@@ -18,3 +18,18 @@ lto = true
 codegen-units = 1
 panic = "abort"
 overflow-checks = true
+
+# Build configuration for cargo-near
+#
+# For local development builds, use:
+#   cargo near build non-reproducible-wasm --env 'RUSTFLAGS=-C target-feature=-bulk-memory'
+#
+# This is required because Rust 1.82+ (LLVM 20) generates bulk memory operations by default,
+# but cargo-near < 0.16.0 uses a version of wasm-opt that doesn't enable bulk memory.
+# See: https://github.com/rust-lang/rust/issues/141080
+#
+# For reproducible builds (production), configure the Docker-based build:
+[package.metadata.near.reproducible_build]
+# Use a recent image that includes cargo-near 0.16.0+ with bulk memory support
+image = "sourcescan/cargo-near:0.16.0-rust-1.85.0"
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
