@@ -45,7 +45,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 01.5-01: NEAR license contract (account_id → subscription_expiry)
+- [x] 01.5-01: NEAR license contract (account_id → subscription_expiry)
 - [ ] 01.5-02: Stripe subscription integration + webhook handler
 - [ ] 01.5-03: x402 + NEAR Intents crypto payment flow
 - [ ] 01.5-04: Extension license validation (check before Phase 2+ execution)
@@ -103,7 +103,7 @@ Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
-| 1.5 Licensing | 0/4 | Not started | - |
+| 1.5 Licensing | 1/4 | In progress | - |
 | 2. Chat Participant | 0/3 | Not started | - |
 | 3. Planning Commands | 0/3 | Not started | - |
 | 4. Execution Commands | 0/3 | Not started | - |
