@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 1.5 of 5 (Licensing)
-Plan: 4 of 5 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-13 — Completed 01.5-04-PLAN.md
+Last activity: 2026-01-13 — Completed 01.5-05-PLAN.md (Admin API endpoints)
 
-Progress: ████████░░░░░░░░░░░ 40%
+Progress: █████████░░░░░░░░░░ 45%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 11.1 min
-- Total execution time: 89 min
+- Total plans completed: 9
+- Average duration: 10.3 min
+- Total execution time: 93 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 4 | 15 min | 3.8 min |
-| 01.5-licensing | 4 | 80 min | 20.0 min |
+| 01.5-licensing | 5 | 84 min | 16.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (8 min), 01.5-01 (4 min), 01.5-02 (9 min), 01.5-03 (25 min), 01.5-04 (33 min)
-- Trend: —
+- Last 5 plans: 01.5-01 (4 min), 01.5-02 (9 min), 01.5-03 (25 min), 01.5-04 (33 min), 01.5-05 (4 min)
+- Trend: Variable (fast for API work, slower for complex integrations)
 
 ## Accumulated Context
 
@@ -58,6 +58,7 @@ Recent decisions affecting current work:
 | 01.5-03 | ANY_INPUT swap for recurring payments | NEAR Intents SDK lacks subscription pre-auth |
 | 01.5-03 | Date-indexed KV storage | Efficient cron queries without full scan |
 | 01.5-04 | Wallet auth required for license | Prevents account impersonation via challenge/signature/JWT |
+| 01.5-05 | ADMIN_WALLET env var for admin auth | Contract admin account configured at deployment |
 | 01.5-04 | CSP nonce with addEventListener | Inline onclick blocked by CSP, use JS event listeners |
 
 ### Deferred Issues
@@ -71,5 +72,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-13
-Stopped at: Completed 01.5-04-PLAN.md
+Stopped at: Completed 01.5-05-PLAN.md (Admin API endpoints)
 Resume file: None
