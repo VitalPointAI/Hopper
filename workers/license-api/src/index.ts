@@ -158,10 +158,21 @@ const adminApi = new Hono<{ Bindings: Env }>();
 // Apply admin auth middleware to all admin API routes
 adminApi.use('/*', adminAuth);
 
-// Mount admin API handlers (to be added in Task 2)
-// GET /admin/api/stats
-// GET /admin/api/licenses
-// GET /admin/api/subscriptions
+// Admin API endpoints
+adminApi.get('/stats', async (c) => {
+  const { handleAdminStats } = await import('./handlers/admin/stats');
+  return handleAdminStats(c);
+});
+
+adminApi.get('/licenses', async (c) => {
+  const { handleAdminLicenses } = await import('./handlers/admin/licenses');
+  return handleAdminLicenses(c);
+});
+
+adminApi.get('/subscriptions', async (c) => {
+  const { handleAdminSubscriptions } = await import('./handlers/admin/subscriptions');
+  return handleAdminSubscriptions(c);
+});
 
 // Mount admin API router
 app.route('/admin/api', adminApi);

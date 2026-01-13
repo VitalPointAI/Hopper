@@ -1,0 +1,174 @@
+/**
+ * Admin licenses endpoint handler
+ * GET /admin/api/licenses
+ */
+
+import type { Context } from 'hono';
+import type { Env, SubscriptionRecord, CryptoSubscription } from '../../types';
+
+interface LicenseInfo {
+  nearAccountId: string;
+  source: 'stripe' | 'crypto';
+  subscriptionStatus: string;
+  currentPeriodEnd?: number;
+  nextChargeDate?: string;
+  contractLicense?: {
+    isLicensed: boolean;
+    expiry: string | null;
+  };
+}
+
+/**
+ * Query NEAR contract for license status
+ */
+async function queryContractLicense(
+  env: Env,
+  nearAccountId: string
+): Promise<{ isLicensed: boolean; expiry: string | null }> {
+  try {
+    // Call is_licensed view function
+    const isLicensedResponse = await fetch(env.NEAR_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'is_licensed',
+        method: 'query',
+        params: {
+          request_type: 'call_function',
+          finality: 'final',
+          account_id: env.LICENSE_CONTRACT_ID,
+          method_name: 'is_licensed',
+          args_base64: btoa(JSON.stringify({ account_id: nearAccountId })),
+        },
+      }),
+    });
+
+    const isLicensedResult = (await isLicensedResponse.json()) as {
+      result?: { result: number[] };
+    };
+
+    const isLicensed = isLicensedResult.result?.result
+      ? JSON.parse(String.fromCharCode(...isLicensedResult.result.result))
+      : false;
+
+    // Call get_expiry view function
+    const expiryResponse = await fetch(env.NEAR_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'get_expiry',
+        method: 'query',
+        params: {
+          request_type: 'call_function',
+          finality: 'final',
+          account_id: env.LICENSE_CONTRACT_ID,
+          method_name: 'get_expiry',
+          args_base64: btoa(JSON.stringify({ account_id: nearAccountId })),
+        },
+      }),
+    });
+
+    const expiryResult = (await expiryResponse.json()) as {
+      result?: { result: number[] };
+    };
+
+    let expiry: string | null = null;
+    if (expiryResult.result?.result) {
+      const expiryNs = JSON.parse(String.fromCharCode(...expiryResult.result.result));
+      if (expiryNs) {
+        // Convert nanoseconds to milliseconds and format as ISO string
+        expiry = new Date(Number(expiryNs) / 1_000_000).toISOString();
+      }
+    }
+
+    return { isLicensed, expiry };
+  } catch (error) {
+    console.error(`Failed to query contract for ${nearAccountId}:`, error);
+    return { isLicensed: false, expiry: null };
+  }
+}
+
+/**
+ * Search for licenses by NEAR account ID prefix
+ * Returns license data from KV and NEAR contract
+ */
+export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promise<Response> {
+  try {
+    const search = c.req.query('search') || '';
+    const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 50);
+
+    const licenses: LicenseInfo[] = [];
+
+    // Search Stripe subscriptions by NEAR account ID
+    // We need to check the near: prefix mappings
+    const stripeList = await c.env.SUBSCRIPTIONS.list({
+      prefix: `near:${search}`,
+      limit: limit,
+    });
+
+    for (const key of stripeList.keys) {
+      if (licenses.length >= limit) break;
+
+      const nearAccountId = key.name.replace('near:', '');
+      const customerId = await c.env.SUBSCRIPTIONS.get(key.name);
+
+      if (customerId) {
+        const subData = await c.env.SUBSCRIPTIONS.get(`customer:${customerId}`);
+        if (subData) {
+          const sub: SubscriptionRecord = JSON.parse(subData);
+          const contractLicense = await queryContractLicense(c.env, nearAccountId);
+
+          licenses.push({
+            nearAccountId,
+            source: 'stripe',
+            subscriptionStatus: sub.status,
+            currentPeriodEnd: sub.currentPeriodEnd,
+            contractLicense,
+          });
+        }
+      }
+    }
+
+    // Search crypto subscriptions
+    const cryptoList = await c.env.CRYPTO_SUBSCRIPTIONS.list({
+      prefix: `crypto_sub:${search}`,
+      limit: limit - licenses.length,
+    });
+
+    for (const key of cryptoList.keys) {
+      if (licenses.length >= limit) break;
+
+      const nearAccountId = key.name.replace('crypto_sub:', '');
+      const subData = await c.env.CRYPTO_SUBSCRIPTIONS.get(key.name);
+
+      if (subData) {
+        const sub: CryptoSubscription = JSON.parse(subData);
+        const contractLicense = await queryContractLicense(c.env, nearAccountId);
+
+        licenses.push({
+          nearAccountId,
+          source: 'crypto',
+          subscriptionStatus: sub.status,
+          nextChargeDate: sub.nextChargeDate,
+          contractLicense,
+        });
+      }
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        licenses,
+        count: licenses.length,
+        search: search || null,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error fetching licenses:', errorMessage);
+    return c.json({ error: 'Failed to fetch licenses' }, 500);
+  }
+}
