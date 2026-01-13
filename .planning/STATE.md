@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 1.5 of 5 (Licensing)
-Plan: 1 of 4 in current phase
+Plan: 2 of 5 in current phase
 Status: In progress
-Last activity: 2026-01-12 — Completed 01.5-01-PLAN.md
+Last activity: 2026-01-13 — Completed 01.5-02-PLAN.md
 
-Progress: ████░░░░░░░░░░░░░░░ 21%
+Progress: █████░░░░░░░░░░░░░░ 26%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 3.8 min
-- Total execution time: 19 min
+- Total plans completed: 6
+- Average duration: 5.2 min
+- Total execution time: 31 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 4 | 15 min | 3.8 min |
-| 01.5-licensing | 1 | 4 min | 4 min |
+| 01.5-licensing | 2 | 22 min | 11 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min), 01-02 (2 min), 01-02-FIX (3 min), 01-03 (8 min), 01.5-01 (4 min)
+- Last 5 plans: 01-02 (2 min), 01-02-FIX (3 min), 01-03 (8 min), 01.5-01 (4 min), 01.5-02 (9 min)
 - Trend: —
 
 ## Accumulated Context
@@ -52,6 +52,9 @@ Recent decisions affecting current work:
 | 01-03 | Graceful API key prompting | Show friendly dialog instead of error when key missing |
 | 01.5-01 | near_sdk::store::LookupMap | Modern SDK pattern over deprecated collections |
 | 01.5-01 | Nanosecond timestamps | NEAR block_timestamp compatibility |
+| 01.5-02 | Cloudflare Workers + Hono | Auditable serverless, globally distributed, edge-native |
+| 01.5-02 | Direct NEAR JSON-RPC | near-api-js incompatible with Workers edge runtime |
+| 01.5-02 | KV for idempotency/state | Fast lookups, TTL for automatic cleanup |
 
 ### Deferred Issues
 
@@ -63,6 +66,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-12
-Stopped at: Completed 01.5-01-PLAN.md
+Last session: 2026-01-13
+Stopped at: Completed 01.5-02-PLAN.md
 Resume file: None

@@ -38,7 +38,7 @@ Plans:
 - [x] 01-03: VSCode Language Model provider registration
 
 ### Phase 1.5: Licensing (INSERTED)
-**Goal**: Freemium license system with on-chain storage and dual payment rails (Stripe + crypto)
+**Goal**: Freemium license system with on-chain storage, recurring subscriptions (Stripe + crypto), and admin dashboard
 **Depends on**: Phase 1 (extension must work before monetizing)
 **Research**: Likely (NEAR contracts, x402 protocol, NEAR Intents)
 **Research topics**: NEAR smart contract for license storage, Stripe subscription webhooks, x402 payment protocol, NEAR Intents for crypto-to-USDC conversion
@@ -46,9 +46,10 @@ Plans:
 
 Plans:
 - [x] 01.5-01: NEAR license contract (account_id → subscription_expiry)
-- [ ] 01.5-02: Stripe subscription integration + webhook handler
-- [ ] 01.5-03: x402 + NEAR Intents crypto payment flow
+- [x] 01.5-02: Stripe recurring subscription integration + webhook handler
+- [ ] 01.5-03: NEAR Intents recurring crypto subscriptions
 - [ ] 01.5-04: Extension license validation (check before Phase 2+ execution)
+- [ ] 01.5-05: Admin dashboard (license/subscription management, pricing)
 
 ### Phase 2: Chat Participant
 **Goal**: @specflow chat participant responding to mentions with slash command routing
@@ -103,7 +104,7 @@ Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
-| 1.5 Licensing | 1/4 | In progress | - |
+| 1.5 Licensing | 2/5 | In progress | - |
 | 2. Chat Participant | 0/3 | Not started | - |
 | 3. Planning Commands | 0/3 | Not started | - |
 | 4. Execution Commands | 0/3 | Not started | - |
