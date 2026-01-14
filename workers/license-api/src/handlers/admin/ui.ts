@@ -688,8 +688,9 @@ export function licensesPage(): string {
         if (data.success) {
           resultDiv.innerHTML = '<div class="bg-green-50 border border-green-200 rounded-md p-4"><p class="text-sm text-green-700">License granted to <strong>' + data.nearAccountId + '</strong> until ' + new Date(data.expiry).toLocaleDateString() + '</p><p class="text-xs text-green-600 mt-1">TX: ' + data.txHash + '</p></div>';
           document.getElementById('grant-account').value = '';
-          // Refresh search results
-          htmx.trigger('#licenses-results', 'htmx:load');
+          // Refresh license list with current search
+          const searchValue = document.getElementById('license-search').value;
+          htmx.ajax('GET', '/admin/api/licenses?search=' + encodeURIComponent(searchValue), {target: '#licenses-results'});
         } else {
           resultDiv.innerHTML = '<div class="bg-red-50 border border-red-200 rounded-md p-4"><p class="text-sm text-red-700">' + (data.error || 'Failed to grant license') + '</p></div>';
         }
