@@ -6,26 +6,51 @@
 
 ## Open Issues
 
-### UAT-002: License check shows modal dialog instead of chat response
+### UAT-003: No follow-up suggestion chips appear
 
 **Discovered:** 2026-01-14
 **Phase/Plan:** 02-01
-**Severity:** Major
-**Feature:** License-gated chat participant response
-**Description:** When user sends message to @specflow without a connected wallet, a modal dialog popup appears asking to connect wallet. The chat panel itself shows nothing - no "SpecFlow Pro Required" message, no upgrade prompt, no follow-ups.
-**Expected:** Chat stream should show the "SpecFlow Pro Required" markdown message with bullet points about Pro features, followed by "Upgrade to Pro" button. The modal should only appear if user clicks that button.
-**Actual:** Modal dialog appears immediately, blocking. After dismissing the modal, chat panel remains empty with no response.
-**Repro:**
-1. Launch Extension Development Host (F5)
-2. Open Chat panel
-3. Type `@specflow hello` and send
-4. Modal popup appears asking to connect wallet
-5. Dismiss modal (click X or Cancel)
-6. Chat panel is empty - no response from @specflow
-
-**Root cause analysis:** The `checkPhaseAccess` function in `src/licensing/phaseGate.ts` likely calls `showUpgradeModal` which shows a blocking VSCode modal dialog, rather than returning false to let the chat handler show the in-chat upgrade prompt.
+**Severity:** Minor (may be VSCode limitation)
+**Feature:** Follow-up suggestions after chat response
+**Description:** No follow-up suggestion chips appear below chat responses.
+**Expected:** Follow-up chips like "Show commands" and "Check progress" should appear.
+**Actual:** No chips visible below the response.
+**Status:** Deferred - may be VSCode version or API limitation. Low priority.
 
 ## Resolved Issues
+
+### UAT-004: License check gates entire chat instead of per-command
+
+**Discovered:** 2026-01-14
+**Resolved:** 2026-01-14 - Fixed in 02-01-FIX3.md
+**Commits:** `000684d`, `e9e6e93`, `29bc077`
+
+**Original issue:**
+- Chat participant checked Phase 2 license on EVERY message
+- Even basic chat like `@specflow hello` showed upgrade prompt
+- License check should be per-command, not upfront
+
+**Resolution:**
+- Removed upfront checkPhaseAccess(2, ...) call
+- Basic chat now works for all users without license check
+- Per-command license gating deferred to 02-02 (slash commands)
+
+### UAT-002: License check shows modal dialog instead of chat response
+
+**Discovered:** 2026-01-14
+**Resolved:** 2026-01-14 - Fixed in 02-01-FIX2.md
+**Commits:** `9b1f796`, `cf54c40`
+
+**Original issue:**
+- Modal dialog popup appeared instead of in-stream upgrade message
+- Chat panel remained empty after dismissing modal
+
+**Resolution:**
+- Added quiet mode to checkPhaseAccess
+- Chat participant uses quiet mode to skip modal dialogs
+- In-stream "SpecFlow Pro Required" message now displays properly
+
+### UAT-001: Extension Development Host crashes on activation
 
 ### UAT-001: Extension Development Host crashes on activation
 
