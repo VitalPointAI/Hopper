@@ -40,28 +40,8 @@ export function createSpecflowParticipant(
     stream: vscode.ChatResponseStream,
     token: vscode.CancellationToken
   ): Promise<ISpecflowResult> => {
-    // Check license for Phase 2+ access (quiet mode - we handle UX in chat)
-    const hasAccess = await checkPhaseAccess(2, licenseValidator, context, { quiet: true });
-
-    if (!hasAccess) {
-      // User doesn't have Pro license - show upgrade message
-      stream.markdown('**SpecFlow Pro Required**\n\n');
-      stream.markdown('The @specflow chat participant requires a Pro license for Phase 2+ features.\n\n');
-      stream.markdown('Phase 1 features (foundation) are free. To unlock:\n');
-      stream.markdown('- Structured planning and execution\n');
-      stream.markdown('- Model-agnostic agent workflows\n');
-      stream.markdown('- Session management and resumption\n\n');
-      stream.button({
-        command: 'specflow.showUpgradeModal',
-        title: 'Upgrade to Pro'
-      });
-
-      return {
-        metadata: {
-          lastCommand: 'license-required'
-        }
-      };
-    }
+    // Note: License gating is per-command, implemented in 02-02 (slash command routing)
+    // Basic chat conversations are free for all users
 
     // Show progress while processing
     stream.progress('Processing your request...');
