@@ -15,6 +15,15 @@
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "chatParticipants": [
+      {
+        "id": "specflow.chat-participant",
+        "name": "specflow",
+        "fullName": "SpecFlow",
+        "description": "Model-agnostic structured planning for agent chat",
+        "isSticky": true
+      }
+    ],
     "languageModelChatProviders": [
       {
         "vendor": "near-ai",
