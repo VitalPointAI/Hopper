@@ -26,6 +26,13 @@ export function createSpecflowParticipant(
   context: vscode.ExtensionContext,
   licenseValidator: LicenseValidator
 ): vscode.Disposable {
+  // Verify Chat API is available
+  if (!vscode.chat || !vscode.chat.createChatParticipant) {
+    console.warn('VSCode Chat API not available - chat participant disabled');
+    // Return a no-op disposable
+    return { dispose: () => {} };
+  }
+
   // Define the chat request handler
   const handler: vscode.ChatRequestHandler = async (
     request: vscode.ChatRequest,
