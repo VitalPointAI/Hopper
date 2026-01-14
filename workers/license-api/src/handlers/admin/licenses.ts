@@ -206,6 +206,32 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
       }
     }
 
+    // Search admin-granted licenses (stored in KV with admin_grant: prefix)
+    const adminList = await c.env.SUBSCRIPTIONS.list({
+      prefix: `admin_grant:${search}`,
+      limit: limit - licenses.length,
+    });
+
+    for (const key of adminList.keys) {
+      if (licenses.length >= limit) break;
+
+      const nearAccountId = key.name.replace('admin_grant:', '');
+
+      // Skip if we already have this account
+      if (seenAccounts.has(nearAccountId)) continue;
+
+      // Query contract for current license status (may have expired)
+      const contractLicense = await queryContractLicense(c.env, nearAccountId);
+
+      licenses.push({
+        nearAccountId,
+        source: 'admin',
+        subscriptionStatus: contractLicense.isLicensed ? 'active' : 'expired',
+        contractLicense,
+      });
+      seenAccounts.add(nearAccountId);
+    }
+
     // Check if request is from htmx
     const isHtmx = c.req.header('HX-Request') === 'true';
 

@@ -97,6 +97,21 @@ export async function handleAdminGrantLicense(
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + durationDays);
 
+    // Store admin grant in KV for discoverability in license list
+    // Uses SUBSCRIPTIONS KV with admin_grant: prefix
+    await c.env.SUBSCRIPTIONS.put(
+      `admin_grant:${nearAccountId}`,
+      JSON.stringify({
+        nearAccountId,
+        grantedAt: new Date().toISOString(),
+        durationDays,
+        expiry: expiryDate.toISOString(),
+        txHash: result.txHash,
+      })
+    );
+
+    console.log(`Admin granted license to ${nearAccountId} for ${durationDays} days, stored in KV`);
+
     return c.json({
       success: true,
       nearAccountId,
