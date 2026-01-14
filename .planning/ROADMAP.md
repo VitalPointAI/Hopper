@@ -61,7 +61,7 @@ Plans:
 
 Plans:
 - [x] 02-01: Chat participant registration and basic response
-- [ ] 02-02: Slash command routing infrastructure
+- [x] 02-02: Slash command routing infrastructure
 - [ ] 02-03: Context variable injection
 
 ### Phase 3: Planning Commands
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 6/6 | Complete | 2026-01-14 |
-| 2. Chat Participant | 1/3 | In progress | - |
+| 2. Chat Participant | 2/3 | In progress | - |
 | 3. Planning Commands | 0/3 | Not started | - |
 | 4. Execution Commands | 0/3 | Not started | - |
 | 5. Session Management | 0/3 | Not started | - |
