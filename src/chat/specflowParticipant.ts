@@ -51,7 +51,7 @@ export function createSpecflowParticipant(
     const messages: vscode.LanguageModelChatMessage[] = [
       vscode.LanguageModelChatMessage.User(
         'You are SpecFlow, a model-agnostic structured planning assistant for VSCode. ' +
-        'Help users plan and execute software projects using the GSD (Get Shit Done) framework. ' +
+        'Help users plan and execute software projects using the SpecFlow framework. ' +
         'Be concise and actionable.'
       ),
       vscode.LanguageModelChatMessage.User(request.prompt)
