@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 1.5 — Licensing (In progress)
+**Current focus:** Phase 1.5 — Licensing (Complete)
 
 ## Current Position
 
 Phase: 1.5 of 5 (Licensing)
-Plan: 5 of 6 in current phase
-Status: In progress
-Last activity: 2026-01-13 — Completed 01.5-05-PLAN.md (Admin API endpoints)
+Plan: 6 of 6 in current phase + UAT fixes
+Status: Phase complete
+Last activity: 2026-01-14 — Completed 01.5-06-FIX (UAT issue fixes)
 
-Progress: █████████░░░░░░░░░░ 45%
+Progress: ██████████░░░░░░░░░ 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Average duration: 10.3 min
-- Total execution time: 93 min
+- Total plans completed: 10 (including FIX plan)
+- Average duration: 10.0 min
+- Total execution time: 97 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 4 | 15 min | 3.8 min |
-| 01.5-licensing | 5 | 84 min | 16.8 min |
+| 01.5-licensing | 6+FIX | 88 min | 12.6 min |
 
 **Recent Trend:**
-- Last 5 plans: 01.5-01 (4 min), 01.5-02 (9 min), 01.5-03 (25 min), 01.5-04 (33 min), 01.5-05 (4 min)
+- Last 5 plans: 01.5-03 (25 min), 01.5-04 (33 min), 01.5-05 (4 min), 01.5-06 (9 min), 01.5-06-FIX (4 min)
 - Trend: Variable (fast for API work, slower for complex integrations)
 
 ## Accumulated Context
@@ -60,6 +60,7 @@ Recent decisions affecting current work:
 | 01.5-04 | Wallet auth required for license | Prevents account impersonation via challenge/signature/JWT |
 | 01.5-05 | ADMIN_WALLET env var for admin auth | Contract admin account configured at deployment |
 | 01.5-04 | CSP nonce with addEventListener | Inline onclick blocked by CSP, use JS event listeners |
+| 01.5-06-FIX | VSCode config for API URLs | process.env doesn't work in bundled extensions |
 
 ### Deferred Issues
 
@@ -71,6 +72,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-01-13
-Stopped at: Completed 01.5-05-PLAN.md (Admin API endpoints)
+Last session: 2026-01-14
+Stopped at: Completed 01.5-06-FIX (UAT issue fixes)
 Resume file: None
