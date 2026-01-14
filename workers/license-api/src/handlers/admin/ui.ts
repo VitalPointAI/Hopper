@@ -218,24 +218,16 @@ export function loginPage(): string {
 
         setSigningMessage('Opening wallet selector...');
 
-        // Open the wallet selector modal
-        // This will show available wallets to the user
-        await connector.openModal();
+        // Connect to wallet - this opens the wallet selector modal
+        // and returns the connected wallet instance
+        const wallet = await connector.connect();
 
-        // Wait for user to connect
-        setSigningMessage('Waiting for wallet connection...');
-
-        // Poll for connection (the modal handles the actual connection)
-        let attempts = 0;
-        const maxAttempts = 60; // 30 seconds
-        while (!connectedAccountId && attempts < maxAttempts) {
-          await new Promise(r => setTimeout(r, 500));
-          attempts++;
+        // Get the connected account
+        const { accounts } = await connector.getConnectedWallet();
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No accounts found after connecting wallet.');
         }
-
-        if (!connectedAccountId) {
-          throw new Error('Wallet connection timed out. Please try again.');
-        }
+        connectedAccountId = accounts[0].accountId;
 
         setSigningMessage('Getting authentication challenge...');
 
@@ -248,9 +240,6 @@ export function loginPage(): string {
         }
 
         setSigningMessage('Please sign the message in your wallet...');
-
-        // Get the wallet instance for signing
-        const wallet = await connector.wallet();
 
         // Create nonce for NEP-413
         const nonce = new Uint8Array(32);

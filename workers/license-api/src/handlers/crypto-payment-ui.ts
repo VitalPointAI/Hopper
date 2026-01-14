@@ -219,24 +219,19 @@ function paymentPage(subscription: {
         }
 
         setProcessingMessage('Opening wallet selector...');
-        await connector.openModal();
 
-        setProcessingMessage('Waiting for wallet connection...');
-        let attempts = 0;
-        const maxAttempts = 60;
-        while (!connectedAccountId && attempts < maxAttempts) {
-          await new Promise(r => setTimeout(r, 500));
-          attempts++;
-        }
+        // Connect to wallet - this opens the wallet selector modal
+        // and returns the connected wallet instance
+        const wallet = await connector.connect();
 
-        if (!connectedAccountId) {
-          throw new Error('Wallet connection timed out. Please try again.');
+        // Get the connected account
+        const { accounts } = await connector.getConnectedWallet();
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No accounts found after connecting wallet.');
         }
+        connectedAccountId = accounts[0].accountId;
 
         setProcessingMessage('Preparing payment transaction...');
-
-        // Get the wallet instance
-        const wallet = await connector.wallet();
 
         // Create transfer transaction to deposit address
         // This will trigger the wallet to send USDC or equivalent
