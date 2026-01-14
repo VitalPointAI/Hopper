@@ -189,7 +189,7 @@ function paymentPage(subscription: {
     // Initialize the connector
     async function initConnector() {
       connector = new NearConnector({
-        network: 'mainnet',
+        network: 'testnet',
         features: { signAndSendTransaction: true }
       });
 

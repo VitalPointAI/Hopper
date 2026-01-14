@@ -184,7 +184,7 @@ export function loginPage(): string {
     // Initialize the connector
     async function initConnector() {
       connector = new NearConnector({
-        network: 'mainnet',
+        network: 'testnet',
         features: { signMessage: true }
       });
 
