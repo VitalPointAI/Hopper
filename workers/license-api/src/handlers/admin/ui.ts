@@ -890,6 +890,7 @@ export function subscriptionsFragment(subscriptions: Array<{
   nearAccountId: string;
   type: 'stripe' | 'crypto';
   status: string;
+  cancelAtPeriodEnd?: boolean;
   nextChargeDate: string | null;
 }>): string {
   if (subscriptions.length === 0) {
@@ -910,35 +911,47 @@ export function subscriptionsFragment(subscriptions: Array<{
           : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Crypto</span>';
 
       let statusLabel: string;
-      switch (sub.status) {
-        case 'active':
-          statusLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>';
-          break;
-        case 'cancelled':
-        case 'canceled':
-          statusLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Cancelled</span>';
-          break;
-        case 'past_due':
-          statusLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Past Due</span>';
-          break;
-        case 'pending':
-          statusLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pending</span>';
-          break;
-        default:
-          statusLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">' +
-            sub.status +
-            '</span>';
+      // Check if subscription is active but set to cancel at period end
+      const isCancelling = sub.status === 'active' && sub.cancelAtPeriodEnd;
+
+      if (isCancelling) {
+        // Show "Cancelling" status for subscriptions that will cancel at period end
+        statusLabel =
+          '<span class="px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">Cancelling</span>';
+      } else {
+        switch (sub.status) {
+          case 'active':
+            statusLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>';
+            break;
+          case 'cancelled':
+          case 'canceled':
+            statusLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Cancelled</span>';
+            break;
+          case 'past_due':
+            statusLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Past Due</span>';
+            break;
+          case 'pending':
+            statusLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pending</span>';
+            break;
+          default:
+            statusLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">' +
+              sub.status +
+              '</span>';
+        }
       }
 
-      const canCancel = sub.status === 'active';
+      // Can only cancel if active AND not already set to cancel at period end
+      const canCancel = sub.status === 'active' && !sub.cancelAtPeriodEnd;
       const cancelBtn = canCancel
         ? `<button onclick="cancelSubscription('${sub.nearAccountId}', '${sub.type}')" class="text-red-600 hover:text-red-900 text-sm">Cancel</button>`
-        : '<span class="text-gray-400 text-sm">-</span>';
+        : isCancelling
+          ? '<span class="text-orange-500 text-sm">Pending cancel</span>'
+          : '<span class="text-gray-400 text-sm">-</span>';
 
       return `
       <tr class="hover:bg-gray-50">

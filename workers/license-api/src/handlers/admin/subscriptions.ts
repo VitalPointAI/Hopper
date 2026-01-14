@@ -131,6 +131,7 @@ export async function handleAdminSubscriptions(
         nearAccountId: sub.nearAccountId,
         type: sub.type,
         status: sub.status,
+        cancelAtPeriodEnd: sub.cancelAtPeriodEnd ?? false,
         nextChargeDate:
           sub.type === 'crypto'
             ? sub.nextCharge || null
