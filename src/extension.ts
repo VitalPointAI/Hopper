@@ -33,8 +33,14 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(providerDisposable);
 
   // Create and register the @specflow chat participant
-  const chatParticipant = createSpecflowParticipant(context, licenseValidator);
-  context.subscriptions.push(chatParticipant);
+  try {
+    const chatParticipant = createSpecflowParticipant(context, licenseValidator);
+    context.subscriptions.push(chatParticipant);
+    console.log('SpecFlow chat participant registered');
+  } catch (err) {
+    console.error('Failed to register chat participant:', err);
+    // Don't crash - chat participant is optional, extension can still work
+  }
 
   // Register the management command for API key setup
   const manageCommand = vscode.commands.registerCommand(
