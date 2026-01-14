@@ -93,16 +93,41 @@ export async function verifyAdminSignature(
 
   // Verify the signature using NEP-413 format
   try {
+    // Validate public key format
+    if (!publicKey.startsWith('ed25519:')) {
+      return { valid: false, error: 'Invalid public key format: must start with ed25519:' };
+    }
+
     const pubKey = PublicKey.fromString(publicKey);
 
     // Decode base64 signature
-    const signatureBytes = Uint8Array.from(atob(signature), (c) => c.charCodeAt(0));
+    let signatureBytes: Uint8Array;
+    try {
+      signatureBytes = Uint8Array.from(atob(signature), (c) => c.charCodeAt(0));
+    } catch {
+      return { valid: false, error: 'Invalid signature: not valid base64' };
+    }
 
     // For NEP-413, we need to verify the hash of the Borsh-encoded payload
     // The payload format is: tag (4 bytes) + message (string) + nonce (32 bytes) + recipient (string) + callbackUrl (optional string)
     if (nonce && recipient) {
+      // Validate nonce length
+      if (nonce.length !== 32) {
+        return { valid: false, error: `Invalid nonce length: expected 32, got ${nonce.length}` };
+      }
+
       // NEP-413 verification
       const payloadHash = await createNep413PayloadHash(message, nonce, recipient);
+
+      console.log('NEP-413 verification:', {
+        publicKey,
+        signatureLength: signatureBytes.length,
+        payloadHashLength: payloadHash.length,
+        nonceLength: nonce.length,
+        recipient,
+        messageLength: message.length,
+      });
+
       const isValid = pubKey.verify(payloadHash, signatureBytes);
 
       if (!isValid) {
@@ -123,6 +148,7 @@ export async function verifyAdminSignature(
 
     return { valid: true };
   } catch (error) {
+    console.error('Signature verification error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { valid: false, error: `Signature verification failed: ${errorMessage}` };
   }

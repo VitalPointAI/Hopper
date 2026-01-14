@@ -10,27 +10,38 @@ import type { Env } from '../../types';
  * Base HTML layout with Tailwind CSS and htmx
  */
 function baseLayout(title: string, content: string, includeAuth = true): string {
-  const authScript = includeAuth
+  // Auth check must run before htmx loads to redirect unauthenticated users
+  const authCheckScript = includeAuth
     ? `
     <script>
-      // Check for JWT token on load
-      document.addEventListener('DOMContentLoaded', function() {
-        const token = localStorage.getItem('specflow_admin_token');
+      // Check for JWT token BEFORE htmx loads
+      (function() {
+        var token = localStorage.getItem('specflow_admin_token');
         if (!token && !window.location.pathname.includes('/admin/login')) {
           window.location.href = '/admin/login';
-          return;
         }
+      })();
+    </script>
+    `
+    : '';
 
-        // Set htmx headers for all requests
+  // Configure htmx to add auth headers to every request
+  // This script MUST run before htmx processes the page, but document.body isn't available in <head>
+  // So we listen on document (events bubble up from body)
+  const htmxConfigScript = includeAuth
+    ? `
+    <script>
+      // Add Authorization header to all htmx requests
+      // Listen on document since body may not exist when this runs in <head>
+      document.addEventListener('htmx:configRequest', function(event) {
+        var token = localStorage.getItem('specflow_admin_token');
         if (token) {
-          document.body.setAttribute('hx-headers', JSON.stringify({
-            'Authorization': 'Bearer ' + token
-          }));
+          event.detail.headers['Authorization'] = 'Bearer ' + token;
         }
       });
 
       // Handle 401 responses (token expired)
-      document.body.addEventListener('htmx:responseError', function(event) {
+      document.addEventListener('htmx:responseError', function(event) {
         if (event.detail.xhr.status === 401) {
           localStorage.removeItem('specflow_admin_token');
           window.location.href = '/admin/login';
@@ -51,9 +62,10 @@ function baseLayout(title: string, content: string, includeAuth = true): string 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title} - SpecFlow Admin</title>
+  ${authCheckScript}
   <script src="https://cdn.tailwindcss.com"></script>
+  ${htmxConfigScript}
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-  ${authScript}
   <style>
     .htmx-indicator { display: none; }
     .htmx-request .htmx-indicator { display: inline-block; }
