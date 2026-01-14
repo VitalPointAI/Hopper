@@ -237,6 +237,19 @@ app.get('/admin/subscriptions', async (c) => {
   return handleAdminSubscriptionsPage(c);
 });
 
+// ============================================================================
+// Crypto Payment UI Routes
+// ============================================================================
+
+/**
+ * Crypto payment page
+ * Shows wallet selector for cross-chain payments
+ */
+app.get('/pay/:intentId', async (c) => {
+  const { handleCryptoPaymentPage } = await import('./handlers/crypto-payment-ui');
+  return handleCryptoPaymentPage(c);
+});
+
 // 404 handler
 app.notFound((c) => {
   return c.json({ error: 'Not Found' }, 404);

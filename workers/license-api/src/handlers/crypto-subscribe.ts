@@ -105,10 +105,14 @@ export async function handleCryptoSubscribe(
     // Save to KV
     await saveCryptoSubscription(c.env.CRYPTO_SUBSCRIPTIONS, subscription);
 
-    // Return response
+    // Build payment page URL (our own page with near-connect wallet selector)
+    const baseUrl = c.req.url.replace(/\/api\/crypto\/subscribe$/, '');
+    const paymentUrl = `${baseUrl}/pay/${encodeURIComponent(intentResult.intentId)}`;
+
+    // Return response with our payment page URL
     const response: CryptoSubscribeResponse = {
       intentId: intentResult.intentId,
-      authorizationUrl: intentResult.authorizationUrl,
+      authorizationUrl: paymentUrl,
       monthlyAmount: monthlyAmountUsd,
     };
 

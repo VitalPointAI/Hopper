@@ -110,7 +110,7 @@ function navHeader(activePage: string): string {
 
 /**
  * Login page HTML
- * Uses Meteor Wallet's injected provider for NEAR authentication
+ * Uses @hot-labs/near-connect for multi-wallet NEAR authentication
  */
 export function loginPage(): string {
   const content = `
@@ -131,7 +131,7 @@ export function loginPage(): string {
           <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
             <h3 class="text-sm font-medium text-blue-800">Wallet Authentication</h3>
             <p class="mt-1 text-sm text-blue-700">
-              Click Login to connect your Meteor Wallet and sign an authentication challenge.
+              Click Login to connect your NEAR wallet and sign an authentication challenge.
             </p>
           </div>
           <button
@@ -144,7 +144,7 @@ export function loginPage(): string {
             Login
           </button>
           <p class="text-xs text-center text-gray-500">
-            Don't have Meteor Wallet? <a href="https://meteorwallet.app" target="_blank" class="text-indigo-600 hover:text-indigo-500">Get it here</a>
+            Supports Meteor, HOT, MyNearWallet, Intear, and more
           </p>
         </div>
 
@@ -174,76 +174,67 @@ export function loginPage(): string {
     </div>
   </div>
 
-  <script>
-    // Detect Meteor Wallet injected provider
-    function getMeteorWallet() {
-      // Meteor Wallet injects window.meteorWallet
-      if (window.meteorWallet) {
-        return window.meteorWallet;
-      }
-      // Also check window.near for compatibility
-      if (window.near && window.near.isMeteorWallet) {
-        return window.near;
-      }
-      return null;
-    }
+  <script type="module">
+    import { NearConnector } from 'https://esm.sh/@hot-labs/near-connect';
 
-    // Wait for wallet to be injected (with timeout)
-    async function waitForWallet(timeout = 3000) {
-      const start = Date.now();
-      while (Date.now() - start < timeout) {
-        const wallet = getMeteorWallet();
-        if (wallet) return wallet;
-        await new Promise(r => setTimeout(r, 100));
-      }
-      return null;
+    // Global connector instance
+    let connector = null;
+    let connectedAccountId = null;
+
+    // Initialize the connector
+    async function initConnector() {
+      connector = new NearConnector({
+        network: 'mainnet',
+        features: { signMessage: true }
+      });
+
+      // Handle sign-in events
+      connector.on('wallet:signIn', async (event) => {
+        if (event.accounts && event.accounts.length > 0) {
+          connectedAccountId = event.accounts[0].accountId;
+          console.log('Wallet connected:', connectedAccountId);
+        }
+      });
+
+      // Handle sign-out events
+      connector.on('wallet:signOut', async () => {
+        connectedAccountId = null;
+        console.log('Wallet disconnected');
+      });
+
+      return connector;
     }
 
     // Main login flow
     async function handleLogin() {
       showStep('signing');
-      setSigningMessage('Looking for Meteor Wallet...');
+      setSigningMessage('Initializing wallet connector...');
 
       try {
-        // Check for Meteor Wallet
-        const wallet = await waitForWallet();
-
-        if (!wallet) {
-          throw new Error('Meteor Wallet not detected. Please install Meteor Wallet extension and refresh the page.');
+        // Initialize connector if not already done
+        if (!connector) {
+          await initConnector();
         }
 
-        setSigningMessage('Connecting to Meteor Wallet...');
+        setSigningMessage('Opening wallet selector...');
 
-        // Request connection if not already connected
-        let accountId;
-        try {
-          // Try to get current account
-          const accounts = await wallet.getAccounts();
-          if (accounts && accounts.length > 0) {
-            accountId = accounts[0].accountId;
-          }
-        } catch {
-          // Not connected yet
+        // Open the wallet selector modal
+        // This will show available wallets to the user
+        await connector.openModal();
+
+        // Wait for user to connect
+        setSigningMessage('Waiting for wallet connection...');
+
+        // Poll for connection (the modal handles the actual connection)
+        let attempts = 0;
+        const maxAttempts = 60; // 30 seconds
+        while (!connectedAccountId && attempts < maxAttempts) {
+          await new Promise(r => setTimeout(r, 500));
+          attempts++;
         }
 
-        if (!accountId) {
-          // Request connection
-          const result = await wallet.requestSignIn({
-            contractId: 'specflow-license.testnet',
-          });
-          if (result && result.accountId) {
-            accountId = result.accountId;
-          } else {
-            // Try getting accounts again after sign in
-            const accounts = await wallet.getAccounts();
-            if (accounts && accounts.length > 0) {
-              accountId = accounts[0].accountId;
-            }
-          }
-        }
-
-        if (!accountId) {
-          throw new Error('Failed to connect wallet. Please try again.');
+        if (!connectedAccountId) {
+          throw new Error('Wallet connection timed out. Please try again.');
         }
 
         setSigningMessage('Getting authentication challenge...');
@@ -257,6 +248,9 @@ export function loginPage(): string {
         }
 
         setSigningMessage('Please sign the message in your wallet...');
+
+        // Get the wallet instance for signing
+        const wallet = await connector.wallet();
 
         // Create nonce for NEP-413
         const nonce = new Uint8Array(32);
@@ -280,7 +274,7 @@ export function loginPage(): string {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            nearAccountId: signResult.accountId || accountId,
+            nearAccountId: signResult.accountId || connectedAccountId,
             signature: signResult.signature,
             publicKey: signResult.publicKey,
             message: challengeData.challenge,
