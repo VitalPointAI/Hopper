@@ -1,25 +1,15 @@
 import * as vscode from 'vscode';
-// LicenseValidator kept for per-command gating in 02-02
 import { LicenseValidator } from '../licensing/validator';
-
-/**
- * Result metadata returned by the SpecFlow chat participant
- */
-interface ISpecflowResult extends vscode.ChatResult {
-  metadata?: {
-    lastCommand?: string;
-    phaseNumber?: number;
-  };
-}
+import { getCommandHandler, isValidCommand, ISpecflowResult, CommandContext } from './commands';
 
 /**
  * Create and register the @specflow chat participant
  *
- * The participant forwards prompts to the selected language model
- * and streams responses. Phase 2+ features require a Pro license.
+ * The participant routes slash commands to handlers and forwards
+ * general prompts to the selected language model.
  *
  * @param context - Extension context for resource paths and subscriptions
- * @param licenseValidator - License validator for phase gating
+ * @param licenseValidator - License validator for per-command gating
  * @returns Disposable for the chat participant
  */
 export function createSpecflowParticipant(
@@ -40,18 +30,38 @@ export function createSpecflowParticipant(
     stream: vscode.ChatResponseStream,
     token: vscode.CancellationToken
   ): Promise<ISpecflowResult> => {
-    // Note: License gating is per-command, implemented in 02-02 (slash command routing)
-    // Basic chat conversations are free for all users
-
     // Show progress while processing
     stream.progress('Processing your request...');
 
-    // Build messages for the model
-    // Note: Use User messages for system instructions (System messages not supported)
+    // Route slash commands to handlers
+    if (request.command) {
+      const commandHandler = getCommandHandler(request.command);
+
+      if (commandHandler) {
+        // Build command context
+        const ctx: CommandContext = {
+          request,
+          context: chatContext,
+          stream,
+          token,
+          licenseValidator
+        };
+
+        return commandHandler(ctx);
+      }
+
+      // Unknown command - show error
+      stream.markdown(`**Unknown command:** /${request.command}\n\nUse **/help** to see available commands.\n`);
+      return { metadata: { lastCommand: 'error' } };
+    }
+
+    // No command - general chat assistance
+    // Build messages for the model with SpecFlow context
     const messages: vscode.LanguageModelChatMessage[] = [
       vscode.LanguageModelChatMessage.User(
         'You are SpecFlow, a model-agnostic structured planning assistant for VSCode. ' +
-        'Help users plan and execute software projects using the SpecFlow framework. ' +
+        'Help the user understand the SpecFlow framework or suggest appropriate commands. ' +
+        'Available commands: /new-project, /create-roadmap, /plan-phase, /execute-plan, /progress, /help. ' +
         'Be concise and actionable.'
       ),
       vscode.LanguageModelChatMessage.User(request.prompt)
@@ -72,7 +82,7 @@ export function createSpecflowParticipant(
 
       return {
         metadata: {
-          lastCommand: 'chat'
+          lastCommand: undefined
         }
       };
     } catch (err) {
@@ -100,14 +110,59 @@ export function createSpecflowParticipant(
   // Set icon path (optional - will use default if not found)
   participant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'resources', 'icon.png');
 
-  // Set up follow-up provider for suggested next actions
+  // Set up follow-up provider for contextual suggestions based on last command
   participant.followupProvider = {
     provideFollowups(
       result: ISpecflowResult,
       _context: vscode.ChatContext,
       _token: vscode.CancellationToken
     ): vscode.ChatFollowup[] {
-      // Note: Per-command license follow-ups will be added in 02-02
+      const lastCmd = result.metadata?.lastCommand;
+
+      // Contextual suggestions based on last command
+      if (lastCmd === 'help') {
+        return [
+          { prompt: '/new-project', label: 'Start new project' },
+          { prompt: '/progress', label: 'Check progress' }
+        ];
+      }
+
+      if (lastCmd === 'new-project') {
+        return [
+          { prompt: '/create-roadmap', label: 'Create roadmap' },
+          { prompt: '/help', label: 'Show commands' }
+        ];
+      }
+
+      if (lastCmd === 'create-roadmap') {
+        return [
+          { prompt: '/plan-phase', label: 'Plan a phase' },
+          { prompt: '/progress', label: 'Check progress' }
+        ];
+      }
+
+      if (lastCmd === 'plan-phase') {
+        return [
+          { prompt: '/execute-plan', label: 'Execute plan' },
+          { prompt: '/progress', label: 'Check progress' }
+        ];
+      }
+
+      if (lastCmd === 'execute-plan') {
+        return [
+          { prompt: '/progress', label: 'Check progress' },
+          { prompt: '/plan-phase', label: 'Plan next phase' }
+        ];
+      }
+
+      if (lastCmd === 'progress') {
+        return [
+          { prompt: '/plan-phase', label: 'Plan a phase' },
+          { prompt: '/execute-plan', label: 'Execute plan' }
+        ];
+      }
+
+      // Default suggestions for general chat or errors
       return [
         { prompt: '/help', label: 'Show commands' },
         { prompt: '/progress', label: 'Check progress' }
@@ -117,3 +172,6 @@ export function createSpecflowParticipant(
 
   return participant;
 }
+
+// Re-export ISpecflowResult for external consumers
+export type { ISpecflowResult } from './commands';
