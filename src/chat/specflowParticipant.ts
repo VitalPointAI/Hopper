@@ -40,8 +40,8 @@ export function createSpecflowParticipant(
     stream: vscode.ChatResponseStream,
     token: vscode.CancellationToken
   ): Promise<ISpecflowResult> => {
-    // Check license for Phase 2+ access
-    const hasAccess = await checkPhaseAccess(2, licenseValidator, context);
+    // Check license for Phase 2+ access (quiet mode - we handle UX in chat)
+    const hasAccess = await checkPhaseAccess(2, licenseValidator, context, { quiet: true });
 
     if (!hasAccess) {
       // User doesn't have Pro license - show upgrade message
