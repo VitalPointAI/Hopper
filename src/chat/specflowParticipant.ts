@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
+// LicenseValidator kept for per-command gating in 02-02
 import { LicenseValidator } from '../licensing/validator';
-import { checkPhaseAccess } from '../licensing/phaseGate';
 
 /**
  * Result metadata returned by the SpecFlow chat participant
