@@ -23,7 +23,33 @@
         "name": "specflow",
         "fullName": "SpecFlow",
         "description": "Model-agnostic structured planning for agent chat",
-        "isSticky": true
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "new-project",
+            "description": "Initialize a new project with PROJECT.md"
+          },
+          {
+            "name": "create-roadmap",
+            "description": "Create roadmap with phases for the project"
+          },
+          {
+            "name": "plan-phase",
+            "description": "Create detailed execution plan for a phase"
+          },
+          {
+            "name": "execute-plan",
+            "description": "Execute a PLAN.md file"
+          },
+          {
+            "name": "progress",
+            "description": "Check project progress and current state"
+          },
+          {
+            "name": "help",
+            "description": "Show available SpecFlow commands"
+          }
+        ]
       }
     ],
     "languageModelChatProviders": [
