@@ -39,7 +39,7 @@ export async function generateAdminChallenge(env: Env): Promise<string> {
 }
 
 /**
- * Verify admin wallet signature
+ * Verify admin wallet signature (NEP-413 format)
  */
 export async function verifyAdminSignature(
   env: Env,
@@ -48,9 +48,11 @@ export async function verifyAdminSignature(
     signature: string;
     publicKey: string;
     message: string;
+    nonce?: number[];
+    recipient?: string;
   }
 ): Promise<{ valid: boolean; error?: string }> {
-  const { nearAccountId, signature, publicKey, message } = params;
+  const { nearAccountId, signature, publicKey, message, nonce, recipient } = params;
 
   // Verify nearAccountId matches env.ADMIN_WALLET
   if (nearAccountId !== env.ADMIN_WALLET) {
@@ -66,8 +68,8 @@ export async function verifyAdminSignature(
     return { valid: false, error: 'Invalid challenge format: missing nonce' };
   }
 
-  const nonce = nonceMatch[1];
-  const challengeKey = `${CHALLENGE_PREFIX}${nonce}`;
+  const challengeNonce = nonceMatch[1];
+  const challengeKey = `${CHALLENGE_PREFIX}${challengeNonce}`;
   const storedChallenge = await env.PROCESSED_EVENTS.get(challengeKey);
 
   if (!storedChallenge) {
@@ -89,18 +91,31 @@ export async function verifyAdminSignature(
     return { valid: false, error: 'Challenge expired' };
   }
 
-  // Verify the signature using @near-js/crypto
+  // Verify the signature using NEP-413 format
   try {
     const pubKey = PublicKey.fromString(publicKey);
-    const messageBytes = new TextEncoder().encode(message);
 
     // Decode base64 signature
     const signatureBytes = Uint8Array.from(atob(signature), (c) => c.charCodeAt(0));
 
-    const isValid = pubKey.verify(messageBytes, signatureBytes);
+    // For NEP-413, we need to verify the hash of the Borsh-encoded payload
+    // The payload format is: tag (4 bytes) + message (string) + nonce (32 bytes) + recipient (string) + callbackUrl (optional string)
+    if (nonce && recipient) {
+      // NEP-413 verification
+      const payloadHash = await createNep413PayloadHash(message, nonce, recipient);
+      const isValid = pubKey.verify(payloadHash, signatureBytes);
 
-    if (!isValid) {
-      return { valid: false, error: 'Invalid signature' };
+      if (!isValid) {
+        return { valid: false, error: 'Invalid signature' };
+      }
+    } else {
+      // Fallback to raw message verification (legacy)
+      const messageBytes = new TextEncoder().encode(message);
+      const isValid = pubKey.verify(messageBytes, signatureBytes);
+
+      if (!isValid) {
+        return { valid: false, error: 'Invalid signature' };
+      }
     }
 
     // Delete challenge after successful verification (one-time use)
@@ -111,6 +126,115 @@ export async function verifyAdminSignature(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { valid: false, error: `Signature verification failed: ${errorMessage}` };
   }
+}
+
+/**
+ * Create NEP-413 payload hash for signature verification
+ * Format: SHA256(tag + borsh_serialize(Payload))
+ * where tag = 2^31 + 413 = 2147484061
+ */
+async function createNep413PayloadHash(
+  message: string,
+  nonce: number[],
+  recipient: string,
+  callbackUrl?: string
+): Promise<Uint8Array> {
+  // NEP-413 tag: 2^31 + 413 = 2147484061
+  const tag = 2147484061;
+
+  // Borsh encode the payload
+  const payloadBytes = borshSerializeNep413Payload(message, nonce, recipient, callbackUrl);
+
+  // Prepend the tag (4 bytes, little-endian)
+  const tagBytes = new Uint8Array(4);
+  tagBytes[0] = tag & 0xff;
+  tagBytes[1] = (tag >> 8) & 0xff;
+  tagBytes[2] = (tag >> 16) & 0xff;
+  tagBytes[3] = (tag >> 24) & 0xff;
+
+  // Concatenate tag + payload
+  const fullPayload = new Uint8Array(tagBytes.length + payloadBytes.length);
+  fullPayload.set(tagBytes, 0);
+  fullPayload.set(payloadBytes, tagBytes.length);
+
+  // SHA-256 hash
+  const hashBuffer = await crypto.subtle.digest('SHA-256', fullPayload);
+  return new Uint8Array(hashBuffer);
+}
+
+/**
+ * Borsh serialize NEP-413 payload
+ * Payload { message: String, nonce: [u8; 32], recipient: String, callbackUrl: Option<String> }
+ */
+function borshSerializeNep413Payload(
+  message: string,
+  nonce: number[],
+  recipient: string,
+  callbackUrl?: string
+): Uint8Array {
+  const encoder = new TextEncoder();
+
+  // Encode message (4-byte length prefix + UTF-8 bytes)
+  const messageBytes = encoder.encode(message);
+  const messageLenBytes = new Uint8Array(4);
+  messageLenBytes[0] = messageBytes.length & 0xff;
+  messageLenBytes[1] = (messageBytes.length >> 8) & 0xff;
+  messageLenBytes[2] = (messageBytes.length >> 16) & 0xff;
+  messageLenBytes[3] = (messageBytes.length >> 24) & 0xff;
+
+  // Nonce is fixed 32 bytes
+  const nonceBytes = new Uint8Array(nonce);
+
+  // Encode recipient (4-byte length prefix + UTF-8 bytes)
+  const recipientBytes = encoder.encode(recipient);
+  const recipientLenBytes = new Uint8Array(4);
+  recipientLenBytes[0] = recipientBytes.length & 0xff;
+  recipientLenBytes[1] = (recipientBytes.length >> 8) & 0xff;
+  recipientLenBytes[2] = (recipientBytes.length >> 16) & 0xff;
+  recipientLenBytes[3] = (recipientBytes.length >> 24) & 0xff;
+
+  // Encode callbackUrl (Option<String>: 1 byte for Some/None + optional length + bytes)
+  let callbackUrlBytes: Uint8Array;
+  if (callbackUrl) {
+    const urlBytes = encoder.encode(callbackUrl);
+    const urlLenBytes = new Uint8Array(4);
+    urlLenBytes[0] = urlBytes.length & 0xff;
+    urlLenBytes[1] = (urlBytes.length >> 8) & 0xff;
+    urlLenBytes[2] = (urlBytes.length >> 16) & 0xff;
+    urlLenBytes[3] = (urlBytes.length >> 24) & 0xff;
+    callbackUrlBytes = new Uint8Array(1 + 4 + urlBytes.length);
+    callbackUrlBytes[0] = 1; // Some
+    callbackUrlBytes.set(urlLenBytes, 1);
+    callbackUrlBytes.set(urlBytes, 5);
+  } else {
+    callbackUrlBytes = new Uint8Array([0]); // None
+  }
+
+  // Concatenate all parts
+  const totalLength =
+    messageLenBytes.length +
+    messageBytes.length +
+    nonceBytes.length +
+    recipientLenBytes.length +
+    recipientBytes.length +
+    callbackUrlBytes.length;
+
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+
+  result.set(messageLenBytes, offset);
+  offset += messageLenBytes.length;
+  result.set(messageBytes, offset);
+  offset += messageBytes.length;
+  result.set(nonceBytes, offset);
+  offset += nonceBytes.length;
+  result.set(recipientLenBytes, offset);
+  offset += recipientLenBytes.length;
+  result.set(recipientBytes, offset);
+  offset += recipientBytes.length;
+  result.set(callbackUrlBytes, offset);
+
+  return result;
 }
 
 /**

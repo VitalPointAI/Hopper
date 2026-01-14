@@ -118,7 +118,7 @@ app.get('/admin/auth/challenge', async (c) => {
 
 /**
  * Verify admin wallet signature and issue JWT
- * Body: { nearAccountId, signature, publicKey, message }
+ * Body: { nearAccountId, signature, publicKey, message, nonce?, recipient? }
  */
 app.post('/admin/auth/verify', async (c) => {
   const body = await c.req.json<{
@@ -126,9 +126,11 @@ app.post('/admin/auth/verify', async (c) => {
     signature: string;
     publicKey: string;
     message: string;
+    nonce?: number[];
+    recipient?: string;
   }>();
 
-  const { nearAccountId, signature, publicKey, message } = body;
+  const { nearAccountId, signature, publicKey, message, nonce, recipient } = body;
 
   if (!nearAccountId || !signature || !publicKey || !message) {
     return c.json({ error: 'Missing required fields' }, 400);
@@ -139,6 +141,8 @@ app.post('/admin/auth/verify', async (c) => {
     signature,
     publicKey,
     message,
+    nonce,
+    recipient,
   });
 
   if (!result.valid) {

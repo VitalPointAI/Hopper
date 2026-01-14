@@ -259,6 +259,7 @@ export function loginPage(network: string): string {
         setSigningMessage('Verifying signature...');
 
         // Submit to server for verification
+        // Include nonce and recipient for NEP-413 verification
         const verifyResponse = await fetch('/admin/auth/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -267,6 +268,8 @@ export function loginPage(network: string): string {
             signature: signResult.signature,
             publicKey: signResult.publicKey,
             message: challengeData.challenge,
+            nonce: Array.from(nonce),
+            recipient: 'specflow-admin',
           })
         });
 
