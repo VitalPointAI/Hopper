@@ -3,6 +3,8 @@ import { NearAiChatModelProvider } from './provider/nearAiProvider';
 import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat, getApiKeyInstructions } from './auth/nearAuth';
 import { LicenseValidator } from './licensing/validator';
 import { checkPhaseAccess, showUpgradeModal, connectWallet, disconnectWallet } from './licensing/phaseGate';
+import { trackActivation } from './telemetry/telemetryService';
+import { createSpecflowParticipant } from './chat/specflowParticipant';
 
 // Export license validator for use by chat participant
 let licenseValidator: LicenseValidator | undefined;
@@ -14,6 +16,11 @@ let licenseValidator: LicenseValidator | undefined;
 export function activate(context: vscode.ExtensionContext): void {
   console.log('SpecFlow extension activated');
 
+  // Track activation telemetry (async, non-blocking)
+  trackActivation(context).catch(() => {
+    // Silently ignore telemetry errors
+  });
+
   // Initialize license validator
   licenseValidator = new LicenseValidator(context);
 
@@ -24,6 +31,10 @@ export function activate(context: vscode.ExtensionContext): void {
     provider
   );
   context.subscriptions.push(providerDisposable);
+
+  // Create and register the @specflow chat participant
+  const chatParticipant = createSpecflowParticipant(context, licenseValidator);
+  context.subscriptions.push(chatParticipant);
 
   // Register the management command for API key setup
   const manageCommand = vscode.commands.registerCommand(
