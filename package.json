@@ -12,7 +12,9 @@
     "AI",
     "Chat"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onChatParticipant:specflow.chat-participant"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "chatParticipants": [
