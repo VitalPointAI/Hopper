@@ -107,13 +107,7 @@ export function createSpecflowParticipant(
       _context: vscode.ChatContext,
       _token: vscode.CancellationToken
     ): vscode.ChatFollowup[] {
-      // Provide different follow-ups based on the last command
-      if (result.metadata?.lastCommand === 'license-required') {
-        return [
-          { prompt: 'What features are included in SpecFlow Pro?', label: 'Learn about Pro' }
-        ];
-      }
-
+      // Note: Per-command license follow-ups will be added in 02-02
       return [
         { prompt: '/help', label: 'Show commands' },
         { prompt: '/progress', label: 'Check progress' }
