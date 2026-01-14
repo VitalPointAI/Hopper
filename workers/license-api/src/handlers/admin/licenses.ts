@@ -9,7 +9,7 @@ import { licensesFragment } from './ui';
 
 interface LicenseInfo {
   nearAccountId: string;
-  source: 'stripe' | 'crypto';
+  source: 'stripe' | 'crypto' | 'admin';
   subscriptionStatus: string;
   currentPeriodEnd?: number;
   nextChargeDate?: string;
@@ -17,6 +17,27 @@ interface LicenseInfo {
     isLicensed: boolean;
     expiry: string | null;
   };
+}
+
+/**
+ * Check if a string looks like a complete NEAR account ID
+ * (ends with .near, .testnet, or is a 64-char hex implicit account)
+ */
+function isCompleteNearAccountId(search: string): boolean {
+  if (!search || search.length < 2) return false;
+
+  // Check for named accounts (.near, .testnet, .tg)
+  if (search.includes('.')) {
+    const validSuffixes = ['.near', '.testnet', '.tg'];
+    return validSuffixes.some((suffix) => search.endsWith(suffix));
+  }
+
+  // Check for implicit account (64-char hex)
+  if (search.length === 64 && /^[0-9a-f]+$/i.test(search)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -101,6 +122,23 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
     const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 50);
 
     const licenses: LicenseInfo[] = [];
+    const seenAccounts = new Set<string>();
+
+    // If search looks like a complete NEAR account ID, check on-chain directly first
+    // This finds licenses granted via admin that have no subscription record
+    if (isCompleteNearAccountId(search)) {
+      const contractLicense = await queryContractLicense(c.env, search);
+      if (contractLicense.isLicensed || contractLicense.expiry) {
+        // License exists on-chain - add it as admin-granted
+        licenses.push({
+          nearAccountId: search,
+          source: 'admin',
+          subscriptionStatus: contractLicense.isLicensed ? 'active' : 'expired',
+          contractLicense,
+        });
+        seenAccounts.add(search);
+      }
+    }
 
     // Search Stripe subscriptions by NEAR account ID
     // We need to check the near: prefix mappings
@@ -113,6 +151,10 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
       if (licenses.length >= limit) break;
 
       const nearAccountId = key.name.replace('near:', '');
+
+      // Skip if we already have this account (from direct on-chain query)
+      if (seenAccounts.has(nearAccountId)) continue;
+
       const customerId = await c.env.SUBSCRIPTIONS.get(key.name);
 
       if (customerId) {
@@ -128,6 +170,7 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
             currentPeriodEnd: sub.currentPeriodEnd,
             contractLicense,
           });
+          seenAccounts.add(nearAccountId);
         }
       }
     }
@@ -142,6 +185,10 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
       if (licenses.length >= limit) break;
 
       const nearAccountId = key.name.replace('crypto_sub:', '');
+
+      // Skip if we already have this account
+      if (seenAccounts.has(nearAccountId)) continue;
+
       const subData = await c.env.CRYPTO_SUBSCRIPTIONS.get(key.name);
 
       if (subData) {
@@ -155,6 +202,7 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
           nextChargeDate: sub.nextChargeDate,
           contractLicense,
         });
+        seenAccounts.add(nearAccountId);
       }
     }
 

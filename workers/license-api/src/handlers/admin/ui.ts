@@ -396,6 +396,13 @@ export function statsFragment(stats: {
   crypto: { active: number; cancelled: number; pending: number; pastDue: number };
   totalActive: number;
   estimatedMonthlyRevenue: number;
+  telemetry: {
+    totalInstallations: number;
+    activeInstallations: number;
+    loggedInUsers: number;
+    conversions: number;
+    conversionRate: number;
+  };
 }): string {
   // Calculate revenue breakdown (using known prices)
   const stripeMonthlyUsd = 5;
@@ -404,7 +411,8 @@ export function statsFragment(stats: {
   const cryptoRevenue = stats.crypto.active * cryptoMonthlyUsd;
 
   return `
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <!-- Subscription Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
     <!-- Stripe Subscriptions -->
     <div class="bg-white overflow-hidden shadow rounded-lg">
       <div class="p-5">
@@ -473,6 +481,105 @@ export function statsFragment(stats: {
       <div class="bg-gray-50 px-5 py-3">
         <div class="text-sm text-gray-500">
           Stripe: $${stripeRevenue.toFixed(2)} | Crypto: $${cryptoRevenue.toFixed(2)}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Installation & Conversion Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <!-- Total Installations -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Total Installs</dt>
+              <dd class="text-3xl font-semibold text-gray-900">${stats.telemetry.totalInstallations}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-5 py-3">
+        <div class="text-sm text-gray-500">
+          ${stats.telemetry.activeInstallations} active (30d)
+        </div>
+      </div>
+    </div>
+
+    <!-- Logged In Users -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Logged In</dt>
+              <dd class="text-3xl font-semibold text-gray-900">${stats.telemetry.loggedInUsers}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-5 py-3">
+        <div class="text-sm text-gray-500">
+          Users with NEAR account
+        </div>
+      </div>
+    </div>
+
+    <!-- Conversions -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Pro Users</dt>
+              <dd class="text-3xl font-semibold text-gray-900">${stats.telemetry.conversions}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-5 py-3">
+        <div class="text-sm text-gray-500">
+          Free to Pro upgrades
+        </div>
+      </div>
+    </div>
+
+    <!-- Conversion Rate -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Conversion Rate</dt>
+              <dd class="text-3xl font-semibold text-gray-900">${stats.telemetry.conversionRate}%</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-5 py-3">
+        <div class="text-sm text-gray-500">
+          Installs → Pro
         </div>
       </div>
     </div>
@@ -600,7 +707,7 @@ export function licensesPage(): string {
  */
 export function licensesFragment(licenses: Array<{
   nearAccountId: string;
-  source: 'stripe' | 'crypto';
+  source: 'stripe' | 'crypto' | 'admin';
   subscriptionStatus: string;
   currentPeriodEnd?: number;
   nextChargeDate?: string;
@@ -624,10 +731,24 @@ export function licensesFragment(licenses: Array<{
       const status = lic.contractLicense?.isLicensed
         ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>'
         : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Expired</span>';
-      const sourceLabel =
-        lic.source === 'stripe'
-          ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">Stripe</span>'
-          : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Crypto</span>';
+      let sourceLabel: string;
+      switch (lic.source) {
+        case 'stripe':
+          sourceLabel =
+            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">Stripe</span>';
+          break;
+        case 'crypto':
+          sourceLabel =
+            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Crypto</span>';
+          break;
+        case 'admin':
+          sourceLabel =
+            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">Admin</span>';
+          break;
+        default:
+          sourceLabel =
+            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Unknown</span>';
+      }
 
       return `
       <tr class="hover:bg-gray-50">
