@@ -112,7 +112,7 @@ function navHeader(activePage: string): string {
  * Login page HTML
  * Uses @hot-labs/near-connect for multi-wallet NEAR authentication
  */
-export function loginPage(): string {
+export function loginPage(network: string): string {
   const content = `
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
     <div class="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
@@ -184,7 +184,7 @@ export function loginPage(): string {
     // Initialize the connector
     async function initConnector() {
       connector = new NearConnector({
-        network: 'testnet',
+        network: '${network}',
         features: { signMessage: true }
       });
 
@@ -843,7 +843,7 @@ export function subscriptionsFragment(subscriptions: Array<{
  * GET /admin/login
  */
 export function handleAdminLogin(c: Context<{ Bindings: Env }>): Response {
-  return c.html(loginPage());
+  return c.html(loginPage(c.env.NEAR_NETWORK));
 }
 
 /**

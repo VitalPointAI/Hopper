@@ -17,6 +17,7 @@ function paymentPage(subscription: {
   monthlyAmountUsd: string;
   depositAddress: string;
   status: string;
+  network: string;
 }): string {
   const isPending = subscription.status === 'pending';
 
@@ -189,7 +190,7 @@ function paymentPage(subscription: {
     // Initialize the connector
     async function initConnector() {
       connector = new NearConnector({
-        network: 'testnet',
+        network: '${subscription.network}',
         features: { signAndSendTransaction: true }
       });
 
@@ -421,5 +422,6 @@ export async function handleCryptoPaymentPage(
     monthlyAmountUsd: subscription.monthlyAmountUsd,
     depositAddress: subscription.intentId, // deposit address is the intent ID
     status: subscription.status,
+    network: c.env.NEAR_NETWORK,
   }));
 }
