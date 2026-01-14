@@ -3,6 +3,14 @@ import { LicenseValidator } from './validator';
 import { UpgradeModalPanel } from './upgradeModal';
 
 /**
+ * Options for checkPhaseAccess behavior
+ */
+interface CheckPhaseAccessOptions {
+  /** If true, don't show modal dialogs - just return result */
+  quiet?: boolean;
+}
+
+/**
  * Check if the user has access to a specific phase
  *
  * Phase 1 is always free. Phase 2+ requires:
@@ -12,12 +20,14 @@ import { UpgradeModalPanel } from './upgradeModal';
  * @param phaseNumber - The phase number to check access for
  * @param validator - LicenseValidator instance
  * @param context - Extension context for showing modal
+ * @param options - Optional behavior configuration
  * @returns true if access is granted, false if gated
  */
 export async function checkPhaseAccess(
   phaseNumber: number,
   validator: LicenseValidator,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
+  options?: CheckPhaseAccessOptions
 ): Promise<boolean> {
   // Phase 1 is always free
   if (phaseNumber <= 1) {
@@ -26,6 +36,11 @@ export async function checkPhaseAccess(
 
   // Check if user is authenticated
   if (!validator.isAuthenticated()) {
+    // In quiet mode, just return false without showing dialogs
+    if (options?.quiet) {
+      return false;
+    }
+
     const action = await vscode.window.showWarningMessage(
       'SpecFlow Pro requires wallet authentication to verify your license.',
       'Connect Wallet',
@@ -65,10 +80,13 @@ export async function checkPhaseAccess(
       const refreshedStatus = await validator.checkLicense();
 
       if (!refreshedStatus || !refreshedStatus.isLicensed) {
-        vscode.window.showWarningMessage(
-          'Your SpecFlow Pro license has expired. Please renew to continue using Phase 2+ features.'
-        );
-        UpgradeModalPanel.show(context, nearAccountId);
+        // In quiet mode, just return false without showing dialogs
+        if (!options?.quiet) {
+          vscode.window.showWarningMessage(
+            'Your SpecFlow Pro license has expired. Please renew to continue using Phase 2+ features.'
+          );
+          UpgradeModalPanel.show(context, nearAccountId);
+        }
         return false;
       }
     }
@@ -76,8 +94,10 @@ export async function checkPhaseAccess(
     return true;
   }
 
-  // Not licensed - show upgrade modal
-  UpgradeModalPanel.show(context, nearAccountId);
+  // Not licensed - show upgrade modal (unless quiet mode)
+  if (!options?.quiet) {
+    UpgradeModalPanel.show(context, nearAccountId);
+  }
   return false;
 }
 
