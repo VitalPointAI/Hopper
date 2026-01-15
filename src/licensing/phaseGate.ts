@@ -56,13 +56,16 @@ export async function checkPhaseAccess(
     return false;
   }
 
-  // Get authenticated account ID
-  const nearAccountId = validator.getAuthenticatedAccountId();
-  if (!nearAccountId) {
+  // Get authenticated session
+  const authSession = validator.getSession();
+  if (!authSession) {
     // This shouldn't happen if isAuthenticated() is true, but handle it
-    console.error('Authenticated but no account ID');
+    console.error('Authenticated but no session');
     return false;
   }
+
+  // For cache operations, we need the user ID
+  const userId = authSession.userId;
 
   // Check license status
   const status = await validator.checkLicense();
@@ -76,7 +79,7 @@ export async function checkPhaseAccess(
     // Check if license is expired
     if (status.expiresAt && status.expiresAt < Date.now() / 1000) {
       // License expired - clear cache and recheck
-      validator.clearCache(nearAccountId);
+      validator.clearCache(userId);
       const refreshedStatus = await validator.checkLicense();
 
       if (!refreshedStatus || !refreshedStatus.isLicensed) {
@@ -85,7 +88,7 @@ export async function checkPhaseAccess(
           vscode.window.showWarningMessage(
             'Your SpecFlow Pro license has expired. Please renew to continue using Phase 2+ features.'
           );
-          UpgradeModalPanel.show(context, nearAccountId);
+          UpgradeModalPanel.show(context, authSession);
         }
         return false;
       }
@@ -96,13 +99,17 @@ export async function checkPhaseAccess(
 
   // Not licensed - show upgrade modal (unless quiet mode)
   if (!options?.quiet) {
-    UpgradeModalPanel.show(context, nearAccountId);
+    UpgradeModalPanel.show(context, authSession);
   }
   return false;
 }
 
 /**
  * Show the upgrade modal manually (for command palette)
+ *
+ * Works with both authenticated and unauthenticated users:
+ * - Authenticated: Shows modal with their account info
+ * - Unauthenticated: Shows modal with sign-in prompts
  *
  * @param validator - LicenseValidator instance
  * @param context - Extension context for showing modal
@@ -111,27 +118,11 @@ export async function showUpgradeModal(
   validator: LicenseValidator,
   context: vscode.ExtensionContext
 ): Promise<void> {
-  // Must be authenticated to show upgrade modal
-  if (validator.isAuthenticated()) {
-    const accountId = validator.getAuthenticatedAccountId();
-    if (accountId) {
-      UpgradeModalPanel.show(context, accountId);
-      return;
-    }
-  }
+  // Get session (may be null if not authenticated)
+  const authSession = validator.getSession();
 
-  // Not authenticated - prompt to connect wallet
-  const action = await vscode.window.showWarningMessage(
-    'Please connect your NEAR wallet to view upgrade options.',
-    'Connect Wallet',
-    'Learn More'
-  );
-
-  if (action === 'Connect Wallet') {
-    await validator.startAuth();
-  } else if (action === 'Learn More') {
-    await vscode.env.openExternal(vscode.Uri.parse('https://specflow.dev/pro'));
-  }
+  // Show the modal - it handles both authenticated and unauthenticated users
+  UpgradeModalPanel.show(context, authSession);
 }
 
 /**

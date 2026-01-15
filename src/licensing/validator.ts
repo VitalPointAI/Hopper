@@ -62,6 +62,14 @@ export class LicenseValidator {
   }
 
   /**
+   * Get the current auth session
+   * Returns null if not authenticated
+   */
+  getSession(): AuthSession | null {
+    return this.authManager.getSession();
+  }
+
+  /**
    * Load configuration from VSCode settings
    */
   private loadConfig(): LicenseConfig {
