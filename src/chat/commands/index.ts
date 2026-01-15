@@ -3,6 +3,7 @@ import { CommandHandler, CommandRegistry, ISpecflowResult, CommandContext } from
 import { formatContextForPrompt, truncateContent } from '../context/projectContext';
 import { handleNewProject } from './newProject';
 import { handleCreateRoadmap } from './createRoadmap';
+import { handlePlanPhase } from './planPhase';
 
 /**
  * Command definitions with descriptions for help output
@@ -182,10 +183,11 @@ registry.set('help', helpHandler);
 registry.set('status', statusHandler);
 registry.set('new-project', handleNewProject);
 registry.set('create-roadmap', handleCreateRoadmap);
+registry.set('plan-phase', handlePlanPhase);
 
 // Register placeholder handlers for all other commands
 for (const cmd of COMMAND_DEFINITIONS) {
-  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project' && cmd.name !== 'create-roadmap') {
+  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project' && cmd.name !== 'create-roadmap' && cmd.name !== 'plan-phase') {
     registry.set(cmd.name, createPlaceholderHandler(cmd.name, cmd.description));
   }
 }
