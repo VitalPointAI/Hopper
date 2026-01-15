@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Extension scaffolding, NEAR AI model registration in VSCode
 - [x] **Phase 1.5: Licensing** - INSERTED - NEAR license contract, Stripe subscription, x402 crypto payments
+- [ ] **Phase 1.5.1: Infrastructure Deploy** - INSERTED - Deploy NEAR contract and Cloudflare Worker to production
 - [x] **Phase 2: Chat Participant** - @specflow agent with command routing
 - [x] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
 - [ ] **Phase 4: Execution Commands** - PLAN.md execution, verification, git integration
@@ -51,6 +52,16 @@ Plans:
 - [x] 01.5-04: Extension license validation (check before Phase 2+ execution)
 - [x] 01.5-05: Admin wallet authentication and API endpoints
 - [x] 01.5-06: Admin dashboard UI and management actions
+
+### Phase 1.5.1: Infrastructure Deploy (INSERTED)
+**Goal**: Deploy licensing infrastructure to production (NEAR contract, Cloudflare Worker, KV namespaces)
+**Depends on**: Phase 1.5 (code must exist before deploying)
+**Research**: Unlikely (deployment of existing code)
+**Plans**: TBD
+
+Plans:
+- [x] 01.5.1-01: Deploy Cloudflare Worker with KV namespaces and secrets
+- [ ] 01.5.1-02: Deploy NEAR license contract to mainnet (license.specflow.near)
 
 ### Phase 2: Chat Participant
 **Goal**: @specflow chat participant responding to mentions with slash command routing
@@ -100,12 +111,13 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 6/6 | Complete | 2026-01-14 |
+| 1.5.1 Infrastructure Deploy | 1/2 | In progress | - |
 | 2. Chat Participant | 3/3 | Complete | 2026-01-15 |
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 0/3 | Not started | - |

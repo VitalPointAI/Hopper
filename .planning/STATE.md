@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 4 — Execution Commands (ready to plan)
+**Current focus:** Phase 1.5.1 — Infrastructure Deploy (urgent insertion)
 
 ## Current Position
 
-Phase: 3 of 5 (Planning Commands)
-Plan: 3 of 3 in current phase
-Status: Phase complete (with FIX)
-Last activity: 2026-01-15 — Completed 03-03-FIX.md (UAT fixes)
+Phase: 1.5.1 (Infrastructure Deploy - INSERTED)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-15 — Completed 01.5.1-01-PLAN.md (Worker deployment)
 
-Progress: ████████████████░░░ 80%
+Progress: █████████████████░░ 85%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22 (including FIX plans)
-- Average duration: 7.0 min
-- Total execution time: 147 min
+- Total plans completed: 23 (including FIX plans)
+- Average duration: 8.9 min
+- Total execution time: 204 min
 
 **By Phase:**
 
@@ -29,12 +29,13 @@ Progress: ████████████████░░░ 80%
 |-------|-------|-------|----------|
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
+| 01.5.1-infra-deploy | 1 | 57 min | 57 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (15 min), 03-02-FIX (5 min), 03-03 (4 min), 03-03-FIX (2 min)
-- Trend: Consistent execution, Phase 3 complete with UAT fixes
+- Last 5 plans: 03-03 (4 min), 03-03-FIX (2 min), 01.5.1-01 (57 min)
+- Trend: Infrastructure deployment took longer due to auth gates and verification
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 | 03-03-FIX | Per-command license gating | /plan-phase requires Pro license before execution |
 | 03-03-FIX | Inline execution context | Self-contained plans without external GSD references |
 | 03-03-FIX | Explicit usage help | Show help when no argument instead of silent default |
+| 01.5.1-01 | Mainnet contract: license.specflow.near | Subaccount of specflow.near for licensing |
+| 01.5.1-01 | workers.dev subdomain: vitalpointai | Cloudflare Workers deployment target |
 
 ### Deferred Issues
 
@@ -88,9 +91,14 @@ Recent decisions affecting current work:
 ### Blockers/Concerns
 
 - **Cosmetic**: NEAR AI category header doesn't appear in dropdown (only in Manage Models). VSCode UI limitation, not blocking.
+- **Resolved (UAT-006)**: Worker deployed, wallet connection works. Remaining: NEAR contract deployment (01.5.1-02).
+
+### Roadmap Evolution
+
+- Phase 1.5.1 inserted after Phase 1.5: Infrastructure Deploy (URGENT) — Discovered during 03-03 UAT that licensing was built but never deployed
 
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 03-03-FIX.md (Phase 3 UAT fixes)
+Stopped at: Completed 01.5.1-01-PLAN.md (Worker deployed)
 Resume file: None
