@@ -31,3 +31,47 @@ export interface GeneratorResult {
   /** Error message (if failed) */
   error?: string;
 }
+
+/**
+ * Configuration for a single phase in the roadmap
+ */
+export interface PhaseConfig {
+  /** Phase number (1-based) */
+  number: number;
+  /** Phase name (kebab-case, e.g., "foundation", "core-features") */
+  name: string;
+  /** What this phase delivers */
+  goal: string;
+  /** Phase number this depends on (undefined for first phase) */
+  dependsOn?: number;
+  /** Whether research is likely needed for this phase */
+  researchLikely: boolean;
+  /** Topics that need investigating (when researchLikely is true) */
+  researchTopics?: string;
+}
+
+/**
+ * Configuration for generating ROADMAP.md
+ */
+export interface RoadmapConfig {
+  /** Project name */
+  projectName: string;
+  /** Overview paragraph describing the journey */
+  overview: string;
+  /** List of phases in the roadmap */
+  phases: PhaseConfig[];
+}
+
+/**
+ * Configuration for generating STATE.md
+ */
+export interface StateConfig {
+  /** Project name */
+  projectName: string;
+  /** Core value from PROJECT.md */
+  coreValue: string;
+  /** Current phase number */
+  currentPhase: number;
+  /** Total number of phases */
+  totalPhases: number;
+}
