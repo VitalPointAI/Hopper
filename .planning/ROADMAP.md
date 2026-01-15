@@ -71,7 +71,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01: /new-project command (PROJECT.md generation)
+- [x] 03-01: /new-project command (PROJECT.md generation)
 - [ ] 03-02: /create-roadmap command (ROADMAP.md, STATE.md)
 - [ ] 03-03: /plan-phase command (PLAN.md generation)
 
@@ -107,6 +107,6 @@ Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 6/6 | Complete | 2026-01-14 |
 | 2. Chat Participant | 3/3 | Complete | 2026-01-15 |
-| 3. Planning Commands | 0/3 | Not started | - |
+| 3. Planning Commands | 1/3 | In progress | - |
 | 4. Execution Commands | 0/3 | Not started | - |
 | 5. Session Management | 0/3 | Not started | - |
