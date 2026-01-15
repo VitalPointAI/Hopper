@@ -87,7 +87,7 @@ export class UpgradeModalPanel {
    */
   private async handleStripeCheckout(): Promise<void> {
     const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://license-api.specflow.workers.dev';
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
 
     try {
       vscode.window.showInformationMessage('Starting Stripe checkout...');
@@ -123,7 +123,7 @@ export class UpgradeModalPanel {
    */
   private async handleCryptoCheckout(): Promise<void> {
     const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://license-api.specflow.workers.dev';
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
 
     try {
       vscode.window.showInformationMessage('Starting crypto checkout...');

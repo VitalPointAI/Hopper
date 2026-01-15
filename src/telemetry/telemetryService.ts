@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 const INSTALL_ID_KEY = 'specflow.installId';
 
 // Default API URL - matches package.json specflow.licenseApiUrl default
-const DEFAULT_API_URL = 'https://license-api.specflow.workers.dev';
+const DEFAULT_API_URL = 'https://specflow-license-api.vitalpointai.workers.dev';
 
 /**
  * Get the API URL from VSCode configuration or use default

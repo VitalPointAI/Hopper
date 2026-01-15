@@ -103,7 +103,7 @@ export class WalletAuthManager {
    */
   async startAuth(): Promise<void> {
     const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://license-api.specflow.workers.dev';
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
     const network = config.get<string>('license.nearNetwork') ?? 'mainnet';
 
     // Generate challenge
@@ -146,7 +146,7 @@ export class WalletAuthManager {
    */
   async handleCallback(accountId: string, signature: string, publicKey: string): Promise<boolean> {
     const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://license-api.specflow.workers.dev';
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
 
     // Retrieve stored challenge
     const storedChallenge = this.context.globalState.get<string>(CHALLENGE_STORAGE_KEY);

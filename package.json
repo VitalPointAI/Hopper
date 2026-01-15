@@ -101,7 +101,7 @@
         },
         "specflow.licenseApiUrl": {
           "type": "string",
-          "default": "https://license-api.specflow.workers.dev",
+          "default": "https://specflow-license-api.vitalpointai.workers.dev",
           "description": "License API URL for checkout endpoints"
         }
       }
