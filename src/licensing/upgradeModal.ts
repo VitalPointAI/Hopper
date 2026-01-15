@@ -198,7 +198,7 @@ export class UpgradeModalPanel {
 
   /**
    * Handle sign-in request
-   * Shows quick pick for auth method selection
+   * Routes to appropriate auth flow based on payment type
    *
    * @param paymentType - The payment type that triggered sign-in ('stripe' or 'crypto')
    */
@@ -206,45 +206,15 @@ export class UpgradeModalPanel {
     // Store pending payment intent so we can resume after auth
     await this.context.globalState.update('specflow.pendingPayment', paymentType);
 
-    // For crypto payments, only offer NEAR wallet
+    // For crypto payments, go directly to wallet auth (no picker needed)
     if (paymentType === 'crypto') {
-      vscode.commands.executeCommand('specflow.signIn');
+      vscode.commands.executeCommand('specflow.connectWallet');
       this.dispose();
       return;
     }
 
-    // For Stripe payments, offer all auth options
-    const authOptions = [
-      { label: '$(globe) Sign in with Google', value: 'google' },
-      { label: '$(github) Sign in with GitHub', value: 'github' },
-      { label: '$(wallet) Sign in with NEAR Wallet', value: 'near' },
-    ];
-
-    const selected = await vscode.window.showQuickPick(authOptions, {
-      placeHolder: 'Choose sign-in method to continue with payment',
-      title: 'Sign In Required',
-    });
-
-    if (!selected) {
-      // User cancelled - clear pending payment
-      await this.context.globalState.update('specflow.pendingPayment', undefined);
-      return;
-    }
-
-    // Trigger the appropriate auth flow
-    switch (selected.value) {
-      case 'google':
-        vscode.commands.executeCommand('specflow.signInWithGoogle');
-        break;
-      case 'github':
-        vscode.commands.executeCommand('specflow.signInWithGitHub');
-        break;
-      case 'near':
-        vscode.commands.executeCommand('specflow.signIn');
-        break;
-    }
-
-    // Close the modal - auth callback will reopen checkout if needed
+    // For Stripe payments, show auth method picker via connect command
+    vscode.commands.executeCommand('specflow.connect');
     this.dispose();
   }
 
