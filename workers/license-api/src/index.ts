@@ -110,6 +110,17 @@ app.post('/api/telemetry', async (c) => {
   return handleTelemetry(c);
 });
 
+/**
+ * License check endpoint for authenticated users
+ * OAuth users: Returns license status from USER_LICENSES KV
+ * Wallet users: Should check NEAR contract directly
+ * Headers: Authorization: Bearer {jwt}
+ */
+app.get('/api/license/check', async (c) => {
+  const { handleLicenseCheck } = await import('./handlers/license-check');
+  return handleLicenseCheck(c);
+});
+
 // ============================================================================
 // User Authentication Routes
 // ============================================================================
