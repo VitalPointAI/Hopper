@@ -34,7 +34,7 @@ ${task.done}
 }
 
 /**
- * Generate PLAN.md content following GSD template
+ * Generate PLAN.md content following SpecFlow template
  *
  * @param config - Plan configuration
  * @returns Formatted PLAN.md content
@@ -89,9 +89,9 @@ Output: ${output}
 </objective>
 
 <execution_context>
-~/.claude/get-shit-done/workflows/execute-phase.md
-~/.claude/get-shit-done/templates/summary.md
-~/.claude/get-shit-done/references/checkpoints.md
+Execute tasks sequentially, committing after each task completion.
+Follow the plan's verification and success criteria.
+Create SUMMARY.md after all tasks complete.
 </execution_context>
 
 <context>
