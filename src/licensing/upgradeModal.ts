@@ -183,53 +183,65 @@ export class UpgradeModalPanel {
    * Handle crypto checkout button click
    */
   private async handleCryptoCheckout(): Promise<void> {
-    // Crypto checkout requires wallet authentication (NEAR account)
-    if (!this.authSession || this.authSession.authType !== 'wallet') {
-      vscode.window.showInformationMessage(
-        'Crypto payments require a NEAR wallet. Please sign in with NEAR wallet first.'
-      );
-      await this.handleSignIn('crypto');
-      return;
-    }
-
     const config = vscode.workspace.getConfiguration('specflow');
     const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
 
     try {
-      vscode.window.showInformationMessage('Starting crypto checkout...');
+      vscode.window.showInformationMessage('Opening crypto payment...');
 
-      const response = await fetch(`${apiUrl}/api/crypto/subscribe`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nearAccountId: this.authSession.userId,
-        }),
-      });
+      // If authenticated with wallet, use existing flow
+      if (this.authSession?.authType === 'wallet') {
+        const response = await fetch(`${apiUrl}/api/crypto/subscribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            nearAccountId: this.authSession.userId,
+          }),
+        });
 
-      // Handle existing subscription (409 Conflict) - resume instead of fail
-      if (response.status === 409) {
-        const data = await response.json() as {
-          error: string;
-          existingIntentId: string;
-          status: string;
-        };
+        // Handle existing subscription (409 Conflict) - resume instead of fail
+        if (response.status === 409) {
+          const data = await response.json() as {
+            error: string;
+            existingIntentId: string;
+            status: string;
+          };
 
-        // Resume existing subscription by navigating to payment page
-        vscode.window.showInformationMessage('Resuming existing subscription...');
-        const paymentUrl = `${apiUrl}/pay/${encodeURIComponent(data.existingIntentId)}`;
-        await vscode.env.openExternal(vscode.Uri.parse(paymentUrl));
+          // Resume existing subscription by navigating to payment page
+          vscode.window.showInformationMessage('Resuming existing subscription...');
+          const paymentUrl = `${apiUrl}/pay/${encodeURIComponent(data.existingIntentId)}`;
+          await vscode.env.openExternal(vscode.Uri.parse(paymentUrl));
+          return;
+        }
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(`Crypto checkout failed: ${error}`);
+        }
+
+        const data = await response.json() as { authorizationUrl: string };
+        await vscode.env.openExternal(vscode.Uri.parse(data.authorizationUrl));
         return;
       }
 
+      // For unauthenticated users, use new init flow
+      // This allows wallet connection on the payment page
+      const response = await fetch(`${apiUrl}/api/crypto/subscribe/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Crypto checkout failed: ${error}`);
+        throw new Error(`Failed to initialize payment: ${error}`);
       }
 
-      const data = await response.json() as { authorizationUrl: string };
-      await vscode.env.openExternal(vscode.Uri.parse(data.authorizationUrl));
+      const data = await response.json() as { paymentUrl: string };
+      await vscode.env.openExternal(vscode.Uri.parse(data.paymentUrl));
+      this.dispose(); // Close modal
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Crypto checkout error:', errorMessage);
