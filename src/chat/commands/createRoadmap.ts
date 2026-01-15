@@ -51,39 +51,100 @@ Guidelines:
 Always return valid JSON.`;
 
 /**
+ * Extract JSON from response, handling various markdown formats
+ */
+function extractJsonFromResponse(response: string): string {
+  // Try to find JSON block in markdown
+  const jsonBlockMatch = response.match(/```json\s*([\s\S]*?)```/);
+  if (jsonBlockMatch) {
+    return jsonBlockMatch[1].trim();
+  }
+
+  // Try generic code block
+  const codeBlockMatch = response.match(/```\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    return codeBlockMatch[1].trim();
+  }
+
+  // Try to find JSON object directly (starts with { ends with })
+  const jsonObjectMatch = response.match(/\{[\s\S]*\}/);
+  if (jsonObjectMatch) {
+    return jsonObjectMatch[0];
+  }
+
+  // Return trimmed response as fallback
+  return response.trim();
+}
+
+/**
+ * Fallback parser for non-JSON responses
+ * Attempts to extract phases from structured text
+ */
+function fallbackParsePhases(response: string): { overview: string; phases: Omit<PhaseConfig, 'number'>[] } | null {
+  try {
+    // Look for numbered list patterns like "1. Phase Name - Description"
+    const phasePattern = /(\d+)\.\s*\*?\*?([^*\-:]+)\*?\*?\s*[-:]\s*(.+)/g;
+    const phases: Omit<PhaseConfig, 'number'>[] = [];
+    let match;
+
+    while ((match = phasePattern.exec(response)) !== null) {
+      const name = match[2].trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      const goal = match[3].trim();
+
+      if (name && goal) {
+        phases.push({
+          name,
+          goal,
+          dependsOn: phases.length > 0 ? phases.length : undefined,
+          researchLikely: false
+        });
+      }
+    }
+
+    if (phases.length >= 2) {
+      // Extract overview from first paragraph or generate one
+      const overviewMatch = response.match(/^([^0-9\n][^\n]+)/);
+      const overview = overviewMatch
+        ? overviewMatch[1].trim()
+        : `A structured approach to building the project in ${phases.length} phases.`;
+
+      return { overview, phases };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Parse JSON from LLM response, handling markdown code blocks
+ * Falls back to text parsing if JSON fails
  */
 function parsePhaseResponse(response: string): { overview: string; phases: Omit<PhaseConfig, 'number'>[] } | null {
+  // First, try to extract and parse JSON
   try {
-    // Remove markdown code blocks if present
-    let cleaned = response.trim();
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.slice(7);
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.slice(3);
-    }
-    if (cleaned.endsWith('```')) {
-      cleaned = cleaned.slice(0, -3);
-    }
-    cleaned = cleaned.trim();
-
-    const parsed = JSON.parse(cleaned);
+    const jsonStr = extractJsonFromResponse(response);
+    const parsed = JSON.parse(jsonStr);
 
     // Validate structure
     if (!parsed.overview || typeof parsed.overview !== 'string') {
-      return null;
+      throw new Error('Missing overview');
     }
     if (!Array.isArray(parsed.phases) || parsed.phases.length === 0) {
-      return null;
+      throw new Error('Missing or empty phases');
     }
 
     // Validate each phase
     for (const phase of parsed.phases) {
       if (!phase.name || typeof phase.name !== 'string') {
-        return null;
+        throw new Error('Phase missing name');
       }
       if (!phase.goal || typeof phase.goal !== 'string') {
-        return null;
+        throw new Error('Phase missing goal');
       }
     }
 
@@ -104,7 +165,8 @@ function parsePhaseResponse(response: string): { overview: string; phases: Omit<
       }))
     };
   } catch {
-    return null;
+    // JSON parsing failed, try fallback parser
+    return fallbackParsePhases(response);
   }
 }
 
@@ -174,16 +236,29 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<ISpecflo
       const roadmapUri = vscode.Uri.joinPath(projectContext.planningUri, 'ROADMAP.md');
       stream.markdown('**Existing roadmap:**\n');
       stream.reference(roadmapUri);
+      stream.markdown('\n');
+
+      // Button to view existing roadmap
+      stream.button({
+        command: 'vscode.open',
+        arguments: [roadmapUri],
+        title: 'View ROADMAP.md'
+      });
     }
 
     stream.markdown('\n**Options:**\n');
-    stream.markdown('- View your roadmap with `/status`\n');
+    stream.markdown('- View your project status with `/status`\n');
     stream.markdown('- Start planning phases with `/plan-phase 1`\n');
-    stream.markdown('- Delete `.planning/ROADMAP.md` manually to recreate\n');
+    stream.markdown('- Delete `.planning/ROADMAP.md` manually to recreate\n\n');
 
     stream.button({
       command: 'specflow.chat-participant.status',
       title: 'View Status'
+    });
+
+    stream.button({
+      command: 'specflow.chat-participant.plan-phase',
+      title: 'Plan Phase 1'
     });
 
     return { metadata: { lastCommand: 'create-roadmap' } };
@@ -222,9 +297,28 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<ISpecflo
     const parsed = parsePhaseResponse(fullResponse);
 
     if (!parsed) {
-      stream.markdown('**Error:** Could not parse phase suggestions.\n\n');
-      stream.markdown('The model returned:\n```\n' + fullResponse.slice(0, 500) + '\n```\n\n');
-      stream.markdown('Please try again or provide more details in PROJECT.md.\n');
+      stream.markdown('## Unable to Parse Phases\n\n');
+      stream.markdown('Could not extract phase information from the model response.\n\n');
+      stream.markdown('**Model output (preview):**\n```\n' + fullResponse.slice(0, 500) + '\n```\n\n');
+      stream.markdown('**Suggestions:**\n');
+      stream.markdown('- Try running the command again\n');
+      stream.markdown('- Add more specific requirements to PROJECT.md\n');
+      stream.markdown('- Ensure PROJECT.md describes clear deliverables\n\n');
+
+      stream.button({
+        command: 'specflow.chat-participant.create-roadmap',
+        title: 'Try Again'
+      });
+
+      if (projectContext.planningUri) {
+        const projectUri = vscode.Uri.joinPath(projectContext.planningUri, 'PROJECT.md');
+        stream.button({
+          command: 'vscode.open',
+          arguments: [projectUri],
+          title: 'Edit PROJECT.md'
+        });
+      }
+
       return { metadata: { lastCommand: 'create-roadmap' } };
     }
 
