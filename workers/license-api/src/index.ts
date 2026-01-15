@@ -74,6 +74,25 @@ app.post('/api/crypto/subscribe', async (c) => {
 });
 
 /**
+ * Initialize crypto subscription without wallet auth
+ * Body: { sessionId?: string }
+ * Returns payment page URL where user will connect wallet
+ */
+app.post('/api/crypto/subscribe/init', async (c) => {
+  const { handleCryptoSubscribeInit } = await import('./handlers/crypto-subscribe');
+  return handleCryptoSubscribeInit(c);
+});
+
+/**
+ * Link wallet account to pending subscription
+ * Body: { intentId: string, nearAccountId: string }
+ */
+app.post('/api/crypto/subscribe/link', async (c) => {
+  const { handleCryptoSubscribeLink } = await import('./handlers/crypto-subscribe');
+  return handleCryptoSubscribeLink(c);
+});
+
+/**
  * Confirm crypto subscription after first payment
  * Body: { intentId: string }
  */
