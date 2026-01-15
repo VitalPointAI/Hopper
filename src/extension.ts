@@ -120,15 +120,14 @@ export function activate(context: vscode.ExtensionContext): void {
   for (const { id, command } of chatParticipantCommands) {
     const disposable = vscode.commands.registerCommand(id, async () => {
       try {
-        // Open the chat panel and send the command to @specflow participant
-        await vscode.commands.executeCommand('workbench.action.chat.open');
-        // Use chat.sendToNewChat to send the message to the chat participant
-        // This approach opens a new chat with the specified text
-        await vscode.commands.executeCommand('workbench.action.chat.sendToNewChat', {
-          inputValue: `@specflow ${command}`
+        // Open the chat panel with the query pre-filled
+        // The query parameter populates the chat input with the specified text
+        // Using @specflow with the command triggers the chat participant
+        await vscode.commands.executeCommand('workbench.action.chat.open', {
+          query: `@specflow ${command}`
         });
       } catch (err) {
-        // Fallback: show guidance if the chat commands aren't available
+        // Fallback: show guidance if the chat command isn't available
         vscode.window.showInformationMessage(
           `Use @specflow ${command} in the chat panel to run this command.`
         );
