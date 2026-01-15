@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation** - Extension scaffolding, NEAR AI model registration in VSCode
 - [x] **Phase 1.5: Licensing** - INSERTED - NEAR license contract, Stripe subscription, x402 crypto payments
 - [x] **Phase 2: Chat Participant** - @specflow agent with command routing
-- [ ] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
+- [x] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
 - [ ] **Phase 4: Execution Commands** - PLAN.md execution, verification, git integration
 - [ ] **Phase 5: Session Management** - Progress tracking, resumption, issue logging
 
@@ -73,7 +73,7 @@ Plans:
 Plans:
 - [x] 03-01: /new-project command (PROJECT.md generation)
 - [x] 03-02: /create-roadmap command (ROADMAP.md, STATE.md)
-- [ ] 03-03: /plan-phase command (PLAN.md generation)
+- [x] 03-03: /plan-phase command (PLAN.md generation)
 
 ### Phase 4: Execution Commands
 **Goal**: Plan execution with verification and git integration
@@ -107,6 +107,6 @@ Phases execute in numeric order: 1 → 1.5 → 2 → 3 → 4 → 5
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 6/6 | Complete | 2026-01-14 |
 | 2. Chat Participant | 3/3 | Complete | 2026-01-15 |
-| 3. Planning Commands | 2/3 | In progress | - |
+| 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 0/3 | Not started | - |
 | 5. Session Management | 0/3 | Not started | - |

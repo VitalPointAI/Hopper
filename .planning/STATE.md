@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 3 — Planning Commands
+**Current focus:** Phase 4 — Execution Commands (ready to plan)
 
 ## Current Position
 
 Phase: 3 of 5 (Planning Commands)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-15 — Completed 03-02-FIX (button functionality)
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-01-15 — Completed 03-03-PLAN.md
 
-Progress: ███████████████░░░░ 75%
+Progress: ████████████████░░░ 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20 (including FIX plans)
-- Average duration: 7.2 min
-- Total execution time: 143 min
+- Total plans completed: 21 (including FIX plans)
+- Average duration: 7.0 min
+- Total execution time: 147 min
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: ███████████████░░░░ 75%
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
-| 03-planning-commands | 2+FIX | 23 min | 7.7 min |
+| 03-planning-commands | 3+FIX | 27 min | 6.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-03 (4 min), 03-01 (3 min), 03-02 (15 min), 03-02-FIX (5 min)
-- Trend: Consistent execution, FIX plans resolve UAT issues quickly
+- Last 5 plans: 03-01 (3 min), 03-02 (15 min), 03-02-FIX (5 min), 03-03 (4 min)
+- Trend: Consistent execution, Phase 3 complete
 
 ## Accumulated Context
 
@@ -74,6 +74,9 @@ Recent decisions affecting current work:
 | 03-02 | Fallback text parsing for LLM | Handle non-JSON LLM responses gracefully |
 | 03-02 | Actionable buttons on errors | Every error state has a retry/fix action |
 | 03-02-FIX | workbench.action.chat.open with query | Register commands to invoke chat participant via buttons |
+| 03-03 | LLM JSON extraction for tasks | Use JSON schema prompts for structured task generation |
+| 03-03 | XML task structure | Follow GSD template with task elements containing name, files, action, verify, done |
+| 03-03 | Non-blocking dependencies | Warn when planning ahead but allow it for exploration |
 
 ### Deferred Issues
 
@@ -86,5 +89,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 03-02-FIX (UAT-001 resolved)
+Stopped at: Completed 03-03-PLAN.md (Phase 3 complete)
 Resume file: None
