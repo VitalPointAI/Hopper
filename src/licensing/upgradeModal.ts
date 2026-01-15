@@ -495,11 +495,6 @@ export class UpgradeModalPanel {
     .account-info strong {
       color: var(--vscode-foreground);
     }
-
-    .account-info.not-signed-in {
-      color: var(--vscode-descriptionForeground);
-      font-style: italic;
-    }
   </style>
 </head>
 <body>
@@ -511,11 +506,11 @@ export class UpgradeModalPanel {
       <p>Unlock unlimited phases and the full SpecFlow workflow</p>
     </div>
 
-    <div class="account-info${isAuthenticated ? '' : ' not-signed-in'}">
-      ${isAuthenticated ? `Licensing for: <strong>${this.escapeHtml(accountDisplay)}</strong>` : accountDisplay}
+${isAuthenticated ? `    <div class="account-info">
+      Licensing for: <strong>${this.escapeHtml(accountDisplay)}</strong>
     </div>
 
-    <div class="pricing-cards">
+` : ''}    <div class="pricing-cards">
       <div class="pricing-card">
         <div class="card-header">
           <div class="card-title">Credit Card</div>
