@@ -6,9 +6,14 @@
 
 ## Open Issues
 
+[None]
+
+## Resolved Issues
+
 ### UAT-001: All stream.button() calls non-functional
 
 **Discovered:** 2026-01-15
+**Resolved:** 2026-01-15
 **Phase/Plan:** 03-02
 **Severity:** Major
 **Feature:** Action buttons throughout extension
@@ -23,9 +28,15 @@
 
 **Scope:** This appears to be an extension-wide issue, not specific to 03-02. Likely affects all commands using stream.button().
 
-## Resolved Issues
+**Resolution:** Registered VSCode commands for all chat participant buttons that use `workbench.action.chat.open` with a `query` parameter to open the chat panel with the appropriate `@specflow /command` pre-filled. Commands registered:
+- specflow.chat-participant.new-project
+- specflow.chat-participant.create-roadmap
+- specflow.chat-participant.plan-phase
+- specflow.chat-participant.status
+- specflow.chat-participant.progress
+- specflow.chat-participant.help
 
-[None yet]
+**Fix commits:** c21e7ba, 8d5f976
 
 ---
 
