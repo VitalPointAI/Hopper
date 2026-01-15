@@ -232,6 +232,23 @@ function paymentPage(subscription: {
         }
         connectedAccountId = accounts[0].accountId;
 
+        setProcessingMessage('Linking wallet to subscription...');
+
+        // Link wallet to subscription BEFORE payment
+        const linkResponse = await fetch('/api/crypto/subscribe/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            intentId,
+            nearAccountId: connectedAccountId
+          })
+        });
+
+        if (!linkResponse.ok) {
+          const linkError = await linkResponse.json();
+          throw new Error(linkError.error || 'Failed to link wallet');
+        }
+
         setProcessingMessage('Preparing payment transaction...');
 
         // Create transfer transaction to deposit address
