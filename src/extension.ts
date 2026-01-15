@@ -3,6 +3,7 @@ import { NearAiChatModelProvider } from './provider/nearAiProvider';
 import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat, getApiKeyInstructions } from './auth/nearAuth';
 import { LicenseValidator } from './licensing/validator';
 import { checkPhaseAccess, showUpgradeModal, connect, disconnect } from './licensing/phaseGate';
+import { UpgradeModalPanel } from './licensing/upgradeModal';
 import { trackActivation } from './telemetry/telemetryService';
 import { createSpecflowParticipant } from './chat/specflowParticipant';
 import { AuthType, AuthProvider } from './licensing/types';
@@ -226,6 +227,24 @@ export function activate(context: vscode.ExtensionContext): void {
           if (success) {
             // Refresh license status after authentication
             await licenseValidator.checkLicense();
+
+            // Check for pending payment to resume
+            const pendingPayment = context.globalState.get<'stripe' | 'crypto'>('specflow.pendingPayment');
+            if (pendingPayment) {
+              // Clear pending payment first
+              await context.globalState.update('specflow.pendingPayment', undefined);
+
+              // Show upgrade modal with new auth session to complete payment
+              const authSession = licenseValidator.getSession();
+              UpgradeModalPanel.show(context, authSession);
+
+              // If this was a crypto payment and user now has wallet auth, start checkout
+              if (pendingPayment === 'crypto' && authSession?.authType === 'wallet') {
+                vscode.window.showInformationMessage(
+                  'Wallet connected! Click "Pay with Crypto" to complete your subscription.'
+                );
+              }
+            }
           }
         } else {
           vscode.window.showErrorMessage(
