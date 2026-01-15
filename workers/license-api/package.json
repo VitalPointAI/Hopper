@@ -15,12 +15,14 @@
     "@near-js/transactions": "^2.5.1",
     "@noble/ed25519": "^3.0.0",
     "@x402/core": "^2.2.0",
+    "bcryptjs": "^3.0.3",
     "borsh": "^2.0.0",
     "hono": "^4.6.0",
     "stripe": "^17.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241230.0",
+    "@types/bcryptjs": "^2.4.6",
     "typescript": "^5.0.0",
     "wrangler": "^4.59.1"
   }
