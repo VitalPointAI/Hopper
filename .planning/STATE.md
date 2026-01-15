@@ -11,15 +11,15 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 
 Phase: 3 of 5 (Planning Commands)
 Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-01-15 — Completed 03-03-PLAN.md
+Status: Phase complete (with FIX)
+Last activity: 2026-01-15 — Completed 03-03-FIX.md (UAT fixes)
 
 Progress: ████████████████░░░ 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21 (including FIX plans)
+- Total plans completed: 22 (including FIX plans)
 - Average duration: 7.0 min
 - Total execution time: 147 min
 
@@ -30,11 +30,11 @@ Progress: ████████████████░░░ 80%
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
-| 03-planning-commands | 3+FIX | 27 min | 6.8 min |
+| 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01 (3 min), 03-02 (15 min), 03-02-FIX (5 min), 03-03 (4 min)
-- Trend: Consistent execution, Phase 3 complete
+- Last 5 plans: 03-02 (15 min), 03-02-FIX (5 min), 03-03 (4 min), 03-03-FIX (2 min)
+- Trend: Consistent execution, Phase 3 complete with UAT fixes
 
 ## Accumulated Context
 
@@ -77,6 +77,9 @@ Recent decisions affecting current work:
 | 03-03 | LLM JSON extraction for tasks | Use JSON schema prompts for structured task generation |
 | 03-03 | XML task structure | Follow GSD template with task elements containing name, files, action, verify, done |
 | 03-03 | Non-blocking dependencies | Warn when planning ahead but allow it for exploration |
+| 03-03-FIX | Per-command license gating | /plan-phase requires Pro license before execution |
+| 03-03-FIX | Inline execution context | Self-contained plans without external GSD references |
+| 03-03-FIX | Explicit usage help | Show help when no argument instead of silent default |
 
 ### Deferred Issues
 
@@ -89,5 +92,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 03-03-PLAN.md (Phase 3 complete)
+Stopped at: Completed 03-03-FIX.md (Phase 3 UAT fixes)
 Resume file: None
