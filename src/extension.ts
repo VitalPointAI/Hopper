@@ -131,6 +131,17 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(connectWalletCommand);
 
+  // Direct wallet auth command (no picker) - used by upgrade modal for crypto payments
+  const startWalletAuthCommand = vscode.commands.registerCommand(
+    'specflow.startWalletAuth',
+    async () => {
+      if (licenseValidator) {
+        await licenseValidator.startAuth();
+      }
+    }
+  );
+  context.subscriptions.push(startWalletAuthCommand);
+
   const disconnectWalletCommand = vscode.commands.registerCommand(
     'specflow.disconnectWallet',
     async () => {

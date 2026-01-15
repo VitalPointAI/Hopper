@@ -208,7 +208,7 @@ export class UpgradeModalPanel {
 
     // For crypto payments, go directly to wallet auth (no picker needed)
     if (paymentType === 'crypto') {
-      vscode.commands.executeCommand('specflow.connectWallet');
+      vscode.commands.executeCommand('specflow.startWalletAuth');
       this.dispose();
       return;
     }
