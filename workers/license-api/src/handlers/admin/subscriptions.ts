@@ -104,7 +104,7 @@ export async function handleAdminSubscriptions(
                 type: 'crypto',
                 status: record.status,
                 createdAt: record.createdAt,
-                nextCharge: record.nextChargeDate,
+                nextCharge: record.nextChargeDate ?? undefined,
                 monthlyAmount: record.monthlyAmountUsd,
               });
             } catch {

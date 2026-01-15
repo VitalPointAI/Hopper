@@ -199,7 +199,7 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
           nearAccountId,
           source: 'crypto',
           subscriptionStatus: sub.status,
-          nextChargeDate: sub.nextChargeDate,
+          nextChargeDate: sub.nextChargeDate ?? undefined,
           contractLicense,
         });
         seenAccounts.add(nearAccountId);

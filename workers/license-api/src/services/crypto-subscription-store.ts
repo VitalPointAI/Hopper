@@ -159,7 +159,7 @@ export async function listDueSubscriptions(
 
   for (const nearAccountId of accounts) {
     const sub = await getCryptoSubscription(kv, nearAccountId);
-    if (sub && (sub.status === 'active' || sub.status === 'past_due')) {
+    if (sub && sub.nextChargeDate && (sub.status === 'active' || sub.status === 'past_due')) {
       // Double-check the date is actually due (not future)
       const nextChargeDate = new Date(sub.nextChargeDate);
       if (nextChargeDate <= date) {
@@ -200,14 +200,16 @@ export async function updateCryptoSubscriptionStatus(
 
   // If next charge date changed, update the index
   if (updates?.nextChargeDate && updates.nextChargeDate !== oldNextChargeDate) {
-    await removeFromDateIndex(kv, nearAccountId, oldNextChargeDate);
+    if (oldNextChargeDate) {
+      await removeFromDateIndex(kv, nearAccountId, oldNextChargeDate);
+    }
     if (status === 'active' || status === 'past_due') {
       await indexByChargeDate(kv, nearAccountId, updates.nextChargeDate);
     }
   }
 
   // If cancelled, remove from date index
-  if (status === 'cancelled') {
+  if (status === 'cancelled' && oldNextChargeDate) {
     await removeFromDateIndex(kv, nearAccountId, oldNextChargeDate);
   }
 
@@ -224,7 +226,9 @@ export async function deleteCryptoSubscription(
   const subscription = await getCryptoSubscription(kv, nearAccountId);
   if (subscription) {
     // Remove from date index
-    await removeFromDateIndex(kv, nearAccountId, subscription.nextChargeDate);
+    if (subscription.nextChargeDate) {
+      await removeFromDateIndex(kv, nearAccountId, subscription.nextChargeDate);
+    }
     // Delete the subscription
     await kv.delete(getSubscriptionKey(nearAccountId));
   }
