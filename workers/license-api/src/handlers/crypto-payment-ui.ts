@@ -294,8 +294,12 @@ function paymentPage(subscription: {
         const confirmData = await confirmResponse.json();
 
         if (confirmResponse.ok && confirmData.success) {
-          // Payment confirmed - reload page to show success state
-          window.location.reload();
+          // Payment confirmed - redirect to VSCode
+          if (confirmData.redirectUrl) {
+            window.location.href = confirmData.redirectUrl;
+          } else {
+            window.location.reload();
+          }
         } else {
           // Payment sent but not yet confirmed - show pending message
           setProcessingMessage('Payment sent! Waiting for confirmation...');
@@ -327,7 +331,12 @@ function paymentPage(subscription: {
           const data = await response.json();
 
           if (response.ok && data.success) {
-            window.location.reload();
+            // Redirect to VSCode
+            if (data.redirectUrl) {
+              window.location.href = data.redirectUrl;
+            } else {
+              window.location.reload();
+            }
             return;
           }
         } catch {
