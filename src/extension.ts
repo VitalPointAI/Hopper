@@ -245,15 +245,23 @@ export function activate(context: vscode.ExtensionContext): void {
               // Clear pending payment first
               await context.globalState.update('specflow.pendingPayment', undefined);
 
-              // Show upgrade modal with new auth session to complete payment
+              // Get auth session and determine checkout type
               const authSession = licenseValidator.getSession();
-              UpgradeModalPanel.show(context, authSession);
 
-              // If this was a crypto payment and user now has wallet auth, start checkout
-              if (pendingPayment === 'crypto' && authSession?.authType === 'wallet') {
+              // For crypto, only proceed if user has wallet auth
+              // For stripe, proceed with any auth type
+              const canProceed = pendingPayment === 'stripe' ||
+                (pendingPayment === 'crypto' && authSession?.authType === 'wallet');
+
+              if (canProceed) {
+                // Show modal and auto-trigger checkout
+                UpgradeModalPanel.show(context, authSession, pendingPayment);
+              } else {
+                // Crypto payment but user signed in with OAuth - show modal without auto-checkout
                 vscode.window.showInformationMessage(
-                  'Wallet connected! Click "Pay with Crypto" to complete your subscription.'
+                  'Crypto payments require a NEAR wallet. Please use card payment or sign in with NEAR wallet.'
                 );
+                UpgradeModalPanel.show(context, authSession);
               }
             }
           }

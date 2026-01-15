@@ -23,7 +23,8 @@ export class UpgradeModalPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     authSession: AuthSession | null,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
+    autoCheckout?: 'stripe' | 'crypto'
   ) {
     this.panel = panel;
     this.extensionUri = extensionUri;
@@ -60,6 +61,12 @@ export class UpgradeModalPanel {
       null,
       this.disposables
     );
+
+    // Auto-trigger checkout if requested (after auth callback)
+    if (autoCheckout && authSession) {
+      // Small delay to ensure panel is fully rendered
+      setTimeout(() => this.triggerCheckout(autoCheckout), 100);
+    }
   }
 
   /**
@@ -67,8 +74,13 @@ export class UpgradeModalPanel {
    *
    * @param context - Extension context
    * @param authSession - Current auth session (null if not authenticated)
+   * @param autoCheckout - If set, automatically trigger checkout after showing modal
    */
-  public static show(context: vscode.ExtensionContext, authSession: AuthSession | null): void {
+  public static show(
+    context: vscode.ExtensionContext,
+    authSession: AuthSession | null,
+    autoCheckout?: 'stripe' | 'crypto'
+  ): void {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
@@ -76,6 +88,10 @@ export class UpgradeModalPanel {
     // If we already have a panel, show it
     if (UpgradeModalPanel.currentPanel) {
       UpgradeModalPanel.currentPanel.panel.reveal(column);
+      // If auto-checkout requested and panel exists, trigger checkout
+      if (autoCheckout) {
+        UpgradeModalPanel.currentPanel.triggerCheckout(autoCheckout);
+      }
       return;
     }
 
@@ -94,8 +110,20 @@ export class UpgradeModalPanel {
       panel,
       context.extensionUri,
       authSession,
-      context
+      context,
+      autoCheckout
     );
+  }
+
+  /**
+   * Trigger checkout programmatically
+   */
+  public triggerCheckout(type: 'stripe' | 'crypto'): void {
+    if (type === 'stripe') {
+      this.handleStripeCheckout();
+    } else {
+      this.handleCryptoCheckout();
+    }
   }
 
   /**
