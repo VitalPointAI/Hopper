@@ -1,48 +1,64 @@
 import * as vscode from 'vscode';
-import { LicenseConfig, LicenseStatus, DEFAULT_LICENSE_CONFIG, NEAR_RPC_URLS } from './types';
+import { LicenseConfig, LicenseStatus, DEFAULT_LICENSE_CONFIG, NEAR_RPC_URLS, AuthSession, AuthType } from './types';
 import { viewIsLicensed, viewGetExpiry } from './nearRpc';
-import { WalletAuthManager } from './walletAuth';
+import { AuthManager } from './authManager';
 import { trackLogin, trackUpgrade } from '../telemetry/telemetryService';
 
 /**
- * License validator with caching support and wallet authentication
+ * License validator with caching support and dual authentication
  *
- * Checks license status against NEAR contract and caches results
- * to minimize RPC calls. Requires wallet authentication to prove
- * account ownership before checking license.
+ * Checks license status against NEAR contract (for wallet users) or
+ * license API (for OAuth users) and caches results to minimize calls.
+ * Supports both OAuth (Google/GitHub/email) and NEAR wallet authentication.
  */
 export class LicenseValidator {
   private config: LicenseConfig;
   private context: vscode.ExtensionContext;
   private licenseCache: Map<string, LicenseStatus> = new Map();
-  private walletAuth: WalletAuthManager;
+  private authManager: AuthManager;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.config = this.loadConfig();
-    this.walletAuth = new WalletAuthManager(context);
+    this.authManager = new AuthManager(context);
   }
 
   /**
-   * Get the wallet auth manager for authentication flows
+   * Get the auth manager for authentication flows
    */
-  getWalletAuth(): WalletAuthManager {
-    return this.walletAuth;
+  getAuthManager(): AuthManager {
+    return this.authManager;
   }
 
   /**
-   * Check if user is authenticated with their wallet
+   * Get the wallet auth manager (alias for backward compatibility)
+   * @deprecated Use getAuthManager() instead
+   */
+  getWalletAuth(): AuthManager {
+    return this.authManager;
+  }
+
+  /**
+   * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    return this.walletAuth.isAuthenticated();
+    return this.authManager.isAuthenticated();
   }
 
   /**
-   * Get the authenticated NEAR account ID
+   * Get the authenticated user ID
+   * Returns userId for both OAuth and wallet sessions
    * Returns undefined if not authenticated
    */
   getAuthenticatedAccountId(): string | undefined {
-    return this.walletAuth.getAccountId();
+    return this.authManager.getUserId();
+  }
+
+  /**
+   * Get the current auth type
+   */
+  getAuthType(): AuthType | undefined {
+    return this.authManager.getAuthType();
   }
 
   /**
@@ -65,18 +81,33 @@ export class LicenseValidator {
 
   /**
    * Check license status for the authenticated account
-   * Uses cached value if available and not expired
+   * Routes to correct backend based on auth type:
+   * - Wallet users: Check NEAR contract
+   * - OAuth users: Check license API
    *
    * @returns License status with caching metadata, or null if not authenticated
    */
   async checkLicense(): Promise<LicenseStatus | null> {
     // Must be authenticated first
-    const accountId = this.walletAuth.getAccountId();
-    if (!accountId || !this.walletAuth.isAuthenticated()) {
+    const session = this.authManager.getSession();
+    if (!session || !this.authManager.isAuthenticated()) {
       console.log('License check failed: not authenticated');
       return null;
     }
 
+    if (session.authType === 'wallet') {
+      // Wallet flow: check NEAR contract
+      return this.checkLicenseOnContract(session.userId);
+    } else {
+      // OAuth flow: check license API
+      return this.checkLicenseOnApi(session);
+    }
+  }
+
+  /**
+   * Check license on NEAR contract (for wallet users)
+   */
+  private async checkLicenseOnContract(accountId: string): Promise<LicenseStatus> {
     // Check cache first
     const cached = this.licenseCache.get(accountId);
     const now = Date.now();
@@ -111,6 +142,60 @@ export class LicenseValidator {
     this.licenseCache.set(accountId, status);
 
     return status;
+  }
+
+  /**
+   * Check license on API (for OAuth users)
+   */
+  private async checkLicenseOnApi(session: AuthSession): Promise<LicenseStatus> {
+    const config = vscode.workspace.getConfiguration('specflow');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+
+    // Check cache first
+    const cached = this.licenseCache.get(session.userId);
+    const now = Date.now();
+
+    if (cached && (now - cached.cachedAt) < this.config.cacheTtlMs) {
+      console.log(`License cache hit for ${session.userId}`);
+      return cached;
+    }
+
+    console.log(`License cache miss for ${session.userId}, checking API...`);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/license/check`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`License check failed: ${response.status}`);
+      }
+
+      const data = await response.json() as { isLicensed: boolean; expiresAt: number | null };
+      const status: LicenseStatus = {
+        isLicensed: data.isLicensed,
+        expiresAt: data.expiresAt,
+        cachedAt: now,
+      };
+
+      // Track upgrade if user just became licensed
+      if (status.isLicensed && (!cached || !cached.isLicensed)) {
+        trackUpgrade(this.context, session.userId).catch(() => {
+          // Silently ignore telemetry errors
+        });
+      }
+
+      // Update cache
+      this.licenseCache.set(session.userId, status);
+
+      return status;
+    } catch (error) {
+      console.error('OAuth license check failed:', error);
+      return { isLicensed: false, expiresAt: null, cachedAt: now };
+    }
   }
 
   /**
@@ -170,25 +255,25 @@ export class LicenseValidator {
   }
 
   /**
-   * Get the authenticated NEAR account ID
-   * @returns NEAR account ID or undefined if not authenticated
+   * Get the authenticated user ID
+   * @returns User ID or undefined if not authenticated
    */
   getNearAccountId(): string | undefined {
-    return this.walletAuth.getAccountId();
+    return this.authManager.getUserId();
   }
 
   /**
    * Start wallet authentication flow
    */
   async startAuth(): Promise<void> {
-    await this.walletAuth.startAuth();
+    await this.authManager.startAuth();
   }
 
   /**
    * Handle authentication callback with signature verification
    */
   async handleAuthCallback(accountId: string, signature: string, publicKey: string): Promise<boolean> {
-    const success = await this.walletAuth.handleCallback(accountId, signature, publicKey);
+    const success = await this.authManager.handleCallback(accountId, signature, publicKey);
 
     if (success) {
       // Track login telemetry
@@ -202,14 +287,22 @@ export class LicenseValidator {
 
   /**
    * Handle authentication callback with pre-verified token
-   * Used when the server has already verified the signature
+   * Supports both OAuth and wallet callbacks with full session data
    */
-  async handleAuthCallbackWithToken(accountId: string, token: string, expiresAt: number): Promise<boolean> {
-    const success = await this.walletAuth.handleCallbackWithToken(accountId, token, expiresAt);
+  async handleAuthCallbackWithToken(sessionData: {
+    userId: string;
+    authType: AuthType;
+    provider: 'google' | 'github' | 'email' | 'near';
+    token: string;
+    expiresAt: number;
+    displayName?: string;
+    email?: string;
+  }): Promise<boolean> {
+    const success = await this.authManager.handleCallbackWithToken(sessionData);
 
     if (success) {
       // Track login telemetry
-      trackLogin(this.context, accountId).catch(() => {
+      trackLogin(this.context, sessionData.userId).catch(() => {
         // Silently ignore telemetry errors
       });
     }
@@ -221,7 +314,7 @@ export class LicenseValidator {
    * Logout / clear authentication
    */
   async logout(): Promise<void> {
-    await this.walletAuth.clearSession();
+    await this.authManager.clearSession();
     this.clearAllCache();
   }
 }
