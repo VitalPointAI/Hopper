@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CommandHandler, CommandRegistry, ISpecflowResult, CommandContext } from './types';
 import { formatContextForPrompt, truncateContent } from '../context/projectContext';
+import { handleNewProject } from './newProject';
 
 /**
  * Command definitions with descriptions for help output
@@ -178,10 +179,11 @@ const registry: CommandRegistry = new Map();
 // Register implemented handlers
 registry.set('help', helpHandler);
 registry.set('status', statusHandler);
+registry.set('new-project', handleNewProject);
 
 // Register placeholder handlers for all other commands
 for (const cmd of COMMAND_DEFINITIONS) {
-  if (cmd.name !== 'help' && cmd.name !== 'status') {
+  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project') {
     registry.set(cmd.name, createPlaceholderHandler(cmd.name, cmd.description));
   }
 }
