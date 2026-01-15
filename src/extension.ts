@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import { NearAiChatModelProvider } from './provider/nearAiProvider';
 import { NEAR_AI_API_KEY_SECRET, isValidApiKeyFormat, getApiKeyInstructions } from './auth/nearAuth';
 import { LicenseValidator } from './licensing/validator';
-import { checkPhaseAccess, showUpgradeModal, connectWallet, disconnectWallet } from './licensing/phaseGate';
+import { checkPhaseAccess, showUpgradeModal, connect, disconnect } from './licensing/phaseGate';
 import { trackActivation } from './telemetry/telemetryService';
 import { createSpecflowParticipant } from './chat/specflowParticipant';
+import { AuthType, AuthProvider } from './licensing/types';
 
 // Export license validator for use by chat participant
 let licenseValidator: LicenseValidator | undefined;
@@ -83,27 +84,61 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(upgradeCommand);
 
-  // Register connect wallet command
+  // Register unified connect command with auth method picker
   const connectCommand = vscode.commands.registerCommand(
-    'specflow.connectWallet',
+    'specflow.connect',
     async () => {
       if (licenseValidator) {
-        await connectWallet(licenseValidator);
+        // Show quick pick with auth options
+        const option = await vscode.window.showQuickPick([
+          { label: 'Google', description: 'Sign in with Google', provider: 'google' as const },
+          { label: 'GitHub', description: 'Sign in with GitHub', provider: 'github' as const },
+          { label: 'NEAR Wallet', description: 'Sign in with NEAR wallet', provider: 'wallet' as const },
+        ], { placeHolder: 'Choose sign-in method' });
+
+        if (option) {
+          if (option.provider === 'wallet') {
+            await licenseValidator.startAuth();
+          } else {
+            await licenseValidator.getAuthManager().startOAuth(option.provider);
+          }
+        }
       }
     }
   );
   context.subscriptions.push(connectCommand);
 
-  // Register disconnect wallet command
+  // Register unified disconnect command
   const disconnectCommand = vscode.commands.registerCommand(
-    'specflow.disconnectWallet',
+    'specflow.disconnect',
     async () => {
       if (licenseValidator) {
-        await disconnectWallet(licenseValidator);
+        await disconnect(licenseValidator);
       }
     }
   );
   context.subscriptions.push(disconnectCommand);
+
+  // Backward-compatible aliases for old command names
+  const connectWalletCommand = vscode.commands.registerCommand(
+    'specflow.connectWallet',
+    async () => {
+      if (licenseValidator) {
+        await connect(licenseValidator);
+      }
+    }
+  );
+  context.subscriptions.push(connectWalletCommand);
+
+  const disconnectWalletCommand = vscode.commands.registerCommand(
+    'specflow.disconnectWallet',
+    async () => {
+      if (licenseValidator) {
+        await disconnect(licenseValidator);
+      }
+    }
+  );
+  context.subscriptions.push(disconnectWalletCommand);
 
   // Register chat participant command wrappers for stream.button() calls
   // These commands open the chat panel and send the appropriate slash command
@@ -136,7 +171,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(disposable);
   }
 
-  // Register URI handler for wallet auth callback
+  // Register URI handler for auth callbacks (both OAuth and wallet)
   const uriHandler = vscode.window.registerUriHandler({
     handleUri: async (uri: vscode.Uri) => {
       console.log('Received URI callback:', uri.toString());
@@ -144,27 +179,45 @@ export function activate(context: vscode.ExtensionContext): void {
       if (uri.path === '/auth-callback') {
         // Parse query parameters
         const params = new URLSearchParams(uri.query);
-        const accountId = params.get('account_id');
-        const signature = params.get('signature');
-        const publicKey = params.get('public_key');
-        // Token and expires_at are provided directly if server already verified
+
+        // Check for error first
+        const error = params.get('error');
+        if (error) {
+          vscode.window.showErrorMessage(`Authentication failed: ${error}`);
+          return;
+        }
+
+        // Parse session data (both OAuth and wallet callbacks send these)
+        const userId = params.get('user_id') ?? params.get('account_id');
+        const authType = (params.get('auth_type') as AuthType) ?? 'wallet';
+        const provider = (params.get('provider') as AuthProvider) ?? 'near';
         const token = params.get('token');
         const expiresAt = params.get('expires_at');
+        const displayName = params.get('display_name');
+        const email = params.get('email');
 
-        if (accountId && licenseValidator) {
+        // Legacy wallet callback support (signature verification)
+        const signature = params.get('signature');
+        const publicKey = params.get('public_key');
+
+        if (userId && licenseValidator) {
           let success = false;
 
           // If token is provided, use it directly (server already verified)
           if (token && expiresAt) {
-            success = await licenseValidator.handleAuthCallbackWithToken(
-              accountId,
+            success = await licenseValidator.handleAuthCallbackWithToken({
+              userId,
+              authType,
+              provider,
               token,
-              parseInt(expiresAt, 10)
-            );
+              expiresAt: parseInt(expiresAt, 10),
+              displayName: displayName ?? undefined,
+              email: email ?? undefined,
+            });
           } else if (signature && publicKey) {
-            // Fallback to signature verification
+            // Fallback to legacy signature verification for wallet
             success = await licenseValidator.handleAuthCallback(
-              accountId,
+              userId,
               signature,
               publicKey
             );

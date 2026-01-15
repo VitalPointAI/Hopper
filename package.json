@@ -75,6 +75,16 @@
         "category": "SpecFlow"
       },
       {
+        "command": "specflow.connect",
+        "title": "Connect",
+        "category": "SpecFlow"
+      },
+      {
+        "command": "specflow.disconnect",
+        "title": "Disconnect",
+        "category": "SpecFlow"
+      },
+      {
         "command": "specflow.connectWallet",
         "title": "Connect NEAR Wallet",
         "category": "SpecFlow"

@@ -135,7 +135,37 @@ export async function showUpgradeModal(
 }
 
 /**
+ * Start authentication (unified connect)
+ * Shows auth method picker for user to choose
+ */
+export async function connect(validator: LicenseValidator): Promise<void> {
+  // Show quick pick with auth options
+  const option = await vscode.window.showQuickPick([
+    { label: 'Google', description: 'Sign in with Google', provider: 'google' as const },
+    { label: 'GitHub', description: 'Sign in with GitHub', provider: 'github' as const },
+    { label: 'NEAR Wallet', description: 'Sign in with NEAR wallet', provider: 'wallet' as const },
+  ], { placeHolder: 'Choose sign-in method' });
+
+  if (option) {
+    if (option.provider === 'wallet') {
+      await validator.startAuth();
+    } else {
+      await validator.getAuthManager().startOAuth(option.provider);
+    }
+  }
+}
+
+/**
+ * Disconnect / logout (unified disconnect)
+ */
+export async function disconnect(validator: LicenseValidator): Promise<void> {
+  await validator.logout();
+  vscode.window.showInformationMessage('Signed out successfully');
+}
+
+/**
  * Start wallet authentication
+ * @deprecated Use connect() for unified auth flow
  */
 export async function connectWallet(validator: LicenseValidator): Promise<void> {
   await validator.startAuth();
@@ -143,6 +173,7 @@ export async function connectWallet(validator: LicenseValidator): Promise<void> 
 
 /**
  * Disconnect wallet / logout
+ * @deprecated Use disconnect() for unified auth flow
  */
 export async function disconnectWallet(validator: LicenseValidator): Promise<void> {
   await validator.logout();
