@@ -187,6 +187,50 @@ export async function handleCryptoSubscribeInit(
 }
 
 /**
+ * POST /api/crypto/subscribe/link
+ * Link wallet account to pending subscription
+ * Called after wallet connects on payment page, before payment
+ */
+export async function handleCryptoSubscribeLink(
+  c: Context<{ Bindings: Env }>
+): Promise<Response> {
+  try {
+    const body = await c.req.json<{ intentId: string; nearAccountId: string }>();
+
+    if (!body.intentId || !body.nearAccountId) {
+      return c.json({ error: 'intentId and nearAccountId required' }, 400);
+    }
+
+    const subscription = await getCryptoSubscriptionByIntentId(
+      c.env.CRYPTO_SUBSCRIPTIONS,
+      body.intentId
+    );
+
+    if (!subscription) {
+      return c.json({ error: 'Subscription not found' }, 404);
+    }
+
+    if (subscription.status !== 'pending') {
+      return c.json({ error: 'Subscription already processed' }, 409);
+    }
+
+    // Update subscription with wallet account
+    subscription.nearAccountId = body.nearAccountId;
+    subscription.updatedAt = new Date().toISOString();
+
+    await saveCryptoSubscription(c.env.CRYPTO_SUBSCRIPTIONS, subscription);
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error linking wallet to subscription:', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to link wallet' },
+      500
+    );
+  }
+}
+
+/**
  * POST /api/crypto/subscribe/confirm
  * Confirm subscription after user sends first payment
  * Verifies payment received and grants initial license
