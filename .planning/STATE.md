@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 2 — Chat Participant (In Progress)
+**Current focus:** Phase 3 — Planning Commands (Next)
 
 ## Current Position
 
-Phase: 2 of 5 (Chat Participant)
-Plan: 2 of 3 in current phase (+ FIX plan complete)
-Status: In progress
-Last activity: 2026-01-15 — Completed 02-02-FIX.md (UAT fixes for slash command routing)
+Phase: 2 of 5 (Chat Participant) — COMPLETE
+Plan: 3 of 3 in phase (all complete)
+Status: Phase complete
+Last activity: 2026-01-15 — Completed 02-03-PLAN.md (Context variable injection)
 
-Progress: ███████████░░░░░░░░ 55%
+Progress: █████████████░░░░░░ 65%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16 (including FIX plans)
-- Average duration: 7.3 min
-- Total execution time: 116 min
+- Total plans completed: 17 (including FIX plans)
+- Average duration: 7.1 min
+- Total execution time: 120 min
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: ███████████░░░░░░░░ 55%
 |-------|-------|-------|----------|
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
-| 02-chat-participant | 2+FIX+FIX2+FIX3+FIX4 | 19 min | 2.7 min |
+| 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01-FIX2 (1.5 min), 02-01-FIX3 (6 min), 02-02 (4 min), 02-02-FIX (1.5 min)
-- Trend: Fast execution on well-scoped FIX plans
+- Last 5 plans: 02-01-FIX3 (6 min), 02-02 (4 min), 02-02-FIX (1.5 min), 02-03 (4 min)
+- Trend: Consistent fast execution on well-scoped plans
 
 ## Accumulated Context
 
@@ -66,6 +66,8 @@ Recent decisions affecting current work:
 | 02-02 | kebab-case command names | Matches VSCode conventions |
 | 02-02 | stream.button() for actions | Clickable buttons work better than markdown links |
 | 02-02 | Contextual follow-ups | Follow-up suggestions change based on lastCommand |
+| 02-03 | Direct file reading via vscode.workspace.fs | Chat Variables API still unstable/proposed |
+| 02-03 | Content truncation at 2000 chars | Avoid token limit issues in LLM prompts |
 
 ### Deferred Issues
 
@@ -78,5 +80,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 02-02-FIX.md (UAT fixes)
+Stopped at: Completed 02-03-PLAN.md (Phase 2 complete)
 Resume file: None
