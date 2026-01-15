@@ -1,4 +1,35 @@
 /**
+ * Authentication type
+ */
+export type AuthType = 'oauth' | 'wallet';
+
+/**
+ * Authentication provider
+ */
+export type AuthProvider = 'google' | 'github' | 'email' | 'near';
+
+/**
+ * Unified auth session (replaces WalletSession)
+ * Supports both OAuth and NEAR wallet authentication
+ */
+export interface AuthSession {
+  /** User ID: oauth:{provider}:{id} OR NEAR account ID */
+  userId: string;
+  /** Type of authentication used */
+  authType: AuthType;
+  /** Provider used for authentication */
+  provider: AuthProvider;
+  /** JWT session token from Worker */
+  token: string;
+  /** When the session expires (Unix timestamp ms) */
+  expiresAt: number;
+  /** Display name from OAuth profile */
+  displayName?: string;
+  /** Email from OAuth profile */
+  email?: string;
+}
+
+/**
  * License status returned from validation
  */
 export interface LicenseStatus {
