@@ -105,6 +105,19 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(disconnectCommand);
 
+  // Register placeholder command for chat participant buttons (Phase 3 commands)
+  // These commands are referenced by stream.button() in /help and /status
+  // They provide user feedback until the actual commands are implemented
+  const newProjectPlaceholder = vscode.commands.registerCommand(
+    'specflow.chat-participant.new-project',
+    () => {
+      vscode.window.showInformationMessage(
+        'The /new-project command will be available in Phase 3. Use @specflow /new-project in the chat.'
+      );
+    }
+  );
+  context.subscriptions.push(newProjectPlaceholder);
+
   // Register URI handler for wallet auth callback
   const uriHandler = vscode.window.registerUriHandler({
     handleUri: async (uri: vscode.Uri) => {
