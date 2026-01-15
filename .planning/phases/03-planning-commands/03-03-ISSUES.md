@@ -6,9 +6,48 @@
 
 ## Open Issues
 
-[None - all resolved]
+### UAT-004: License check runs before argument validation
+
+**Discovered:** 2026-01-15
+**Phase/Plan:** 03-03
+**Severity:** Major
+**Feature:** /plan-phase command
+**Description:** When running `/plan-phase` with no arguments, the command shows "connect wallet" message instead of usage help. The license check happens before argument validation.
+**Expected:** Show usage help explaining how to use the command when no arguments provided
+**Actual:** Shows license/wallet connection message blocking access to usage help
+**Repro:**
+1. Open VSCode chat
+2. Type `@specflow /plan-phase` (no arguments)
+3. Observe wallet connection message instead of usage help
+
+### UAT-005: Phase 1 planning requires license
+
+**Discovered:** 2026-01-15
+**Phase/Plan:** 03-03
+**Severity:** Major
+**Feature:** /plan-phase command
+**Description:** Per the freemium model, Phase 1 planning should be free without requiring a license. Currently all /plan-phase usage is gated behind license check.
+**Expected:** Phase 1 planning should work without license; only Phase 2+ should require Pro license
+**Actual:** All phases require license, including Phase 1
+**Repro:**
+1. Open VSCode chat without connecting wallet/license
+2. Type `@specflow /plan-phase 1`
+3. Observe license required message
 
 ## Resolved Issues
+
+### UAT-006: Licensing infrastructure not deployed (RESOLVED)
+
+**Discovered:** 2026-01-15
+**Phase/Plan:** 03-03 (blocks testing)
+**Severity:** Blocker
+**Feature:** Wallet connection / license validation
+**Description:** Cannot test /plan-phase with license because the wallet/license infrastructure (NEAR contract, Cloudflare Worker, KV namespaces) has not been deployed to production.
+**Expected:** Wallet page loads, user can connect and obtain license
+**Actual:** "That page is not deployed/useable"
+**Resolved:** 2026-01-15 - Phase 01.5.1 deployed Worker, contract, and implemented user auth endpoints
+**Worker:** https://specflow-license-api.vitalpointai.workers.dev
+**Contract:** license.specflow.near
 
 ### UAT-001: License gating not enforced for /plan-phase
 

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { LicenseConfig, LicenseStatus, DEFAULT_LICENSE_CONFIG, NEAR_RPC_URLS } from './types';
 import { viewIsLicensed, viewGetExpiry } from './nearRpc';
 import { WalletAuthManager } from './walletAuth';
+import { trackLogin, trackUpgrade } from '../telemetry/telemetryService';
 
 /**
  * License validator with caching support and wallet authentication
@@ -99,6 +100,13 @@ export class LicenseValidator {
       cachedAt: now,
     };
 
+    // Track upgrade if user just became licensed (wasn't licensed before, is now)
+    if (isLicensed && (!cached || !cached.isLicensed)) {
+      trackUpgrade(this.context, accountId).catch(() => {
+        // Silently ignore telemetry errors
+      });
+    }
+
     // Update cache
     this.licenseCache.set(accountId, status);
 
@@ -177,10 +185,36 @@ export class LicenseValidator {
   }
 
   /**
-   * Handle authentication callback
+   * Handle authentication callback with signature verification
    */
   async handleAuthCallback(accountId: string, signature: string, publicKey: string): Promise<boolean> {
-    return this.walletAuth.handleCallback(accountId, signature, publicKey);
+    const success = await this.walletAuth.handleCallback(accountId, signature, publicKey);
+
+    if (success) {
+      // Track login telemetry
+      trackLogin(this.context, accountId).catch(() => {
+        // Silently ignore telemetry errors
+      });
+    }
+
+    return success;
+  }
+
+  /**
+   * Handle authentication callback with pre-verified token
+   * Used when the server has already verified the signature
+   */
+  async handleAuthCallbackWithToken(accountId: string, token: string, expiresAt: number): Promise<boolean> {
+    const success = await this.walletAuth.handleCallbackWithToken(accountId, token, expiresAt);
+
+    if (success) {
+      // Track login telemetry
+      trackLogin(this.context, accountId).catch(() => {
+        // Silently ignore telemetry errors
+      });
+    }
+
+    return success;
   }
 
   /**

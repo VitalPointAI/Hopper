@@ -30,8 +30,18 @@ Enhancements discovered during execution. Not critical - address in future phase
 
 ## Closed Enhancements
 
-[None yet]
+### ISS-003: Implement user wallet auth endpoints in Worker (CLOSED)
+
+- **Discovered:** Phase 01.5.1 Task 02 (2026-01-15)
+- **Closed:** Phase 01.5.1 Task 02 (2026-01-15)
+- **Resolution:** Implemented `/auth/sign` and `/auth/verify` endpoints in Worker. Created professional branded sign-in page with wallet selector (@hot-labs/near-connect), NEP-413 signature verification, and JWT token flow. Fixed callback to pass token directly to extension to avoid double verification.
+- **Files:**
+  - workers/license-api/src/handlers/user-auth.ts (new)
+  - workers/license-api/src/index.ts (routes added)
+  - src/licensing/walletAuth.ts (handleCallbackWithToken added)
+  - src/licensing/validator.ts (handleAuthCallbackWithToken added)
+  - src/extension.ts (URI handler updated)
 
 ---
 
-*Last updated: 2026-01-13*
+*Last updated: 2026-01-15*

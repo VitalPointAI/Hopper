@@ -147,13 +147,28 @@ export function activate(context: vscode.ExtensionContext): void {
         const accountId = params.get('account_id');
         const signature = params.get('signature');
         const publicKey = params.get('public_key');
+        // Token and expires_at are provided directly if server already verified
+        const token = params.get('token');
+        const expiresAt = params.get('expires_at');
 
-        if (accountId && signature && publicKey && licenseValidator) {
-          const success = await licenseValidator.handleAuthCallback(
-            accountId,
-            signature,
-            publicKey
-          );
+        if (accountId && licenseValidator) {
+          let success = false;
+
+          // If token is provided, use it directly (server already verified)
+          if (token && expiresAt) {
+            success = await licenseValidator.handleAuthCallbackWithToken(
+              accountId,
+              token,
+              parseInt(expiresAt, 10)
+            );
+          } else if (signature && publicKey) {
+            // Fallback to signature verification
+            success = await licenseValidator.handleAuthCallback(
+              accountId,
+              signature,
+              publicKey
+            );
+          }
 
           if (success) {
             // Refresh license status after authentication

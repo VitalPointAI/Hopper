@@ -209,6 +209,36 @@ export class WalletAuthManager {
   }
 
   /**
+   * Handle callback with pre-verified token from server
+   * Used when the sign page has already verified the signature
+   *
+   * @param accountId - NEAR account that authenticated
+   * @param token - JWT token from server
+   * @param expiresAt - Token expiry timestamp (Unix ms)
+   */
+  async handleCallbackWithToken(accountId: string, token: string, expiresAt: number): Promise<boolean> {
+    try {
+      // Store session directly - no verification needed
+      this.session = {
+        accountId,
+        token,
+        expiresAt,
+      };
+
+      await this.context.secrets.store(SESSION_STORAGE_KEY, JSON.stringify(this.session));
+      await this.context.globalState.update(CHALLENGE_STORAGE_KEY, undefined);
+
+      vscode.window.showInformationMessage(`Authenticated as ${accountId}`);
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Token storage error:', errorMessage);
+      vscode.window.showErrorMessage(`Authentication failed: ${errorMessage}`);
+      return false;
+    }
+  }
+
+  /**
    * Clear the current session (logout)
    */
   async clearSession(): Promise<void> {

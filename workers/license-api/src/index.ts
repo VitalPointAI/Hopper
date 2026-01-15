@@ -100,6 +100,42 @@ app.post('/api/crypto/subscription/cancel', async (c) => {
   return handleCryptoSubscriptionCancel(c);
 });
 
+/**
+ * Telemetry endpoint for extension analytics
+ * Public endpoint (no auth required)
+ * Body: { event, installId, extensionVersion, vscodeVersion, platform, nearAccountId?, source? }
+ */
+app.post('/api/telemetry', async (c) => {
+  const { handleTelemetry } = await import('./handlers/telemetry');
+  return handleTelemetry(c);
+});
+
+// ============================================================================
+// User Authentication Routes
+// ============================================================================
+
+// Enable CORS for auth endpoints
+app.use('/auth/*', cors());
+
+/**
+ * User wallet authentication page
+ * Displays wallet selector for signing authentication message
+ * Query params: nonce, timestamp, message, callback
+ */
+app.get('/auth/sign', async (c) => {
+  const { handleUserSignPage } = await import('./handlers/user-auth');
+  return handleUserSignPage(c);
+});
+
+/**
+ * Verify user wallet signature and return JWT
+ * Body: { nearAccountId, signature, publicKey, message, nonce?, recipient? }
+ */
+app.post('/auth/verify', async (c) => {
+  const { handleUserVerify } = await import('./handlers/user-auth');
+  return handleUserVerify(c);
+});
+
 // ============================================================================
 // Admin Routes
 // ============================================================================
