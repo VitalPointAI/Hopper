@@ -33,13 +33,7 @@ async function helpHandler(ctx: CommandContext): Promise<ISpecflowResult> {
     ctx.stream.markdown(`- **/${cmd.name}** - ${cmd.description}\n`);
   }
 
-  ctx.stream.markdown('\n**Quick Actions:**\n\n');
-
-  // Use stream.button() for clickable actions (not markdown links - Pitfall 5)
-  ctx.stream.button({
-    command: 'specflow.newProject',
-    title: 'New Project'
-  });
+  ctx.stream.markdown('\n*Use the suggestions below to get started.*\n');
 
   return { metadata: { lastCommand: 'help' } };
 }
