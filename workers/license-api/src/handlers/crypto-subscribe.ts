@@ -314,15 +314,20 @@ export async function handleCryptoSubscribeConfirm(
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + durationDays);
 
-    const response: CryptoConfirmResponse = {
+    // Build VSCode callback URL for wallet authentication
+    const vscodeCallback = `vscode://specflow.specflow/auth-callback?` +
+      `type=wallet&` +
+      `accountId=${encodeURIComponent(subscription.nearAccountId)}&` +
+      `status=success`;
+
+    return c.json({
       success: true,
       license: {
         days: durationDays,
         expiresAt: expiresAt.toISOString(),
       },
-    };
-
-    return c.json(response);
+      redirectUrl: vscodeCallback,
+    });
   } catch (error) {
     console.error('Error confirming crypto subscription:', error);
     return c.json(
