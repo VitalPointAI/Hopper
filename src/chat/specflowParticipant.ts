@@ -120,52 +120,53 @@ export function createSpecflowParticipant(
       const lastCmd = result.metadata?.lastCommand;
 
       // Contextual suggestions based on last command
+      // Each follow-up needs: command (slash command name), prompt (message text), label (button text)
       if (lastCmd === 'help') {
         return [
-          { prompt: '/new-project', label: 'Start new project' },
-          { prompt: '/progress', label: 'Check progress' }
+          { command: 'new-project', prompt: 'Initialize my project', label: 'Start new project' },
+          { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' }
         ];
       }
 
       if (lastCmd === 'new-project') {
         return [
-          { prompt: '/create-roadmap', label: 'Create roadmap' },
-          { prompt: '/help', label: 'Show commands' }
+          { command: 'create-roadmap', prompt: 'Create a roadmap for my project', label: 'Create roadmap' },
+          { command: 'help', prompt: 'Show me all commands', label: 'Show commands' }
         ];
       }
 
       if (lastCmd === 'create-roadmap') {
         return [
-          { prompt: '/plan-phase', label: 'Plan a phase' },
-          { prompt: '/progress', label: 'Check progress' }
+          { command: 'plan-phase', prompt: 'Plan the next phase', label: 'Plan a phase' },
+          { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' }
         ];
       }
 
       if (lastCmd === 'plan-phase') {
         return [
-          { prompt: '/execute-plan', label: 'Execute plan' },
-          { prompt: '/progress', label: 'Check progress' }
+          { command: 'execute-plan', prompt: 'Execute the plan', label: 'Execute plan' },
+          { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' }
         ];
       }
 
       if (lastCmd === 'execute-plan') {
         return [
-          { prompt: '/progress', label: 'Check progress' },
-          { prompt: '/plan-phase', label: 'Plan next phase' }
+          { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' },
+          { command: 'plan-phase', prompt: 'Plan the next phase', label: 'Plan next phase' }
         ];
       }
 
       if (lastCmd === 'progress') {
         return [
-          { prompt: '/plan-phase', label: 'Plan a phase' },
-          { prompt: '/execute-plan', label: 'Execute plan' }
+          { command: 'plan-phase', prompt: 'Plan the next phase', label: 'Plan a phase' },
+          { command: 'execute-plan', prompt: 'Execute the plan', label: 'Execute plan' }
         ];
       }
 
       // Default suggestions for general chat or errors
       return [
-        { prompt: '/help', label: 'Show commands' },
-        { prompt: '/progress', label: 'Check progress' }
+        { command: 'help', prompt: 'Show me all available commands', label: 'Show commands' },
+        { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' }
       ];
     }
   };
