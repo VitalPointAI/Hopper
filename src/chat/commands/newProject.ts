@@ -186,10 +186,36 @@ export async function handleNewProject(ctx: CommandContext): Promise<ISpecflowRe
       stream.markdown('\n');
     }
 
+    if (config.constraints.length > 0) {
+      stream.markdown('**Constraints:**\n');
+      for (const c of config.constraints) {
+        stream.markdown(`- ${c}\n`);
+      }
+      stream.markdown('\n');
+    }
+
+    // Show assumptions note if defaults were applied
+    const hasDefaults =
+      config.requirements.length === 0 ||
+      config.outOfScope.length === 0 ||
+      config.constraints.length === 0;
+
+    if (hasDefaults) {
+      stream.markdown('*Note: Some fields used defaults. Edit PROJECT.md to add more details.*\n\n');
+    }
+
     // Reference to created file
     stream.markdown('### Created Files\n\n');
     if (result.filePath) {
       stream.reference(result.filePath);
+      stream.markdown('\n');
+
+      // Button to open the file
+      stream.button({
+        command: 'vscode.open',
+        arguments: [result.filePath],
+        title: 'Open PROJECT.md'
+      });
     }
 
     // Next steps
