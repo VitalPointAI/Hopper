@@ -105,18 +105,37 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(disconnectCommand);
 
-  // Register placeholder command for chat participant buttons (Phase 3 commands)
-  // These commands are referenced by stream.button() in /help and /status
-  // They provide user feedback until the actual commands are implemented
-  const newProjectPlaceholder = vscode.commands.registerCommand(
-    'specflow.chat-participant.new-project',
-    () => {
-      vscode.window.showInformationMessage(
-        'The /new-project command will be available in Phase 3. Use @specflow /new-project in the chat.'
-      );
-    }
-  );
-  context.subscriptions.push(newProjectPlaceholder);
+  // Register chat participant command wrappers for stream.button() calls
+  // These commands open the chat panel and send the appropriate slash command
+  // to the @specflow chat participant
+  const chatParticipantCommands = [
+    { id: 'specflow.chat-participant.new-project', command: '/new-project' },
+    { id: 'specflow.chat-participant.create-roadmap', command: '/create-roadmap' },
+    { id: 'specflow.chat-participant.plan-phase', command: '/plan-phase' },
+    { id: 'specflow.chat-participant.status', command: '/status' },
+    { id: 'specflow.chat-participant.progress', command: '/progress' },
+    { id: 'specflow.chat-participant.help', command: '/help' }
+  ];
+
+  for (const { id, command } of chatParticipantCommands) {
+    const disposable = vscode.commands.registerCommand(id, async () => {
+      try {
+        // Open the chat panel and send the command to @specflow participant
+        await vscode.commands.executeCommand('workbench.action.chat.open');
+        // Use chat.sendToNewChat to send the message to the chat participant
+        // This approach opens a new chat with the specified text
+        await vscode.commands.executeCommand('workbench.action.chat.sendToNewChat', {
+          inputValue: `@specflow ${command}`
+        });
+      } catch (err) {
+        // Fallback: show guidance if the chat commands aren't available
+        vscode.window.showInformationMessage(
+          `Use @specflow ${command} in the chat panel to run this command.`
+        );
+      }
+    });
+    context.subscriptions.push(disposable);
+  }
 
   // Register URI handler for wallet auth callback
   const uriHandler = vscode.window.registerUriHandler({
