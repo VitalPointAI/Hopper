@@ -24,6 +24,10 @@ id = "c161852936364f3d809fa0826215eb4d"
 binding = "TELEMETRY"
 id = "a539a15f0b8d42c19f52e1750837cecb"
 
+[[kv_namespaces]]
+binding = "USER_LICENSES"
+id = "b85c3c3954f54412ac7bbfd41dca9f4d"
+
 # Environment variables (non-secret)
 [vars]
 NEAR_RPC_URL = "https://rpc.mainnet.fastnear.com"
@@ -44,3 +48,7 @@ ADMIN_WALLET = "specflow.near"
 # FASTNEAR_API_KEY - FastNEAR API key for RPC access
 # NEAR_INTENTS_API_KEY - NEAR Intents 1Click API key for subscription processing
 # ADMIN_SECRET - Secret key for signing admin JWT tokens
+# GOOGLE_CLIENT_ID - Google OAuth 2.0 client ID
+# GOOGLE_CLIENT_SECRET - Google OAuth 2.0 client secret
+# GITHUB_CLIENT_ID - GitHub OAuth App client ID
+# GITHUB_CLIENT_SECRET - GitHub OAuth App client secret

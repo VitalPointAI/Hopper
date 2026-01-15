@@ -6,6 +6,8 @@ export interface Env {
   PROCESSED_EVENTS: KVNamespace;
   SUBSCRIPTIONS: KVNamespace;
   CRYPTO_SUBSCRIPTIONS: KVNamespace;
+  TELEMETRY: KVNamespace;
+  USER_LICENSES: KVNamespace;
 
   // Secrets (set via wrangler secret put)
   STRIPE_SECRET_KEY: string;
@@ -17,6 +19,10 @@ export interface Env {
   FASTNEAR_API_KEY: string;
   NEAR_INTENTS_API_KEY: string;
   ADMIN_SECRET: string; // JWT signing key for admin sessions
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
 
   // Environment variables
   NEAR_RPC_URL: string;
@@ -178,4 +184,124 @@ export interface AdminSession {
   nearAccountId: string;
   issuedAt: number;
   expiresAt: number;
+}
+
+/**
+ * Installation record stored in KV
+ * Tracks unique extension installations for conversion analytics
+ */
+export interface InstallationRecord {
+  installId: string; // Unique identifier (machine ID or generated UUID)
+  firstSeen: string; // ISO timestamp of first activation
+  lastSeen: string; // ISO timestamp of most recent activation
+  extensionVersion: string;
+  vscodeVersion: string;
+  platform: string; // darwin, linux, win32
+  nearAccountId?: string; // Set when user logs in with NEAR wallet
+  upgradedAt?: string; // Set when user subscribes (free -> pro conversion)
+  source?: string; // Optional: marketplace, direct, etc.
+}
+
+/**
+ * Request body for telemetry endpoint
+ */
+export interface TelemetryRequest {
+  event: 'install' | 'activate' | 'login' | 'upgrade';
+  installId: string;
+  extensionVersion: string;
+  vscodeVersion: string;
+  platform: string;
+  nearAccountId?: string; // For login/upgrade events
+  source?: string;
+}
+
+/**
+ * Telemetry stats for admin dashboard
+ */
+export interface TelemetryStats {
+  totalInstallations: number;
+  activeInstallations: number; // Seen in last 30 days
+  loggedInUsers: number; // Have nearAccountId
+  conversions: number; // Have upgradedAt
+  conversionRate: number; // conversions / totalInstallations * 100
+}
+
+// ============================================================================
+// OAuth Authentication Types
+// ============================================================================
+
+/**
+ * OAuth provider types
+ */
+export type OAuthProvider = 'google' | 'github' | 'email';
+
+/**
+ * OAuth user license stored in USER_LICENSES KV
+ * Key: oauth:{provider}:{userId} (e.g., oauth:google:123456)
+ */
+export interface OAuthUserLicense {
+  id: string; // Provider-specific user ID
+  provider: OAuthProvider;
+  email: string;
+  displayName?: string;
+  licenseExpiry: number | null; // Unix timestamp, null if no license
+  stripeCustomerId?: string; // Set when they subscribe
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Email user stored in USER_LICENSES KV (for email+password auth)
+ * Key: email:{email}
+ */
+export interface EmailUser {
+  email: string;
+  passwordHash: string; // bcrypt hash
+  createdAt: number;
+}
+
+/**
+ * OAuth state stored temporarily in PROCESSED_EVENTS KV
+ * Key: oauth_state:{state}
+ */
+export interface OAuthState {
+  provider: 'google' | 'github';
+  callback: string; // VSCode callback URL
+  createdAt: number;
+}
+
+/**
+ * Request body for email registration
+ */
+export interface EmailRegisterRequest {
+  email: string;
+  password: string;
+  displayName?: string;
+}
+
+/**
+ * Request body for email login
+ */
+export interface EmailLoginRequest {
+  email: string;
+  password: string;
+}
+
+/**
+ * Response from email auth endpoints
+ */
+export interface EmailAuthResponse {
+  token: string;
+  expiresAt: number;
+  userId: string; // oauth:email:{email}
+}
+
+/**
+ * Rate limit record stored in PROCESSED_EVENTS KV
+ * Key: ratelimit:{ip}
+ */
+export interface RateLimitRecord {
+  failedAttempts: number;
+  lockoutUntil: number | null; // Unix timestamp, null if not locked out
+  lastAttempt: number;
 }
