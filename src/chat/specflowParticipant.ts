@@ -179,6 +179,13 @@ export function createSpecflowParticipant(
         ];
       }
 
+      if (lastCmd === 'status') {
+        return [
+          { command: 'plan-phase', prompt: 'Plan the next phase', label: 'Plan a phase' },
+          { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' }
+        ];
+      }
+
       // Default suggestions for general chat or errors
       return [
         { command: 'help', prompt: 'Show me all available commands', label: 'Show commands' },

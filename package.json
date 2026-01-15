@@ -46,6 +46,10 @@
             "description": "Check project progress and current state"
           },
           {
+            "name": "status",
+            "description": "Show current project status and phase"
+          },
+          {
             "name": "help",
             "description": "Show available SpecFlow commands"
           }
