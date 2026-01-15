@@ -7,6 +7,8 @@ import type { CryptoSubscription } from '../types';
 
 // KV key prefixes
 const SUBSCRIPTION_PREFIX = 'crypto_sub:';
+const SUBSCRIPTION_BY_INTENT_PREFIX = 'crypto_sub_intent:';
+const SUBSCRIPTION_BY_SESSION_PREFIX = 'crypto_sub_session:';
 const SUBSCRIPTIONS_BY_DATE_PREFIX = 'crypto_subs_by_date:';
 
 /**
@@ -30,21 +32,33 @@ export async function saveCryptoSubscription(
   kv: KVNamespace,
   subscription: CryptoSubscription
 ): Promise<void> {
-  const key = getSubscriptionKey(subscription.nearAccountId);
-
   // Update the updatedAt timestamp
   const updatedSubscription: CryptoSubscription = {
     ...subscription,
     updatedAt: new Date().toISOString(),
   };
 
-  // Store with 2 year expiration (subscriptions older than this are stale)
-  await kv.put(key, JSON.stringify(updatedSubscription), {
-    expirationTtl: 2 * 365 * 24 * 60 * 60, // 2 years in seconds
-  });
+  const ttl = 2 * 365 * 24 * 60 * 60; // 2 years in seconds
+
+  // Store by NEAR account ID if available
+  if (subscription.nearAccountId) {
+    const key = getSubscriptionKey(subscription.nearAccountId);
+    await kv.put(key, JSON.stringify(updatedSubscription), { expirationTtl: ttl });
+  }
+
+  // Always index by intent ID for lookups
+  const intentKey = `${SUBSCRIPTION_BY_INTENT_PREFIX}${subscription.intentId}`;
+  await kv.put(intentKey, JSON.stringify(updatedSubscription), { expirationTtl: ttl });
+
+  // Index by session ID if available (for session-based init flow)
+  if (subscription.sessionId) {
+    const sessionKey = `${SUBSCRIPTION_BY_SESSION_PREFIX}${subscription.sessionId}`;
+    await kv.put(sessionKey, JSON.stringify(updatedSubscription), { expirationTtl: ttl });
+  }
 
   // Also index by next charge date for efficient cron processing
-  if (subscription.status === 'active' || subscription.status === 'past_due') {
+  if (subscription.nextChargeDate && subscription.nearAccountId &&
+      (subscription.status === 'active' || subscription.status === 'past_due')) {
     await indexByChargeDate(kv, subscription.nearAccountId, subscription.nextChargeDate);
   }
 }
@@ -119,21 +133,10 @@ export async function getCryptoSubscriptionByIntentId(
   kv: KVNamespace,
   intentId: string
 ): Promise<CryptoSubscription | null> {
-  // List all subscriptions to find by intent ID
-  // Note: In production, you'd want a secondary index for this
-  const list = await kv.list({ prefix: SUBSCRIPTION_PREFIX });
-
-  for (const key of list.keys) {
-    const data = await kv.get(key.name);
-    if (data) {
-      const sub: CryptoSubscription = JSON.parse(data);
-      if (sub.intentId === intentId) {
-        return sub;
-      }
-    }
-  }
-
-  return null;
+  // Use the intent ID index for efficient lookup
+  const intentKey = `${SUBSCRIPTION_BY_INTENT_PREFIX}${intentId}`;
+  const data = await kv.get(intentKey);
+  return data ? JSON.parse(data) : null;
 }
 
 /**

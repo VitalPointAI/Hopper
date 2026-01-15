@@ -27,6 +27,7 @@ import {
   getDefaultBillingDay,
 } from '../services/crypto-subscription-store';
 import { grantLicense } from '../services/near-contract';
+import { markUpgradeByAccount } from '../services/telemetry-store';
 
 /**
  * POST /api/crypto/subscribe
@@ -127,6 +128,65 @@ export async function handleCryptoSubscribe(
 }
 
 /**
+ * POST /api/crypto/subscribe/init
+ * Initialize crypto subscription without requiring wallet auth
+ * Returns payment page URL where user will connect wallet and pay
+ */
+export async function handleCryptoSubscribeInit(
+  c: Context<{ Bindings: Env }>
+): Promise<Response> {
+  try {
+    const body = await c.req.json<{ sessionId?: string }>();
+
+    // Generate session ID if not provided
+    const sessionId = body.sessionId || crypto.randomUUID();
+
+    // Get monthly amount from config
+    const monthlyAmountUsd = c.env.CRYPTO_MONTHLY_USD;
+
+    // Create NEAR Intents deposit address using session ID as temporary identifier
+    const intentResult = await createSubscriptionIntent(
+      c.env,
+      sessionId, // Use session ID as temporary identifier
+      monthlyAmountUsd
+    );
+
+    // Store pending subscription with session ID (no nearAccountId yet)
+    const subscription: CryptoSubscription = {
+      nearAccountId: '', // Will be set when wallet connects
+      sessionId,
+      intentId: intentResult.intentId,
+      monthlyAmountUsd,
+      billingDay: getDefaultBillingDay(),
+      status: 'pending',
+      retryCount: 0,
+      lastChargeDate: null,
+      nextChargeDate: null, // Will be set when activated
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveCryptoSubscription(c.env.CRYPTO_SUBSCRIPTIONS, subscription);
+
+    // Return payment page URL
+    const baseUrl = c.req.url.replace(/\/api\/crypto\/subscribe\/init$/, '');
+    const paymentUrl = `${baseUrl}/pay/${encodeURIComponent(intentResult.intentId)}`;
+
+    return c.json({
+      intentId: intentResult.intentId,
+      paymentUrl,
+      sessionId,
+    }, 201);
+  } catch (error) {
+    console.error('Error initializing crypto subscription:', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to initialize subscription' },
+      500
+    );
+  }
+}
+
+/**
  * POST /api/crypto/subscribe/confirm
  * Confirm subscription after user sends first payment
  * Verifies payment received and grants initial license
@@ -202,6 +262,9 @@ export async function handleCryptoSubscribeConfirm(
         retryCount: 0,
       }
     );
+
+    // Mark installation as upgraded (for conversion tracking)
+    await markUpgradeByAccount(c.env.TELEMETRY, subscription.nearAccountId);
 
     // Calculate expiry date
     const expiresAt = new Date();

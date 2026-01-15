@@ -120,13 +120,14 @@ export interface NearAction {
  */
 export interface CryptoSubscription {
   nearAccountId: string;
+  sessionId?: string; // Session ID for anonymous subscription init (set before wallet connects)
   intentId: string; // NEAR Intents subscription intent ID
   monthlyAmountUsd: string;
   billingDay: number; // 1-28
   status: 'pending' | 'active' | 'past_due' | 'cancelled';
   retryCount: number; // Track retry attempts for past_due
   lastChargeDate: string | null;
-  nextChargeDate: string;
+  nextChargeDate: string | null;
   createdAt: string;
   updatedAt: string;
 }
