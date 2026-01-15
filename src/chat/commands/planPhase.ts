@@ -177,13 +177,37 @@ function parsePlanResponse(response: string): ParsedPlanResponse | null {
 }
 
 /**
+ * Check if dependent phases are complete based on STATE.md
+ */
+function checkDependenciesComplete(stateMd: string | undefined, targetPhaseNum: number): { complete: boolean; currentPhase: number } {
+  if (!stateMd) {
+    return { complete: false, currentPhase: 0 };
+  }
+
+  // Look for "Phase: X of Y" pattern
+  const match = stateMd.match(/Phase:\s*(\d+(?:\.\d+)?)\s*of\s*\d+/);
+  if (!match) {
+    return { complete: false, currentPhase: 0 };
+  }
+
+  const currentPhase = parseFloat(match[1]);
+  // Dependencies complete if current phase >= target phase - 1
+  // (i.e., if we're at phase 2 or beyond, phase 1 is complete)
+  return {
+    complete: currentPhase >= targetPhaseNum - 1,
+    currentPhase
+  };
+}
+
+/**
  * Handle /plan-phase command
  *
  * Creates a PLAN.md file for a specific phase by:
  * 1. Parsing phase number from prompt
  * 2. Validating phase exists in ROADMAP.md
- * 3. Using LLM to generate tasks
- * 4. Creating PLAN.md in phase directory
+ * 3. Checking dependencies (warn but don't block)
+ * 4. Using LLM to generate tasks
+ * 5. Creating PLAN.md in phase directory
  */
 export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowResult> {
   const { request, stream, token, projectContext } = ctx;
@@ -211,12 +235,23 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
   }
 
   // Parse phases from roadmap
+  stream.progress('Reading roadmap...');
   const phases = parseRoadmapPhases(projectContext.roadmapMd);
   if (phases.length === 0) {
     stream.markdown('## Unable to Parse Phases\n\n');
     stream.markdown('Could not find phases in ROADMAP.md.\n\n');
     stream.markdown('Ensure your ROADMAP.md has phases in the format:\n');
     stream.markdown('`- [ ] **Phase 1: Name** - Goal`\n\n');
+
+    if (projectContext.planningUri) {
+      const roadmapUri = vscode.Uri.joinPath(projectContext.planningUri, 'ROADMAP.md');
+      stream.button({
+        command: 'vscode.open',
+        arguments: [roadmapUri],
+        title: 'Edit ROADMAP.md'
+      });
+    }
+
     return { metadata: { lastCommand: 'plan-phase' } };
   }
 
@@ -225,7 +260,24 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
   let targetPhaseNum: number | undefined;
 
   if (promptText) {
-    // Try to parse as number
+    // Check for invalid input (non-numeric)
+    if (!/^[\d.]+$/.test(promptText)) {
+      stream.markdown('## Invalid Argument\n\n');
+      stream.markdown(`"${promptText}" is not a valid phase number.\n\n`);
+      stream.markdown('**Usage:** `/plan-phase [phase-number]`\n\n');
+      stream.markdown('**Examples:**\n');
+      stream.markdown('- `/plan-phase 1` - Plan for Phase 1\n');
+      stream.markdown('- `/plan-phase 2.1` - Plan for inserted Phase 2.1\n');
+      stream.markdown('- `/plan-phase` - Auto-detect next unplanned phase\n\n');
+      stream.markdown('**Available phases:**\n');
+      for (const p of phases) {
+        stream.markdown(`- Phase ${p.number}: ${p.name}\n`);
+      }
+      stream.markdown('\n');
+      return { metadata: { lastCommand: 'plan-phase' } };
+    }
+
+    // Try to parse as number (supports decimal like 1.5)
     const parsed = parseFloat(promptText);
     if (!isNaN(parsed)) {
       targetPhaseNum = parsed;
@@ -234,6 +286,8 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
 
   // If no phase specified, suggest next unplanned phase
   if (targetPhaseNum === undefined) {
+    stream.progress('Detecting next unplanned phase...');
+
     // Find first phase without any plans
     for (const phase of phases) {
       const hasExistingPlan = await planExists(workspaceUri, phase.dirName, phase.number, 1);
@@ -264,12 +318,36 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
     return { metadata: { lastCommand: 'plan-phase' } };
   }
 
+  // Check if dependent phases are complete (warning only, non-blocking)
+  if (targetPhase.dependsOn) {
+    const depCheck = checkDependenciesComplete(projectContext.stateMd, targetPhaseNum!);
+    if (!depCheck.complete && depCheck.currentPhase < targetPhase.dependsOn) {
+      stream.markdown(`**Warning:** Planning Phase ${targetPhaseNum} ahead of schedule.\n`);
+      stream.markdown(`Phase ${targetPhase.dependsOn} (${phases.find(p => p.number === targetPhase.dependsOn)?.name || 'dependency'}) may not be complete.\n\n`);
+    }
+  }
+
   // Get next plan number for this phase
+  stream.progress('Checking existing plans...');
   const planNumber = await getNextPlanNumber(workspaceUri, targetPhase.dirName, targetPhase.number);
 
-  // Check if plan already exists
+  // Check if plan already exists - offer options
   if (planNumber > 1) {
-    stream.markdown(`**Note:** Phase ${targetPhase.number} already has ${planNumber - 1} plan(s). Creating plan ${planNumber}.\n\n`);
+    const existingPlanUri = vscode.Uri.joinPath(
+      workspaceUri,
+      '.planning',
+      'phases',
+      targetPhase.dirName,
+      `${targetPhase.number.toString().padStart(2, '0')}-${(planNumber - 1).toString().padStart(2, '0')}-PLAN.md`
+    );
+
+    stream.markdown(`**Note:** Phase ${targetPhase.number} already has ${planNumber - 1} plan(s).\n\n`);
+    stream.markdown(`Creating **Plan ${planNumber}** for additional work in this phase.\n\n`);
+
+    // Show reference to existing plan
+    stream.markdown('**Existing plan:**\n');
+    stream.reference(existingPlanUri);
+    stream.markdown('\n\n');
   }
 
   stream.progress('Reading project context...');
