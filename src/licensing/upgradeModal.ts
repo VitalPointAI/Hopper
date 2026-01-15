@@ -208,6 +208,21 @@ export class UpgradeModalPanel {
         }),
       });
 
+      // Handle existing subscription (409 Conflict) - resume instead of fail
+      if (response.status === 409) {
+        const data = await response.json() as {
+          error: string;
+          existingIntentId: string;
+          status: string;
+        };
+
+        // Resume existing subscription by navigating to payment page
+        vscode.window.showInformationMessage('Resuming existing subscription...');
+        const paymentUrl = `${apiUrl}/pay/${encodeURIComponent(data.existingIntentId)}`;
+        await vscode.env.openExternal(vscode.Uri.parse(paymentUrl));
+        return;
+      }
+
       if (!response.ok) {
         const error = await response.text();
         throw new Error(`Crypto checkout failed: ${error}`);
