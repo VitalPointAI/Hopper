@@ -276,8 +276,8 @@ export class UpgradeModalPanel {
     const accountDisplay = this.getAccountDisplay();
 
     // Determine button text based on auth state
-    const stripeButtonText = isAuthenticated ? 'Subscribe with Card' : 'Sign in to Subscribe';
-    const cryptoButtonText = isAuthenticated ? 'Pay with Crypto' : 'Sign in with NEAR';
+    const stripeButtonText = isAuthenticated ? 'Subscribe with Card' : 'Subscribe';
+    const cryptoButtonText = isAuthenticated ? 'Pay with Crypto' : 'Subscribe';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -550,7 +550,7 @@ export class UpgradeModalPanel {
         <span class="recommended-badge">Save 20%</span>
         <div class="card-header">
           <div class="card-title">Crypto</div>
-          <div class="card-subtitle">Pay with NEAR or USDC</div>
+          <div class="card-subtitle">Pay with any token</div>
           <div class="price">$4</div>
           <div class="price-period">per month</div>
           <div class="discount">20% OFF</div>
