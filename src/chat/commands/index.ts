@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { CommandHandler, CommandRegistry, ISpecflowResult, CommandContext } from './types';
 import { formatContextForPrompt, truncateContent } from '../context/projectContext';
 import { handleNewProject } from './newProject';
+import { handleCreateRoadmap } from './createRoadmap';
 
 /**
  * Command definitions with descriptions for help output
@@ -180,10 +181,11 @@ const registry: CommandRegistry = new Map();
 registry.set('help', helpHandler);
 registry.set('status', statusHandler);
 registry.set('new-project', handleNewProject);
+registry.set('create-roadmap', handleCreateRoadmap);
 
 // Register placeholder handlers for all other commands
 for (const cmd of COMMAND_DEFINITIONS) {
-  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project') {
+  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project' && cmd.name !== 'create-roadmap') {
     registry.set(cmd.name, createPlaceholderHandler(cmd.name, cmd.description));
   }
 }
