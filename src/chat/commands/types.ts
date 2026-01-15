@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { LicenseValidator } from '../../licensing/validator';
+import { ProjectContext } from '../context/projectContext';
 
 /**
  * Result metadata returned by the SpecFlow chat participant
@@ -20,6 +21,7 @@ export interface CommandContext {
   stream: vscode.ChatResponseStream;
   token: vscode.CancellationToken;
   licenseValidator: LicenseValidator;
+  projectContext: ProjectContext;
 }
 
 /**

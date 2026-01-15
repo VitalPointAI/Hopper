@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { LicenseValidator } from '../licensing/validator';
 import { getCommandHandler, isValidCommand, ISpecflowResult, CommandContext } from './commands';
+import { getProjectContext, formatContextForPrompt } from './context/projectContext';
 
 /**
  * Create and register the @specflow chat participant
@@ -30,21 +31,25 @@ export function createSpecflowParticipant(
     stream: vscode.ChatResponseStream,
     token: vscode.CancellationToken
   ): Promise<ISpecflowResult> => {
-    // Show progress while processing
-    stream.progress('Processing your request...');
+    // Show progress while loading context
+    stream.progress('Loading project context...');
+
+    // Fetch project context from .planning files
+    const projectContext = await getProjectContext();
 
     // Route slash commands to handlers
     if (request.command) {
       const commandHandler = getCommandHandler(request.command);
 
       if (commandHandler) {
-        // Build command context
+        // Build command context with project context
         const ctx: CommandContext = {
           request,
           context: chatContext,
           stream,
           token,
-          licenseValidator
+          licenseValidator,
+          projectContext
         };
 
         return commandHandler(ctx);
@@ -57,17 +62,26 @@ export function createSpecflowParticipant(
 
     // No command - general chat assistance
     // Build messages for the model with SpecFlow context
-    const messages: vscode.LanguageModelChatMessage[] = [
-      vscode.LanguageModelChatMessage.User(
-        'IMPORTANT: You are SpecFlow, a VSCode extension for model-agnostic structured planning. ' +
-        'When users ask what you do or how to use you, explain that SpecFlow helps organize software projects ' +
-        'through planning documents (PROJECT.md, ROADMAP.md, PLAN.md). ' +
-        'Available slash commands: /new-project (start here), /create-roadmap, /plan-phase, /execute-plan, /progress, /help. ' +
-        'Always suggest relevant commands. Be concise and actionable. ' +
-        'If unsure what the user needs, suggest /help to see all commands.'
-      ),
-      vscode.LanguageModelChatMessage.User(request.prompt)
-    ];
+    const messages: vscode.LanguageModelChatMessage[] = [];
+
+    // Base system instructions (as User message since System not supported)
+    let systemPrompt = 'IMPORTANT: You are SpecFlow, a VSCode extension for model-agnostic structured planning. ' +
+      'When users ask what you do or how to use you, explain that SpecFlow helps organize software projects ' +
+      'through planning documents (PROJECT.md, ROADMAP.md, PLAN.md). ' +
+      'Available slash commands: /new-project (start here), /create-roadmap, /plan-phase, /execute-plan, /progress, /status, /help. ' +
+      'Always suggest relevant commands. Be concise and actionable. ' +
+      'If unsure what the user needs, suggest /help to see all commands.';
+
+    // Include project context if available
+    if (projectContext.hasPlanning) {
+      const formattedContext = formatContextForPrompt(projectContext);
+      systemPrompt += '\n\nThe user is working on a project with SpecFlow planning. Here is the current state:\n' + formattedContext;
+    } else {
+      systemPrompt += '\n\nNo SpecFlow project found in this workspace. Suggest /new-project to initialize.';
+    }
+
+    messages.push(vscode.LanguageModelChatMessage.User(systemPrompt));
+    messages.push(vscode.LanguageModelChatMessage.User(request.prompt));
 
     try {
       // Forward request to the selected model
