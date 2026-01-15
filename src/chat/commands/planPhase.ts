@@ -210,7 +210,7 @@ function checkDependenciesComplete(stateMd: string | undefined, targetPhaseNum: 
  * 5. Creating PLAN.md in phase directory
  */
 export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowResult> {
-  const { request, stream, token, projectContext } = ctx;
+  const { request, stream, token, projectContext, licenseValidator } = ctx;
 
   // Check for workspace
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -221,6 +221,32 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
   }
 
   const workspaceUri = workspaceFolders[0].uri;
+
+  // Check license - /plan-phase requires Pro license
+  if (!licenseValidator.isAuthenticated()) {
+    stream.markdown('## Wallet Connection Required\n\n');
+    stream.markdown('Please connect your NEAR wallet to use planning commands.\n\n');
+    stream.button({
+      command: 'specflow.connectWallet',
+      title: 'Connect Wallet'
+    });
+    return { metadata: { lastCommand: 'plan-phase' } };
+  }
+
+  const licenseStatus = await licenseValidator.checkLicense();
+  if (!licenseStatus?.isLicensed) {
+    stream.markdown('## Pro License Required\n\n');
+    stream.markdown('The `/plan-phase` command requires a Pro license.\n\n');
+    stream.markdown('**Subscribe to unlock:**\n');
+    stream.markdown('- `/plan-phase` - Create detailed execution plans\n');
+    stream.markdown('- `/execute-plan` - Execute plans automatically\n');
+    stream.markdown('- Full session management features\n\n');
+    stream.button({
+      command: 'specflow.subscribe',
+      title: 'Subscribe'
+    });
+    return { metadata: { lastCommand: 'plan-phase' } };
+  }
 
   // Check if ROADMAP.md exists
   if (!projectContext.hasPlanning || !projectContext.roadmapMd) {
@@ -284,25 +310,21 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
     }
   }
 
-  // If no phase specified, suggest next unplanned phase
+  // If no phase specified, show usage help
   if (targetPhaseNum === undefined) {
-    stream.progress('Detecting next unplanned phase...');
-
-    // Find first phase without any plans
-    for (const phase of phases) {
-      const hasExistingPlan = await planExists(workspaceUri, phase.dirName, phase.number, 1);
-      if (!hasExistingPlan) {
-        targetPhaseNum = phase.number;
-        break;
-      }
+    stream.markdown('## Usage\n\n');
+    stream.markdown('**`/plan-phase <phase-number>`**\n\n');
+    stream.markdown('Create a detailed execution plan for a specific phase.\n\n');
+    stream.markdown('**Examples:**\n');
+    stream.markdown('- `/plan-phase 1` - Plan for Phase 1\n');
+    stream.markdown('- `/plan-phase 2` - Plan for Phase 2\n');
+    stream.markdown('- `/plan-phase 1.5` - Plan for inserted Phase 1.5\n\n');
+    stream.markdown('**Available phases:**\n');
+    for (const p of phases) {
+      stream.markdown(`- Phase ${p.number}: ${p.name}\n`);
     }
-
-    // If all phases have plans, default to first phase
-    if (targetPhaseNum === undefined) {
-      targetPhaseNum = phases[0].number;
-    }
-
-    stream.markdown(`No phase specified. Planning for **Phase ${targetPhaseNum}**.\n\n`);
+    stream.markdown('\n');
+    return { metadata: { lastCommand: 'plan-phase' } };
   }
 
   // Find target phase
