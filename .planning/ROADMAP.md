@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation** - Extension scaffolding, NEAR AI model registration in VSCode
 - [x] **Phase 1.5: Licensing** - INSERTED - NEAR license contract, Stripe subscription, x402 crypto payments
 - [ ] **Phase 1.5.1: Infrastructure Deploy** - INSERTED - Deploy NEAR contract and Cloudflare Worker to production
+- [ ] **Phase 1.5.2: Dual Auth** - INSERTED - OAuth + wallet authentication with unified license management
 - [x] **Phase 2: Chat Participant** - @specflow agent with command routing
 - [x] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
 - [ ] **Phase 4: Execution Commands** - PLAN.md execution, verification, git integration
@@ -61,7 +62,20 @@ Plans:
 
 Plans:
 - [x] 01.5.1-01: Deploy Cloudflare Worker with KV namespaces and secrets
-- [ ] 01.5.1-02: Deploy NEAR license contract to mainnet (license.specflow.near)
+- [x] 01.5.1-02: Configure extension and verify end-to-end flow
+
+### Phase 1.5.2: Dual Auth (INSERTED)
+**Goal**: Support OAuth (Google/GitHub/Email) alongside NEAR wallet auth with unified license management
+**Depends on**: Phase 1.5.1 (infrastructure must be deployed)
+**Research**: Unlikely (standard OAuth patterns)
+**Research topics**: OAuth 2.0 flows, Cloudflare Workers OAuth handling
+**Plans**: TBD
+
+Plans:
+- [x] 01.5.2-01: OAuth infrastructure in Worker (Google, GitHub, email+password)
+- [ ] 01.5.2-02: Extension auth flow updates (unified connect command)
+- [ ] 01.5.2-03: Stripe flow updates (OAuth user as customer ID)
+- [ ] 01.5.2-04: Testing and validation
 
 ### Phase 2: Chat Participant
 **Goal**: @specflow chat participant responding to mentions with slash command routing
@@ -117,7 +131,8 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 6/6 | Complete | 2026-01-14 |
-| 1.5.1 Infrastructure Deploy | 1/2 | In progress | - |
+| 1.5.1 Infrastructure Deploy | 2/2 | Complete | 2026-01-15 |
+| 1.5.2 Dual Auth | 1/4 | In progress | - |
 | 2. Chat Participant | 3/3 | Complete | 2026-01-15 |
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 0/3 | Not started | - |

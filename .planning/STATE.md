@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 1.5.1 — Infrastructure Deploy (urgent insertion)
+**Current focus:** Phase 1.5.2 — Dual Auth (OAuth + wallet)
 
 ## Current Position
 
-Phase: 1.5.1 (Infrastructure Deploy - INSERTED)
-Plan: 1 of 2 in current phase
+Phase: 1.5.2 (Dual Auth - INSERTED)
+Plan: 1 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-15 — Completed 01.5.1-01-PLAN.md (Worker deployment)
+Last activity: 2026-01-15 — Completed 01.5.2-01-PLAN.md (OAuth infrastructure)
 
-Progress: █████████████████░░ 85%
+Progress: █████████████████░░░ 86%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23 (including FIX plans)
-- Average duration: 8.9 min
-- Total execution time: 204 min
+- Total plans completed: 24 (including FIX plans)
+- Average duration: 8.7 min
+- Total execution time: 209 min
 
 **By Phase:**
 
@@ -29,13 +29,14 @@ Progress: █████████████████░░ 85%
 |-------|-------|-------|----------|
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
-| 01.5.1-infra-deploy | 1 | 57 min | 57 min |
+| 01.5.1-infra-deploy | 2 | 57 min | 28.5 min |
+| 01.5.2-dual-auth | 1 | 5 min | 5 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-03 (4 min), 03-03-FIX (2 min), 01.5.1-01 (57 min)
-- Trend: Infrastructure deployment took longer due to auth gates and verification
+- Last 5 plans: 03-03-FIX (2 min), 01.5.1-01 (57 min), 01.5.2-01 (5 min)
+- Trend: OAuth infrastructure plan fast due to subagent autonomous execution
 
 ## Accumulated Context
 
@@ -83,6 +84,9 @@ Recent decisions affecting current work:
 | 03-03-FIX | Explicit usage help | Show help when no argument instead of silent default |
 | 01.5.1-01 | Mainnet contract: license.specflow.near | Subaccount of specflow.near for licensing |
 | 01.5.1-01 | workers.dev subdomain: vitalpointai | Cloudflare Workers deployment target |
+| 01.5.2-01 | bcryptjs for Workers password hashing | Workers-compatible, native bcrypt not supported |
+| 01.5.2-01 | OAuth state in PROCESSED_EVENTS KV | 5-min TTL for CSRF protection |
+| 01.5.2-01 | Rate limiting: 5 attempts -> 15-min lockout | Prevent brute force on email login |
 
 ### Deferred Issues
 
@@ -100,5 +104,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 01.5.1-01-PLAN.md (Worker deployed)
+Stopped at: Completed 01.5.2-01-PLAN.md (OAuth infrastructure)
 Resume file: None
