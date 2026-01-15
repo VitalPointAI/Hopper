@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 1.5.2 (Dual Auth - INSERTED)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-15 — Completed 01.5.2-02-PLAN.md (Extension auth flow updates)
+Last activity: 2026-01-15 — Completed 01.5.2-03-PLAN.md (Stripe flow updates)
 
-Progress: █████████████████░░░ 89%
+Progress: █████████████████░░░ 93%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 25 (including FIX plans)
-- Average duration: 8.6 min
-- Total execution time: 215 min
+- Total plans completed: 26 (including FIX plans)
+- Average duration: 8.5 min
+- Total execution time: 222 min
 
 **By Phase:**
 
@@ -30,13 +30,13 @@ Progress: █████████████████░░░ 89%
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
 | 01.5.1-infra-deploy | 2 | 57 min | 28.5 min |
-| 01.5.2-dual-auth | 2 | 11 min | 5.5 min |
+| 01.5.2-dual-auth | 3 | 18 min | 6 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 01.5.1-01 (57 min), 01.5.2-01 (5 min), 01.5.2-02 (6 min)
-- Trend: Extension auth plans fast due to subagent autonomous execution
+- Last 5 plans: 01.5.2-01 (5 min), 01.5.2-02 (6 min), 01.5.2-03 (7 min)
+- Trend: Dual auth plans fast (~6 min avg) due to subagent autonomous execution
 
 ## Accumulated Context
 
@@ -89,6 +89,10 @@ Recent decisions affecting current work:
 | 01.5.2-01 | Rate limiting: 5 attempts -> 15-min lockout | Prevent brute force on email login |
 | 01.5.2-02 | AuthSession userId supports both OAuth and wallet | oauth:{provider}:{id} OR NEAR account ID |
 | 01.5.2-02 | Dual license checking backends | Contract for wallet, Worker API for OAuth |
+| 01.5.2-03 | JWT verification reuses admin pattern | HMAC-SHA256 with ADMIN_SECRET for consistency |
+| 01.5.2-03 | Stripe metadata has auth_type + user_id | Enables webhook routing to correct license store |
+| 01.5.2-03 | Crypto payments require wallet | OAuth users must use card payments |
+| 01.5.2-03 | Pending payment in globalState | Resumes after auth callback completes |
 
 ### Deferred Issues
 
@@ -106,5 +110,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 01.5.2-02-PLAN.md (Extension auth flow updates)
+Stopped at: Completed 01.5.2-03-PLAN.md (Stripe flow updates)
 Resume file: None

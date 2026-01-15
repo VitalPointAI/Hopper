@@ -74,7 +74,7 @@ Plans:
 Plans:
 - [x] 01.5.2-01: OAuth infrastructure in Worker (Google, GitHub, email+password)
 - [x] 01.5.2-02: Extension auth flow updates (unified connect command)
-- [ ] 01.5.2-03: Stripe flow updates (OAuth user as customer ID)
+- [x] 01.5.2-03: Stripe flow updates (OAuth user as customer ID)
 - [ ] 01.5.2-04: Testing and validation
 
 ### Phase 2: Chat Participant
@@ -132,7 +132,7 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 2 → 3 → 4 → 5
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 6/6 | Complete | 2026-01-14 |
 | 1.5.1 Infrastructure Deploy | 2/2 | Complete | 2026-01-15 |
-| 1.5.2 Dual Auth | 2/4 | In progress | - |
+| 1.5.2 Dual Auth | 3/4 | In progress | - |
 | 2. Chat Participant | 3/3 | Complete | 2026-01-15 |
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 0/3 | Not started | - |
