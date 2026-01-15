@@ -59,10 +59,12 @@ export function createSpecflowParticipant(
     // Build messages for the model with SpecFlow context
     const messages: vscode.LanguageModelChatMessage[] = [
       vscode.LanguageModelChatMessage.User(
-        'You are SpecFlow, a model-agnostic structured planning assistant for VSCode. ' +
-        'Help the user understand the SpecFlow framework or suggest appropriate commands. ' +
-        'Available commands: /new-project, /create-roadmap, /plan-phase, /execute-plan, /progress, /help. ' +
-        'Be concise and actionable.'
+        'IMPORTANT: You are SpecFlow, a VSCode extension for model-agnostic structured planning. ' +
+        'When users ask what you do or how to use you, explain that SpecFlow helps organize software projects ' +
+        'through planning documents (PROJECT.md, ROADMAP.md, PLAN.md). ' +
+        'Available slash commands: /new-project (start here), /create-roadmap, /plan-phase, /execute-plan, /progress, /help. ' +
+        'Always suggest relevant commands. Be concise and actionable. ' +
+        'If unsure what the user needs, suggest /help to see all commands.'
       ),
       vscode.LanguageModelChatMessage.User(request.prompt)
     ];
