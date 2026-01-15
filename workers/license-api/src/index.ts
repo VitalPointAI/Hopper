@@ -137,6 +137,68 @@ app.post('/auth/verify', async (c) => {
 });
 
 // ============================================================================
+// OAuth Authentication Routes
+// ============================================================================
+
+/**
+ * Start Google OAuth flow
+ * Query: callback (required) - VSCode callback URL
+ */
+app.get('/auth/oauth/google', async (c) => {
+  const { handleGoogleAuth } = await import('./handlers/oauth-auth');
+  return handleGoogleAuth(c);
+});
+
+/**
+ * Google OAuth callback
+ * Handles authorization code exchange and user info fetch
+ */
+app.get('/auth/oauth/google/callback', async (c) => {
+  const { handleGoogleCallback } = await import('./handlers/oauth-auth');
+  return handleGoogleCallback(c);
+});
+
+/**
+ * Start GitHub OAuth flow
+ * Query: callback (required) - VSCode callback URL
+ */
+app.get('/auth/oauth/github', async (c) => {
+  const { handleGitHubAuth } = await import('./handlers/oauth-auth');
+  return handleGitHubAuth(c);
+});
+
+/**
+ * GitHub OAuth callback
+ * Handles authorization code exchange and user info fetch
+ */
+app.get('/auth/oauth/github/callback', async (c) => {
+  const { handleGitHubCallback } = await import('./handlers/oauth-auth');
+  return handleGitHubCallback(c);
+});
+
+// ============================================================================
+// Email Authentication Routes
+// ============================================================================
+
+/**
+ * Register new email user
+ * Body: { email, password, displayName? }
+ */
+app.post('/auth/email/register', async (c) => {
+  const { handleEmailRegister } = await import('./handlers/email-auth');
+  return handleEmailRegister(c);
+});
+
+/**
+ * Login existing email user
+ * Body: { email, password }
+ */
+app.post('/auth/email/login', async (c) => {
+  const { handleEmailLogin } = await import('./handlers/email-auth');
+  return handleEmailLogin(c);
+});
+
+// ============================================================================
 // Admin Routes
 // ============================================================================
 
