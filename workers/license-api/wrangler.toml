@@ -7,35 +7,32 @@ compatibility_date = "2024-01-01"
 [triggers]
 crons = ["0 6 * * *"]
 
-# KV Namespace bindings
-# Create with: wrangler kv:namespace create "PROCESSED_EVENTS"
-# Create with: wrangler kv:namespace create "SUBSCRIPTIONS"
-# Create with: wrangler kv:namespace create "CRYPTO_SUBSCRIPTIONS"
-# Note: For production, replace these placeholder IDs with actual KV namespace IDs
+# KV Namespace bindings (production)
 [[kv_namespaces]]
 binding = "PROCESSED_EVENTS"
-id = "placeholder_processed_events_id"
-preview_id = "preview_processed_events_id"
+id = "e2a32f00864d41369d77d0160db950d7"
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
-id = "placeholder_subscriptions_id"
-preview_id = "preview_subscriptions_id"
+id = "ab2b417d9e5b4b3c92abc9efc0c063fa"
 
 [[kv_namespaces]]
 binding = "CRYPTO_SUBSCRIPTIONS"
-id = "placeholder_crypto_subscriptions_id"
-preview_id = "preview_crypto_subscriptions_id"
+id = "c161852936364f3d809fa0826215eb4d"
+
+[[kv_namespaces]]
+binding = "TELEMETRY"
+id = "a539a15f0b8d42c19f52e1750837cecb"
 
 # Environment variables (non-secret)
 [vars]
-NEAR_RPC_URL = "https://rpc.mainnet.fastnear.com"
+NEAR_RPC_URL = "https://rpc.testnet.fastnear.com"
 LICENSE_DURATION_DAYS = "30"
 CRYPTO_MONTHLY_USD = "4.00"
 NEAR_INTENTS_API_URL = "https://1click.chaindefuser.com"
 SETTLEMENT_ACCOUNT = "vitalpointai.near"
 # Set to contract admin account (e.g., specflow.testnet or admin.specflow.near)
-ADMIN_WALLET = "admin.specflow.near"
+ADMIN_WALLET = "specflow.testnet"
 
 # Secrets (set with: wrangler secret put <NAME>)
 # STRIPE_SECRET_KEY - Stripe API key
