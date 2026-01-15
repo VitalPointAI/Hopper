@@ -1,6 +1,10 @@
 /**
  * Stripe webhook handler for subscription events
  * Handles: invoice.paid, customer.subscription.updated, customer.subscription.deleted
+ *
+ * Routes license grants based on auth_type metadata:
+ * - OAuth users: Grant license in USER_LICENSES KV
+ * - Wallet users: Grant license on NEAR contract
  */
 
 import type { Context } from 'hono';
@@ -8,11 +12,13 @@ import Stripe from 'stripe';
 import type { Env, SubscriptionRecord } from '../types';
 import { isProcessed, markProcessed } from '../services/idempotency';
 import { grantLicense } from '../services/near-contract';
+import { grantOAuthLicense } from '../services/oauth-license-store';
 import {
   saveSubscription,
   updateSubscriptionStatus,
   getSubscriptionByCustomerId,
 } from '../services/subscription-store';
+import { markUpgradeByAccount } from '../services/telemetry-store';
 
 /**
  * Handle Stripe webhook events
@@ -91,7 +97,9 @@ export async function handleStripeWebhook(
 
 /**
  * Handle invoice.paid event
- * Extends license for another billing period
+ * Routes license grant based on auth_type:
+ * - OAuth users: USER_LICENSES KV
+ * - Wallet users: NEAR contract
  */
 async function handleInvoicePaid(
   env: Env,
@@ -116,7 +124,7 @@ async function handleInvoicePaid(
     return;
   }
 
-  // Get customer to retrieve NEAR account ID from metadata
+  // Get customer to retrieve user info from metadata
   const customer = await stripe.customers.retrieve(customerId);
 
   if (customer.deleted) {
@@ -124,10 +132,20 @@ async function handleInvoicePaid(
     return;
   }
 
+  // Check auth type from metadata (new field)
+  const authType = customer.metadata?.auth_type;
+  const userId = customer.metadata?.user_id;
+  // Fallback to near_account_id for backward compatibility
   const nearAccountId = customer.metadata?.near_account_id;
 
-  if (!nearAccountId) {
-    console.error(`No near_account_id in customer ${customerId} metadata`);
+  // Determine if this is an OAuth user
+  const isOAuthUser = authType === 'oauth' || (userId && userId.startsWith('oauth:'));
+
+  // Get the effective user ID
+  const effectiveUserId = userId || nearAccountId;
+
+  if (!effectiveUserId) {
+    console.error(`No user_id or near_account_id in customer ${customerId} metadata`);
     return;
   }
 
@@ -139,34 +157,74 @@ async function handleInvoicePaid(
 
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-  // Grant license on NEAR contract
+  // Calculate license duration
   const durationDays = parseInt(env.LICENSE_DURATION_DAYS, 10) || 30;
-  const result = await grantLicense(env, nearAccountId, durationDays);
 
-  if (!result.success) {
-    console.error(`Failed to grant license: ${result.error}`);
-    throw new Error(`License grant failed: ${result.error}`);
+  if (isOAuthUser) {
+    // OAuth user: grant license in USER_LICENSES KV
+    const result = await grantOAuthLicense(
+      env.USER_LICENSES,
+      effectiveUserId,
+      durationDays,
+      customerId
+    );
+
+    if (!result.success) {
+      console.error(`Failed to grant OAuth license to ${effectiveUserId}`);
+      throw new Error('OAuth license grant failed');
+    }
+
+    console.log(
+      `Granted ${durationDays}-day license to OAuth user ${effectiveUserId}, expires: ${new Date(result.expiresAt).toISOString()}`
+    );
+
+    // For OAuth users, we don't need to save to SUBSCRIPTIONS KV (they use USER_LICENSES)
+    // But we can still track for admin visibility
+    const record: SubscriptionRecord = {
+      nearAccountId: effectiveUserId, // Using the unified user ID
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      status: subscription.status as SubscriptionRecord['status'],
+      currentPeriodEnd: subscription.current_period_end,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await saveSubscription(env.SUBSCRIPTIONS, record);
+  } else {
+    // Wallet user: grant license on NEAR contract (existing flow)
+    const accountId = nearAccountId || effectiveUserId;
+    const result = await grantLicense(env, accountId, durationDays);
+
+    if (!result.success) {
+      console.error(`Failed to grant NEAR license: ${result.error}`);
+      throw new Error(`NEAR license grant failed: ${result.error}`);
+    }
+
+    console.log(
+      `Granted ${durationDays}-day license to ${accountId}, tx: ${result.txHash}`
+    );
+
+    // Update subscription record in KV
+    const record: SubscriptionRecord = {
+      nearAccountId: accountId,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscriptionId,
+      status: subscription.status as SubscriptionRecord['status'],
+      currentPeriodEnd: subscription.current_period_end,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await saveSubscription(env.SUBSCRIPTIONS, record);
+
+    // Mark installation as upgraded (for conversion tracking) - only for wallet users
+    await markUpgradeByAccount(env.TELEMETRY, accountId);
   }
 
-  console.log(
-    `Granted ${durationDays}-day license to ${nearAccountId}, tx: ${result.txHash}`
-  );
-
-  // Update subscription record in KV
-  const record: SubscriptionRecord = {
-    nearAccountId,
-    stripeCustomerId: customerId,
-    stripeSubscriptionId: subscriptionId,
-    status: subscription.status as SubscriptionRecord['status'],
-    currentPeriodEnd: subscription.current_period_end,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-
-  await saveSubscription(env.SUBSCRIPTIONS, record);
-
-  console.log(`Updated subscription record for ${nearAccountId}`);
+  console.log(`Updated subscription record for ${effectiveUserId}`);
 }
 
 /**
