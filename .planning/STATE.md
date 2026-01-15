@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 1.5.2 (Dual Auth - INSERTED)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-15 — Completed 01.5.2-01-PLAN.md (OAuth infrastructure)
+Last activity: 2026-01-15 — Completed 01.5.2-02-PLAN.md (Extension auth flow updates)
 
-Progress: █████████████████░░░ 86%
+Progress: █████████████████░░░ 89%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24 (including FIX plans)
-- Average duration: 8.7 min
-- Total execution time: 209 min
+- Total plans completed: 25 (including FIX plans)
+- Average duration: 8.6 min
+- Total execution time: 215 min
 
 **By Phase:**
 
@@ -30,13 +30,13 @@ Progress: █████████████████░░░ 86%
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
 | 01.5.1-infra-deploy | 2 | 57 min | 28.5 min |
-| 01.5.2-dual-auth | 1 | 5 min | 5 min |
+| 01.5.2-dual-auth | 2 | 11 min | 5.5 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-03-FIX (2 min), 01.5.1-01 (57 min), 01.5.2-01 (5 min)
-- Trend: OAuth infrastructure plan fast due to subagent autonomous execution
+- Last 5 plans: 01.5.1-01 (57 min), 01.5.2-01 (5 min), 01.5.2-02 (6 min)
+- Trend: Extension auth plans fast due to subagent autonomous execution
 
 ## Accumulated Context
 
@@ -87,6 +87,8 @@ Recent decisions affecting current work:
 | 01.5.2-01 | bcryptjs for Workers password hashing | Workers-compatible, native bcrypt not supported |
 | 01.5.2-01 | OAuth state in PROCESSED_EVENTS KV | 5-min TTL for CSRF protection |
 | 01.5.2-01 | Rate limiting: 5 attempts -> 15-min lockout | Prevent brute force on email login |
+| 01.5.2-02 | AuthSession userId supports both OAuth and wallet | oauth:{provider}:{id} OR NEAR account ID |
+| 01.5.2-02 | Dual license checking backends | Contract for wallet, Worker API for OAuth |
 
 ### Deferred Issues
 
@@ -104,5 +106,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-15
-Stopped at: Completed 01.5.2-01-PLAN.md (OAuth infrastructure)
+Stopped at: Completed 01.5.2-02-PLAN.md (Extension auth flow updates)
 Resume file: None
