@@ -4,8 +4,8 @@
  */
 
 import type { Context } from 'hono';
-import type { Env, SubscriptionRecord, CryptoSubscription } from '../../types';
-import { licensesFragment } from './ui';
+import type { Env, SubscriptionRecord, CryptoSubscription, OAuthUserLicense, OAuthProvider } from '../../types';
+import { licensesFragment, type LicenseDisplayInfo } from './ui';
 
 interface LicenseInfo {
   nearAccountId: string;
@@ -17,6 +17,16 @@ interface LicenseInfo {
     isLicensed: boolean;
     expiry: string | null;
   };
+}
+
+interface OAuthLicenseInfo {
+  userId: string;
+  authType: 'oauth';
+  provider: OAuthProvider;
+  email: string;
+  displayName?: string;
+  isLicensed: boolean;
+  expiresAt: number | null;
 }
 
 /**
@@ -232,18 +242,67 @@ export async function handleAdminLicenses(c: Context<{ Bindings: Env }>): Promis
       seenAccounts.add(nearAccountId);
     }
 
+    // Search OAuth users (stored in USER_LICENSES KV with oauth: prefix)
+    const oauthUsers: OAuthLicenseInfo[] = [];
+    const oauthList = await c.env.USER_LICENSES.list({
+      prefix: 'oauth:',
+      limit: limit - licenses.length,
+    });
+
+    const now = Date.now();
+    const searchLower = search.toLowerCase();
+
+    for (const key of oauthList.keys) {
+      if (oauthUsers.length >= limit - licenses.length) break;
+
+      const data = await c.env.USER_LICENSES.get(key.name);
+      if (data) {
+        try {
+          const record: OAuthUserLicense = JSON.parse(data);
+          // Filter by search term (matches email or display name)
+          if (
+            !search ||
+            record.email.toLowerCase().includes(searchLower) ||
+            record.displayName?.toLowerCase().includes(searchLower) ||
+            key.name.toLowerCase().includes(searchLower)
+          ) {
+            oauthUsers.push({
+              userId: key.name,
+              authType: 'oauth',
+              provider: record.provider,
+              email: record.email,
+              displayName: record.displayName,
+              isLicensed: record.licenseExpiry ? record.licenseExpiry > now : false,
+              expiresAt: record.licenseExpiry,
+            });
+          }
+        } catch {
+          // Skip malformed records
+        }
+      }
+    }
+
+    // Combine wallet and OAuth licenses for display
+    const allLicenses: LicenseDisplayInfo[] = [
+      ...licenses.map((lic) => ({
+        ...lic,
+        authType: 'wallet' as const,
+      })),
+      ...oauthUsers,
+    ];
+
     // Check if request is from htmx
     const isHtmx = c.req.header('HX-Request') === 'true';
 
     if (isHtmx) {
-      return c.html(licensesFragment(licenses));
+      return c.html(licensesFragment(allLicenses));
     }
 
     return c.json({
       success: true,
       data: {
-        licenses,
-        count: licenses.length,
+        licenses: allLicenses,
+        count: allLicenses.length,
         search: search || null,
       },
       timestamp: new Date().toISOString(),

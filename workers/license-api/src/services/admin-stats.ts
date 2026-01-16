@@ -3,7 +3,8 @@
  * Aggregates subscription data from KV namespaces
  */
 
-import type { Env, SubscriptionRecord, CryptoSubscription } from '../types';
+import type { Env, SubscriptionRecord, CryptoSubscription, TelemetryStats, OAuthUserLicense } from '../types';
+import { getTelemetryStats } from './telemetry-store';
 
 // Pricing for revenue estimates
 const STRIPE_MONTHLY_USD = 5;
@@ -21,20 +22,30 @@ export interface SubscriptionStats {
     pastDue: number;
     pending: number;
   };
+  oauth: {
+    totalUsers: number;
+    licensedUsers: number;
+  };
   totalActive: number;
   estimatedMonthlyRevenue: number;
+  telemetry: TelemetryStats;
 }
 
 /**
  * Get aggregated subscription statistics
  */
 export async function getSubscriptionStats(env: Env): Promise<SubscriptionStats> {
+  // Get telemetry stats
+  const telemetry = await getTelemetryStats(env.TELEMETRY);
+
   // Initialize counts
   const stats: SubscriptionStats = {
     stripe: { active: 0, canceled: 0, pastDue: 0 },
     crypto: { active: 0, cancelled: 0, pastDue: 0, pending: 0 },
+    oauth: { totalUsers: 0, licensedUsers: 0 },
     totalActive: 0,
     estimatedMonthlyRevenue: 0,
+    telemetry,
   };
 
   // Process Stripe subscriptions
@@ -109,6 +120,34 @@ export async function getSubscriptionStats(env: Env): Promise<SubscriptionStats>
 
     cryptoCursor = cryptoList.list_complete ? undefined : cryptoList.cursor;
   } while (cryptoCursor);
+
+  // Process OAuth users
+  let oauthCursor: string | undefined;
+  const now = Date.now();
+  do {
+    const oauthList = await env.USER_LICENSES.list({
+      prefix: 'oauth:',
+      cursor: oauthCursor,
+      limit: 1000,
+    });
+
+    for (const key of oauthList.keys) {
+      stats.oauth.totalUsers++;
+      const data = await env.USER_LICENSES.get(key.name);
+      if (data) {
+        try {
+          const record: OAuthUserLicense = JSON.parse(data);
+          if (record.licenseExpiry && record.licenseExpiry > now) {
+            stats.oauth.licensedUsers++;
+          }
+        } catch {
+          // Skip malformed records
+        }
+      }
+    }
+
+    oauthCursor = oauthList.list_complete ? undefined : oauthList.cursor;
+  } while (oauthCursor);
 
   // Calculate totals
   stats.totalActive = stats.stripe.active + stats.crypto.active;

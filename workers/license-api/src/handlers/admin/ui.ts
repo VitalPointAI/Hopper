@@ -4,7 +4,34 @@
  */
 
 import type { Context } from 'hono';
-import type { Env } from '../../types';
+import type { Env, OAuthProvider } from '../../types';
+
+/**
+ * Union type for license display in admin UI
+ * Supports both wallet (NEAR) and OAuth users
+ */
+export type LicenseDisplayInfo =
+  | {
+      authType: 'wallet';
+      nearAccountId: string;
+      source: 'stripe' | 'crypto' | 'admin';
+      subscriptionStatus: string;
+      currentPeriodEnd?: number;
+      nextChargeDate?: string;
+      contractLicense?: {
+        isLicensed: boolean;
+        expiry: string | null;
+      };
+    }
+  | {
+      authType: 'oauth';
+      userId: string;
+      provider: OAuthProvider;
+      email: string;
+      displayName?: string;
+      isLicensed: boolean;
+      expiresAt: number | null;
+    };
 
 /**
  * Base HTML layout with Tailwind CSS and htmx
@@ -394,6 +421,7 @@ export function dashboardPage(): string {
 export function statsFragment(stats: {
   stripe: { active: number; canceled: number; pastDue: number };
   crypto: { active: number; cancelled: number; pending: number; pastDue: number };
+  oauth: { totalUsers: number; licensedUsers: number };
   totalActive: number;
   estimatedMonthlyRevenue: number;
   telemetry: {
@@ -412,7 +440,7 @@ export function statsFragment(stats: {
 
   return `
   <!-- Subscription Stats -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
     <!-- Stripe Subscriptions -->
     <div class="bg-white overflow-hidden shadow rounded-lg">
       <div class="p-5">
@@ -481,6 +509,30 @@ export function statsFragment(stats: {
       <div class="bg-gray-50 px-5 py-3">
         <div class="text-sm text-gray-500">
           Stripe: $${stripeRevenue.toFixed(2)} | Crypto: $${cryptoRevenue.toFixed(2)}
+        </div>
+      </div>
+    </div>
+
+    <!-- OAuth Users -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">OAuth Users</dt>
+              <dd class="text-3xl font-semibold text-gray-900">${stats.oauth.totalUsers}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-5 py-3">
+        <div class="text-sm text-gray-500">
+          ${stats.oauth.licensedUsers} licensed (Pro)
         </div>
       </div>
     </div>
@@ -706,18 +758,9 @@ export function licensesPage(): string {
 
 /**
  * Licenses search results fragment
+ * Handles both wallet (NEAR) and OAuth users
  */
-export function licensesFragment(licenses: Array<{
-  nearAccountId: string;
-  source: 'stripe' | 'crypto' | 'admin';
-  subscriptionStatus: string;
-  currentPeriodEnd?: number;
-  nextChargeDate?: string;
-  contractLicense?: {
-    isLicensed: boolean;
-    expiry: string | null;
-  };
-}>): string {
+export function licensesFragment(licenses: LicenseDisplayInfo[]): string {
   if (licenses.length === 0) {
     return `
     <div class="text-center py-8 text-gray-500">
@@ -727,38 +770,88 @@ export function licensesFragment(licenses: Array<{
 
   const rows = licenses
     .map((lic) => {
-      const expiryDate = lic.contractLicense?.expiry
-        ? new Date(lic.contractLicense.expiry).toLocaleDateString()
-        : 'N/A';
-      const status = lic.contractLicense?.isLicensed
-        ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>'
-        : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Expired</span>';
-      let sourceLabel: string;
-      switch (lic.source) {
-        case 'stripe':
-          sourceLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">Stripe</span>';
-          break;
-        case 'crypto':
-          sourceLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Crypto</span>';
-          break;
-        case 'admin':
-          sourceLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">Admin</span>';
-          break;
-        default:
-          sourceLabel =
-            '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Unknown</span>';
-      }
+      if (lic.authType === 'oauth') {
+        // OAuth user
+        const expiryDate = lic.expiresAt
+          ? new Date(lic.expiresAt).toLocaleDateString()
+          : 'N/A';
+        const status = lic.isLicensed
+          ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>'
+          : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">No License</span>';
 
-      return `
+        // Auth type badge with provider icon
+        let authBadge: string;
+        switch (lic.provider) {
+          case 'google':
+            authBadge =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Google</span>';
+            break;
+          case 'github':
+            authBadge =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-800 text-white">GitHub</span>';
+            break;
+          case 'email':
+            authBadge =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Email</span>';
+            break;
+          default:
+            authBadge =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800">OAuth</span>';
+        }
+
+        return `
       <tr class="hover:bg-gray-50">
-        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${lic.nearAccountId}</td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="text-sm font-medium text-gray-900">${lic.email}</div>
+          <div class="text-xs text-gray-500">${lic.displayName || ''}</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${expiryDate}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${authBadge}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${status}</td>
+      </tr>`;
+      } else {
+        // Wallet user (NEAR)
+        const expiryDate = lic.contractLicense?.expiry
+          ? new Date(lic.contractLicense.expiry).toLocaleDateString()
+          : 'N/A';
+        const status = lic.contractLicense?.isLicensed
+          ? '<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>'
+          : '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Expired</span>';
+
+        let sourceLabel: string;
+        switch (lic.source) {
+          case 'stripe':
+            sourceLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">Stripe</span>';
+            break;
+          case 'crypto':
+            sourceLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Crypto</span>';
+            break;
+          case 'admin':
+            sourceLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">Admin</span>';
+            break;
+          default:
+            sourceLabel =
+              '<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Unknown</span>';
+        }
+
+        // Add NEAR badge to indicate wallet auth
+        const authBadge =
+          '<span class="px-2 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-800">NEAR</span>';
+
+        return `
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="text-sm font-medium text-gray-900">${lic.nearAccountId}</div>
+          <div class="text-xs text-gray-500">${authBadge}</div>
+        </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${expiryDate}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${sourceLabel}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${status}</td>
       </tr>`;
+      }
     })
     .join('');
 
