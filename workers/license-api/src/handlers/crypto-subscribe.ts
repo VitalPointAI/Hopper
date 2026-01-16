@@ -135,21 +135,43 @@ export async function handleCryptoSubscribe(
 export async function handleCryptoSubscribeInit(
   c: Context<{ Bindings: Env }>
 ): Promise<Response> {
+  console.log('[init] Handler started');
   try {
+    // Validate required configuration early to prevent crashes
+    if (!c.env.CRYPTO_MONTHLY_USD) {
+      console.error('[init] Missing CRYPTO_MONTHLY_USD configuration');
+      return c.json({ error: 'Crypto subscriptions not configured' }, 503);
+    }
+    if (!c.env.NEAR_INTENTS_API_URL) {
+      console.error('[init] Missing NEAR_INTENTS_API_URL configuration');
+      return c.json({ error: 'Payment service not configured' }, 503);
+    }
+    if (!c.env.SETTLEMENT_ACCOUNT) {
+      console.error('[init] Missing SETTLEMENT_ACCOUNT configuration');
+      return c.json({ error: 'Settlement account not configured' }, 503);
+    }
+
     const body = await c.req.json<{ sessionId?: string }>();
+    console.log('[init] Body parsed:', JSON.stringify(body));
 
     // Generate session ID if not provided
     const sessionId = body.sessionId || crypto.randomUUID();
+    console.log('[init] Session ID:', sessionId);
 
     // Get monthly amount from config
     const monthlyAmountUsd = c.env.CRYPTO_MONTHLY_USD;
+    console.log('[init] Monthly USD:', monthlyAmountUsd);
+    console.log('[init] NEAR_INTENTS_API_URL:', c.env.NEAR_INTENTS_API_URL);
+    console.log('[init] Has NEAR_INTENTS_API_KEY:', !!c.env.NEAR_INTENTS_API_KEY);
 
     // Create NEAR Intents deposit address using session ID as temporary identifier
+    console.log('[init] Calling createSubscriptionIntent...');
     const intentResult = await createSubscriptionIntent(
       c.env,
       sessionId, // Use session ID as temporary identifier
       monthlyAmountUsd
     );
+    console.log('[init] Intent created:', intentResult.intentId);
 
     // Store pending subscription with session ID (no nearAccountId yet)
     const subscription: CryptoSubscription = {
