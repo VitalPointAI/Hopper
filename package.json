@@ -1,6 +1,6 @@
 {
-  "name": "specflow",
-  "displayName": "SpecFlow",
+  "name": "hopper",
+  "displayName": "Hopper",
   "description": "Model-agnostic structured planning for VSCode agent chat with NEAR AI integration",
   "version": "0.0.1",
   "publisher": "vitalpointai",
@@ -13,15 +13,15 @@
     "Chat"
   ],
   "activationEvents": [
-    "onChatParticipant:specflow.chat-participant"
+    "onChatParticipant:hopper.chat-participant"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "chatParticipants": [
       {
-        "id": "specflow.chat-participant",
-        "name": "specflow",
-        "fullName": "SpecFlow",
+        "id": "hopper.chat-participant",
+        "name": "hopper",
+        "fullName": "Hopper",
         "description": "Model-agnostic structured planning for agent chat",
         "isSticky": true,
         "commands": [
@@ -51,7 +51,7 @@
           },
           {
             "name": "help",
-            "description": "Show available SpecFlow commands"
+            "description": "Show available Hopper commands"
           }
         ]
       }
@@ -60,48 +60,48 @@
       {
         "vendor": "near-ai",
         "displayName": "NEAR AI",
-        "managementCommand": "specflow.manageNearAi"
+        "managementCommand": "hopper.manageNearAi"
       }
     ],
     "commands": [
       {
-        "command": "specflow.manageNearAi",
+        "command": "hopper.manageNearAi",
         "title": "Manage NEAR AI Connection",
-        "category": "SpecFlow"
+        "category": "Hopper"
       },
       {
-        "command": "specflow.showUpgradeModal",
+        "command": "hopper.showUpgradeModal",
         "title": "Upgrade to Pro",
-        "category": "SpecFlow"
+        "category": "Hopper"
       },
       {
-        "command": "specflow.connect",
+        "command": "hopper.connect",
         "title": "Connect",
-        "category": "SpecFlow"
+        "category": "Hopper"
       },
       {
-        "command": "specflow.disconnect",
+        "command": "hopper.disconnect",
         "title": "Disconnect",
-        "category": "SpecFlow"
+        "category": "Hopper"
       }
     ],
     "configuration": {
-      "title": "SpecFlow",
+      "title": "Hopper",
       "properties": {
-        "specflow.license.contractId": {
+        "hopper.license.contractId": {
           "type": "string",
-          "default": "license.specflow.near",
+          "default": "license.hopper.near",
           "description": "NEAR contract ID for license validation"
         },
-        "specflow.license.nearNetwork": {
+        "hopper.license.nearNetwork": {
           "type": "string",
           "enum": ["mainnet", "testnet"],
           "default": "mainnet",
           "description": "NEAR network for license contract"
         },
-        "specflow.licenseApiUrl": {
+        "hopper.licenseApiUrl": {
           "type": "string",
-          "default": "https://specflow-license-api.vitalpointai.workers.dev",
+          "default": "https://hopper-license-api.vitalpointai.workers.dev",
           "description": "License API URL for checkout endpoints"
         }
       }
