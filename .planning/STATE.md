@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 1.5.2 (Dual Auth - INSERTED)
-Plan: 3 of 4 in current phase (+ FIX2 complete)
+Plan: 3 of 4 in current phase (+ FIX2, FIX3 complete)
 Status: In progress
-Last activity: 2026-01-15 — Completed 01.5.2-03-FIX2 (Streamlined payment flows)
+Last activity: 2026-01-16 — Completed 01.5.2-03-FIX3 (Crypto init endpoint fix)
 
 Progress: █████████████████░░░ 93%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27 (including FIX plans)
-- Average duration: 8.4 min
-- Total execution time: 228 min
+- Total plans completed: 28 (including FIX plans)
+- Average duration: 8.2 min
+- Total execution time: 231 min
 
 **By Phase:**
 
@@ -30,13 +30,13 @@ Progress: █████████████████░░░ 93%
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
 | 01.5.1-infra-deploy | 2 | 57 min | 28.5 min |
-| 01.5.2-dual-auth | 3+FIX2 | 24 min | 6 min |
+| 01.5.2-dual-auth | 3+FIX2+FIX3 | 27 min | 5.4 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 01.5.2-01 (5 min), 01.5.2-02 (6 min), 01.5.2-03 (7 min), 01.5.2-03-FIX2 (6 min)
-- Trend: Dual auth plans fast (~6 min avg) due to subagent autonomous execution
+- Last 5 plans: 01.5.2-02 (6 min), 01.5.2-03 (7 min), 01.5.2-03-FIX2 (6 min), 01.5.2-03-FIX3 (3 min)
+- Trend: Dual auth plans fast (~5.4 min avg) due to subagent autonomous execution
 
 ## Accumulated Context
 
