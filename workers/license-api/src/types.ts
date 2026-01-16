@@ -119,9 +119,12 @@ export interface NearAction {
  * Uses NEAR Intents for pre-authorized recurring payments
  */
 export interface CryptoSubscription {
-  nearAccountId: string;
+  nearAccountId: string; // @deprecated Use walletAddress instead
+  walletAddress?: string; // Payment wallet address (any chain)
+  walletChain?: string; // Chain identifier (near, eth, base, sol, etc.)
   sessionId?: string; // Session ID for anonymous subscription init (set before wallet connects)
-  intentId: string; // NEAR Intents subscription intent ID
+  intentId: string; // NEAR Intents subscription intent ID (initial, may not be used for payment)
+  paymentDepositAddress?: string; // Actual deposit address used for payment (from payment-quote)
   monthlyAmountUsd: string;
   billingDay: number; // 1-28
   status: 'pending' | 'active' | 'past_due' | 'cancelled';
@@ -269,6 +272,8 @@ export interface OAuthState {
   provider: 'google' | 'github';
   callback: string; // VSCode callback URL
   createdAt: number;
+  /** If 'stripe', redirect to Stripe checkout after auth instead of VSCode */
+  payment?: 'stripe';
 }
 
 /**

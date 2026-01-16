@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env } from './types';
-import { handleScheduled } from './handlers/cron-handler';
+// NOTE: cron-handler imported dynamically to avoid loading SDK at startup
+// import { handleScheduled } from './handlers/cron-handler';
 import { adminAuth } from './middleware/admin-auth';
 import {
   generateAdminChallenge,
@@ -120,6 +121,42 @@ app.post('/api/crypto/subscription/cancel', async (c) => {
 });
 
 /**
+ * Get supported tokens for crypto payment
+ * Returns list of tokens with pricing info
+ */
+app.get('/api/crypto/tokens', async (c) => {
+  const { handleGetTokens } = await import('./handlers/crypto-tokens');
+  return handleGetTokens(c);
+});
+
+/**
+ * Get quote for paying with a specific token
+ * Body: { originAsset, amountUsd, nearAccountId }
+ */
+app.post('/api/crypto/quote', async (c) => {
+  const { handleGetQuote } = await import('./handlers/crypto-tokens');
+  return handleGetQuote(c);
+});
+
+/**
+ * Create payment quote with deposit address
+ * Body: { originAsset, amountUsd, nearAccountId }
+ */
+app.post('/api/crypto/payment-quote', async (c) => {
+  const { handleCreatePaymentQuote } = await import('./handlers/crypto-tokens');
+  return handleCreatePaymentQuote(c);
+});
+
+/**
+ * Get tokens the user has in their wallet with balances and required amounts
+ * Query: ?nearAccountId=xxx&amountUsd=4.00
+ */
+app.get('/api/crypto/wallet-tokens', async (c) => {
+  const { handleGetWalletTokens } = await import('./handlers/crypto-tokens');
+  return handleGetWalletTokens(c);
+});
+
+/**
  * Telemetry endpoint for extension analytics
  * Public endpoint (no auth required)
  * Body: { event, installId, extensionVersion, vscodeVersion, platform, nearAccountId?, source? }
@@ -148,7 +185,17 @@ app.get('/api/license/check', async (c) => {
 app.use('/auth/*', cors());
 
 /**
- * User wallet authentication page
+ * Multi-chain wallet authentication page
+ * Displays wallet selector for NEAR, Ethereum, Solana, etc.
+ * Query params: callback, network
+ */
+app.get('/auth/wallet', async (c) => {
+  const { handleWalletAuthPage } = await import('./handlers/wallet-auth-ui');
+  return handleWalletAuthPage(c);
+});
+
+/**
+ * User wallet authentication page (legacy NEAR-only)
  * Displays wallet selector for signing authentication message
  * Query params: nonce, timestamp, message, callback
  */
@@ -397,6 +444,8 @@ app.onError((err, c) => {
 export default {
   fetch: app.fetch,
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // Dynamic import to avoid loading SDK at worker startup
+    const { handleScheduled } = await import('./handlers/cron-handler');
     const result = await handleScheduled(event, env, ctx);
     console.log('Cron summary:', JSON.stringify(result));
   },

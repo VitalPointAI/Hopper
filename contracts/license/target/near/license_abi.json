@@ -1,0 +1,127 @@
+{
+  "schema_version": "0.4.0",
+  "metadata": {
+    "name": "license",
+    "version": "0.1.0",
+    "build": {
+      "compiler": "rustc 1.86.0",
+      "builder": "cargo-near cargo-near-build 0.10.0"
+    },
+    "wasm_hash": "6pwC9L7VdvBpDa7qF8888zpT3JGimohjRFa9gjEKB3iS"
+  },
+  "body": {
+    "functions": [
+      {
+        "name": "contract_source_metadata",
+        "kind": "view"
+      },
+      {
+        "name": "get_expiry",
+        "doc": " Get the raw expiry timestamp for a wallet.\n\n # Arguments\n * `wallet_address` - The wallet address to query\n\n # Returns\n `Some(timestamp)` if the wallet has a license entry, `None` otherwise",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "wallet_address",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        }
+      },
+      {
+        "name": "grant_license",
+        "doc": " Grant a license to a wallet for a specified duration.\n If the wallet already has a license, extends from the current expiry.\n If no existing license or expired, starts from current block timestamp.\n\n # Arguments\n * `wallet_address` - The wallet address to grant the license to (NEAR account, EVM address, etc.)\n * `duration_days` - Number of days to grant the license for\n\n # Panics\n Panics if caller is not the admin",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "wallet_address",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "duration_days",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "is_licensed",
+        "doc": " Check if a wallet has a valid (non-expired) license.\n\n # Arguments\n * `wallet_address` - The wallet address to check\n\n # Returns\n `true` if the wallet has a license that hasn't expired, `false` otherwise",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "wallet_address",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "boolean"
+          }
+        }
+      },
+      {
+        "name": "migrate",
+        "doc": " Migrate from old contract state (AccountId keys) to new state (String keys).\n This preserves the admin but creates a new empty licenses map.\n Existing licenses will remain accessible if they were stored with the same prefix,\n since String serialization of valid AccountIds is compatible.\n\n # Panics\n Panics if caller is not the admin",
+        "kind": "call",
+        "modifiers": [
+          "init",
+          "private"
+        ]
+      },
+      {
+        "name": "new",
+        "doc": " Initialize the contract with an admin account.\n\n # Arguments\n * `admin` - The account ID that will have permission to grant licenses",
+        "kind": "call",
+        "modifiers": [
+          "init"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "admin",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "root_schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "String",
+      "type": "string"
+    }
+  }
+}

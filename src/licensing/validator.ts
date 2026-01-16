@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { LicenseConfig, LicenseStatus, DEFAULT_LICENSE_CONFIG, NEAR_RPC_URLS, AuthSession, AuthType } from './types';
+import { LicenseConfig, LicenseStatus, DEFAULT_LICENSE_CONFIG, NEAR_RPC_URLS, AuthSession, AuthType, AuthProvider } from './types';
 import { viewIsLicensed, viewGetExpiry } from './nearRpc';
 import { AuthManager } from './authManager';
 import { trackLogin, trackUpgrade } from '../telemetry/telemetryService';
@@ -39,7 +39,15 @@ export class LicenseValidator {
   }
 
   /**
+   * Ensure auth manager is initialized (session loaded from storage)
+   */
+  async ensureInitialized(): Promise<void> {
+    await this.authManager.ensureInitialized();
+  }
+
+  /**
    * Check if user is authenticated
+   * Note: Call ensureInitialized() first if checking immediately after extension activation
    */
   isAuthenticated(): boolean {
     return this.authManager.isAuthenticated();
@@ -90,7 +98,7 @@ export class LicenseValidator {
   /**
    * Check license status for the authenticated account
    * Routes to correct backend based on auth type:
-   * - Wallet users: Check NEAR contract
+   * - ALL wallet users: Check NEAR contract (supports NEAR, EVM, Solana, etc.)
    * - OAuth users: Check license API
    *
    * @returns License status with caching metadata, or null if not authenticated
@@ -104,7 +112,8 @@ export class LicenseValidator {
     }
 
     if (session.authType === 'wallet') {
-      // Wallet flow: check NEAR contract
+      // ALL wallets (NEAR, EVM, Solana, etc.) use the NEAR contract
+      // The contract now accepts any wallet address string
       return this.checkLicenseOnContract(session.userId);
     } else {
       // OAuth flow: check license API
@@ -209,26 +218,28 @@ export class LicenseValidator {
   /**
    * Check license status for a specific account (internal use)
    * Used after payment verification where we know the account
+   * ALL wallet types are stored on the NEAR contract
    *
-   * @param nearAccountId - NEAR account ID to check
+   * @param walletAddress - Wallet address to check (NEAR account, EVM address, Solana pubkey, etc.)
    * @returns License status with caching metadata
    */
-  async checkLicenseForAccount(nearAccountId: string): Promise<LicenseStatus> {
+  async checkLicenseForAccount(walletAddress: string): Promise<LicenseStatus> {
     // Check cache first
-    const cached = this.licenseCache.get(nearAccountId);
+    const cached = this.licenseCache.get(walletAddress);
     const now = Date.now();
 
     if (cached && (now - cached.cachedAt) < this.config.cacheTtlMs) {
-      console.log(`License cache hit for ${nearAccountId}`);
+      console.log(`License cache hit for ${walletAddress}`);
       return cached;
     }
 
-    console.log(`License cache miss for ${nearAccountId}, checking contract...`);
+    console.log(`License cache miss for ${walletAddress}, checking NEAR contract...`);
 
-    // Fetch fresh status from contract
+    // Fetch fresh status from NEAR contract
+    // The contract now accepts any wallet address string
     const [isLicensed, expiresAt] = await Promise.all([
-      viewIsLicensed(nearAccountId, this.config),
-      viewGetExpiry(nearAccountId, this.config),
+      viewIsLicensed(walletAddress, this.config),
+      viewGetExpiry(walletAddress, this.config),
     ]);
 
     const status: LicenseStatus = {
@@ -238,7 +249,7 @@ export class LicenseValidator {
     };
 
     // Update cache
-    this.licenseCache.set(nearAccountId, status);
+    this.licenseCache.set(walletAddress, status);
 
     return status;
   }
@@ -272,9 +283,12 @@ export class LicenseValidator {
 
   /**
    * Start wallet authentication flow
+   *
+   * @param options - Optional parameters
+   * @param options.payment - If 'crypto', stay in browser for payment after auth
    */
-  async startAuth(): Promise<void> {
-    await this.authManager.startAuth();
+  async startAuth(options?: { payment?: 'crypto' }): Promise<void> {
+    await this.authManager.startAuth(options);
   }
 
   /**
@@ -300,7 +314,8 @@ export class LicenseValidator {
   async handleAuthCallbackWithToken(sessionData: {
     userId: string;
     authType: AuthType;
-    provider: 'google' | 'github' | 'email' | 'near';
+    provider: AuthProvider;
+    chain?: string;
     token: string;
     expiresAt: number;
     displayName?: string;

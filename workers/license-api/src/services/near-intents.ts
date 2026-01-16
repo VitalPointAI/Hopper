@@ -16,8 +16,6 @@ import type { Env } from '../types';
 
 // USDC on NEAR for settlement (NEP-141 format required by 1Click API)
 const USDC_NEAR_ASSET_ID = 'nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1';
-// USDC on Base (common source for crypto payments, NEP-141 bridged format)
-const USDC_BASE_ASSET_ID = 'nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near';
 
 /**
  * Configure the 1Click API with the provided environment
@@ -44,11 +42,17 @@ export interface SubscriptionIntentResult {
 /**
  * Create a subscription intent (deposit address) for recurring payments
  * Uses ANY_INPUT swap type to allow variable deposits over time
+ *
+ * @param env - Environment bindings
+ * @param nearAccountIdOrSessionId - NEAR account ID for authenticated users, or session ID for unauthenticated
+ * @param monthlyAmountUsd - Monthly subscription amount in USD
+ * @param refundAddress - Optional explicit refund address (defaults to settlement account for sessions)
  */
 export async function createSubscriptionIntent(
   env: Env,
-  nearAccountId: string,
-  monthlyAmountUsd: string
+  nearAccountIdOrSessionId: string,
+  monthlyAmountUsd: string,
+  refundAddress?: string
 ): Promise<SubscriptionIntentResult> {
   configureApi(env);
 
@@ -60,20 +64,34 @@ export async function createSubscriptionIntent(
   oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
   const deadline = oneYearFromNow.toISOString();
 
+  // Determine refund address:
+  // - Use explicit refundAddress if provided
+  // - For valid NEAR accounts (contains '.'), use the account
+  // - For session IDs (UUIDs), use settlement account as fallback
+  // Note: refundTo must be a NEAR account when using INTENTS refund type
+  const isValidNearAccount = nearAccountIdOrSessionId.includes('.');
+  const refundTo = refundAddress || (isValidNearAccount ? nearAccountIdOrSessionId : env.SETTLEMENT_ACCOUNT);
+
   // Create quote request for ANY_INPUT swap
   // ANY_INPUT allows receiving variable amounts over time
+  // NOTE: This initial intent is used as a subscription ID. The actual payment deposit
+  // address comes from /api/crypto/payment-quote with ORIGIN_CHAIN type for simpler ft_transfer.
+  //
+  // For the subscription intent, we use INTENTS deposit/refund type since we're using NEAR accounts.
+  // This creates a deposit address in the NEAR Intents contract.
+  // The actual payment-quote uses ORIGIN_CHAIN with the user's wallet address on their payment chain.
   const quoteRequest: QuoteRequest = {
     dry: false,
     swapType: QuoteRequest.swapType.ANY_INPUT,
     slippageTolerance: 100, // 1%
-    originAsset: USDC_BASE_ASSET_ID, // Accept USDC from Base
-    depositType: QuoteRequest.depositType.INTENTS,
+    originAsset: USDC_NEAR_ASSET_ID, // Use NEAR USDC for intent-based deposits
+    depositType: QuoteRequest.depositType.INTENTS, // Use INTENTS for NEAR account compatibility
     destinationAsset: USDC_NEAR_ASSET_ID, // Settle as USDC on NEAR
     amount: usdcAmount,
-    refundTo: nearAccountId, // Refund to user's NEAR account
-    refundType: QuoteRequest.refundType.INTENTS,
+    refundTo, // NEAR account for refunds (settlement account for unauthenticated users)
+    refundType: QuoteRequest.refundType.INTENTS, // Use INTENTS since refundTo is a NEAR account
     recipient: env.SETTLEMENT_ACCOUNT, // vitalpointai.near
-    recipientType: QuoteRequest.recipientType.INTENTS,
+    recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN, // Send directly to wallet, not intents contract
     deadline,
     referral: 'specflow',
   };

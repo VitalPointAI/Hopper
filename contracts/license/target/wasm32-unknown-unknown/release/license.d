@@ -1,0 +1,1 @@
+/home/vitalpointai/projects/SpecFlow/contracts/license/target/wasm32-unknown-unknown/release/license.wasm: /home/vitalpointai/projects/SpecFlow/contracts/license/src/lib.rs /home/vitalpointai/projects/SpecFlow/contracts/license/target/near/license_abi.zst

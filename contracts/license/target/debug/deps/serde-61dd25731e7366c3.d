@@ -1,0 +1,14 @@
+/home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/deps/libserde-61dd25731e7366c3.rmeta: /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/build/serde-132b544af54ee608/out/private.rs
+
+/home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/deps/libserde-61dd25731e7366c3.rlib: /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/build/serde-132b544af54ee608/out/private.rs
+
+/home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/deps/serde-61dd25731e7366c3.d: /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/build/serde-132b544af54ee608/out/private.rs
+
+/home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/vitalpointai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/build/serde-132b544af54ee608/out/private.rs:
+
+# env-dep:OUT_DIR=/home/vitalpointai/projects/SpecFlow/contracts/license/target/debug/build/serde-132b544af54ee608/out

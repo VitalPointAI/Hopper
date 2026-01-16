@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandContext, ISpecflowResult } from './types';
+import { CommandContext, IHopperResult } from './types';
 import { ProjectConfig, saveProject, planningExists } from '../generators';
 
 /**
@@ -49,7 +49,7 @@ function parseJsonResponse(response: string): ProjectConfig | null {
     // Provide defaults for missing fields
     return {
       name: parsed.name,
-      description: parsed.description || 'A new project initialized with SpecFlow',
+      description: parsed.description || 'A new project initialized with Hopper',
       coreValue: parsed.coreValue || 'Deliver value to users',
       requirements: Array.isArray(parsed.requirements) ? parsed.requirements : [],
       outOfScope: Array.isArray(parsed.outOfScope) ? parsed.outOfScope : [],
@@ -69,7 +69,7 @@ function parseJsonResponse(response: string): ProjectConfig | null {
  * 2. Using LLM to extract project details from user's description
  * 3. Generating PROJECT.md following GSD template
  */
-export async function handleNewProject(ctx: CommandContext): Promise<ISpecflowResult> {
+export async function handleNewProject(ctx: CommandContext): Promise<IHopperResult> {
   const { request, stream, token, projectContext } = ctx;
 
   // Check for workspace
@@ -100,7 +100,7 @@ export async function handleNewProject(ctx: CommandContext): Promise<ISpecflowRe
     stream.markdown('- Delete `.planning/` manually to start fresh\n');
 
     stream.button({
-      command: 'specflow.chat-participant.status',
+      command: 'hopper.chat-participant.status',
       title: 'View Status'
     });
 
@@ -223,7 +223,7 @@ export async function handleNewProject(ctx: CommandContext): Promise<ISpecflowRe
     stream.markdown('Use **/create-roadmap** to plan your project phases.\n\n');
 
     stream.button({
-      command: 'specflow.chat-participant.create-roadmap',
+      command: 'hopper.chat-participant.create-roadmap',
       title: 'Create Roadmap'
     });
 

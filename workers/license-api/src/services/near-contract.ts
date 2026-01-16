@@ -151,11 +151,12 @@ async function sha256(data: Uint8Array): Promise<Uint8Array> {
 
 /**
  * Grant license on NEAR contract
- * Calls contract.grant_license(account_id, duration_days)
+ * Calls contract.grant_license(wallet_address, duration_days)
+ * Supports any wallet address string (NEAR accounts, EVM addresses, Solana pubkeys, etc.)
  */
 export async function grantLicense(
   env: Env,
-  nearAccountId: string,
+  walletAddress: string,
   durationDays: number
 ): Promise<{ success: boolean; txHash?: string; error?: string }> {
   try {
@@ -168,8 +169,9 @@ export async function grantLicense(
     const publicKey = keyPair.getPublicKey();
     const publicKeyStr = publicKey.toString();
 
-    // The signer account is the contract (admin = contract deployer pattern)
-    const signerId = contractId;
+    // The signer account is the admin account (specflow.near), not the contract itself
+    // The contract checks predecessor_account_id == admin
+    const signerId = env.ADMIN_WALLET;
 
     // Get access key info (nonce and recent block hash)
     const accessKeyInfo = await getAccessKey(
@@ -182,8 +184,9 @@ export async function grantLicense(
     const blockHash = base58Decode(accessKeyInfo.block_hash);
 
     // Prepare the function call arguments
+    // Contract now accepts any wallet address string
     const args = JSON.stringify({
-      account_id: nearAccountId,
+      wallet_address: walletAddress,
       duration_days: durationDays,
     });
 
@@ -241,7 +244,7 @@ export async function grantLicense(
     );
 
     console.log(
-      `License granted to ${nearAccountId} for ${durationDays} days, tx: ${result.transaction.hash}`
+      `License granted to ${walletAddress} for ${durationDays} days, tx: ${result.transaction.hash}`
     );
 
     return {

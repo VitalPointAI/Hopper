@@ -71,7 +71,7 @@ async function queryContractLicense(
           finality: 'final',
           account_id: env.LICENSE_CONTRACT_ID,
           method_name: 'is_licensed',
-          args_base64: btoa(JSON.stringify({ account_id: nearAccountId })),
+          args_base64: btoa(JSON.stringify({ wallet_address: nearAccountId })),
         },
       }),
     });
@@ -97,7 +97,7 @@ async function queryContractLicense(
           finality: 'final',
           account_id: env.LICENSE_CONTRACT_ID,
           method_name: 'get_expiry',
-          args_base64: btoa(JSON.stringify({ account_id: nearAccountId })),
+          args_base64: btoa(JSON.stringify({ wallet_address: nearAccountId })),
         },
       }),
     });

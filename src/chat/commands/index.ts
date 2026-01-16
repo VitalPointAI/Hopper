@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandHandler, CommandRegistry, ISpecflowResult, CommandContext } from './types';
+import { CommandHandler, CommandRegistry, IHopperResult, CommandContext } from './types';
 import { formatContextForPrompt, truncateContent } from '../context/projectContext';
 import { handleNewProject } from './newProject';
 import { handleCreateRoadmap } from './createRoadmap';
@@ -15,14 +15,14 @@ const COMMAND_DEFINITIONS = [
   { name: 'execute-plan', description: 'Execute a PLAN.md file' },
   { name: 'progress', description: 'Check project progress and current state' },
   { name: 'status', description: 'Show current project status and phase' },
-  { name: 'help', description: 'Show available SpecFlow commands' }
+  { name: 'help', description: 'Show available Hopper commands' }
 ];
 
 /**
  * Create placeholder handler for commands not yet implemented
  */
 function createPlaceholderHandler(commandName: string, description: string): CommandHandler {
-  return async (ctx: CommandContext): Promise<ISpecflowResult> => {
+  return async (ctx: CommandContext): Promise<IHopperResult> => {
     ctx.stream.markdown(`**/${commandName}** - Coming in Phase 3!\n\nThis command will ${description.toLowerCase()}.\n`);
     return { metadata: { lastCommand: commandName } };
   };
@@ -32,21 +32,21 @@ function createPlaceholderHandler(commandName: string, description: string): Com
  * Help command handler - lists all available commands
  * Adapts message based on whether .planning folder exists
  */
-async function helpHandler(ctx: CommandContext): Promise<ISpecflowResult> {
+async function helpHandler(ctx: CommandContext): Promise<IHopperResult> {
   // Check if project exists
   if (!ctx.projectContext.hasPlanning) {
-    ctx.stream.markdown('## SpecFlow - No Project Found\n\n');
-    ctx.stream.markdown('No SpecFlow project found in this workspace.\n\n');
+    ctx.stream.markdown('## Hopper - No Project Found\n\n');
+    ctx.stream.markdown('No Hopper project found in this workspace.\n\n');
     ctx.stream.markdown('Use **/new-project** to initialize a new project with PROJECT.md.\n\n');
     ctx.stream.button({
-      command: 'specflow.chat-participant.new-project',
+      command: 'hopper.chat-participant.new-project',
       title: 'Initialize Project'
     });
     return { metadata: { lastCommand: 'help' } };
   }
 
   // Project exists - show full command list
-  ctx.stream.markdown('## SpecFlow Commands\n\n');
+  ctx.stream.markdown('## Hopper Commands\n\n');
 
   for (const cmd of COMMAND_DEFINITIONS) {
     ctx.stream.markdown(`- **/${cmd.name}** - ${cmd.description}\n`);
@@ -60,7 +60,7 @@ async function helpHandler(ctx: CommandContext): Promise<ISpecflowResult> {
 /**
  * Status command handler - shows current project status with clickable references
  */
-async function statusHandler(ctx: CommandContext): Promise<ISpecflowResult> {
+async function statusHandler(ctx: CommandContext): Promise<IHopperResult> {
   const { projectContext, licenseValidator } = ctx;
 
   // Show authentication status first
@@ -85,14 +85,23 @@ async function statusHandler(ctx: CommandContext): Promise<ISpecflowResult> {
       // Show license status
       const licenseStatus = await licenseValidator.checkLicense();
       if (licenseStatus?.isLicensed) {
-        const expiryDate = licenseStatus.expiresAt
-          ? new Date(licenseStatus.expiresAt).toLocaleDateString()
+        // Note: expiresAt from contract is in nanoseconds, convert to milliseconds
+        const expiresAtMs = licenseStatus.expiresAt ? licenseStatus.expiresAt / 1_000_000 : null;
+        const expiryDate = expiresAtMs
+          ? new Date(expiresAtMs).toLocaleDateString()
           : 'Unknown';
         ctx.stream.markdown(`**License:** Pro (expires ${expiryDate})\n\n`);
+        ctx.stream.markdown('You have full access to all Hopper features.\n\n');
+        ctx.stream.button({
+          command: 'hopper.chat-participant.plan-phase',
+          title: 'Continue Planning'
+        });
+        ctx.stream.markdown('\n\n');
       } else {
         ctx.stream.markdown(`**License:** Free tier\n\n`);
+        ctx.stream.markdown('Upgrade to Pro to unlock Phase 2+ planning and execution.\n\n');
         ctx.stream.button({
-          command: 'specflow.showUpgradeModal',
+          command: 'hopper.showUpgradeModal',
           title: 'Upgrade to Pro'
         });
         ctx.stream.markdown('\n\n');
@@ -100,8 +109,9 @@ async function statusHandler(ctx: CommandContext): Promise<ISpecflowResult> {
     }
   } else {
     ctx.stream.markdown('**Not connected**\n\n');
+    ctx.stream.markdown('Connect to verify your license and access Pro features.\n\n');
     ctx.stream.button({
-      command: 'specflow.connect',
+      command: 'hopper.connect',
       title: 'Connect'
     });
     ctx.stream.markdown('\n\n');
@@ -109,10 +119,10 @@ async function statusHandler(ctx: CommandContext): Promise<ISpecflowResult> {
 
   // Check if project exists
   if (!projectContext.hasPlanning) {
-    ctx.stream.markdown('## No SpecFlow Project Found\n\n');
+    ctx.stream.markdown('## No Hopper Project Found\n\n');
     ctx.stream.markdown('This workspace does not have a `.planning` directory.\n\n');
     ctx.stream.button({
-      command: 'specflow.chat-participant.new-project',
+      command: 'hopper.chat-participant.new-project',
       title: 'New Project'
     });
     return { metadata: { lastCommand: 'status' } };
@@ -252,4 +262,4 @@ export function isValidCommand(name: string): boolean {
 }
 
 // Re-export types for consumer convenience
-export type { ISpecflowResult, CommandContext, CommandHandler } from './types';
+export type { IHopperResult, CommandContext, CommandHandler } from './types';

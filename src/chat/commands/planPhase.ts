@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandContext, ISpecflowResult } from './types';
+import { CommandContext, IHopperResult } from './types';
 import {
   PlanConfig,
   TaskConfig,
@@ -209,7 +209,7 @@ function checkDependenciesComplete(stateMd: string | undefined, targetPhaseNum: 
  * 4. Using LLM to generate tasks
  * 5. Creating PLAN.md in phase directory
  */
-export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowResult> {
+export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResult> {
   const { request, stream, token, projectContext, licenseValidator } = ctx;
 
   // Check for workspace
@@ -228,7 +228,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
     stream.markdown('Cannot create plan without ROADMAP.md.\n\n');
     stream.markdown('Use **/create-roadmap** to create your roadmap first.\n\n');
     stream.button({
-      command: 'specflow.chat-participant.create-roadmap',
+      command: 'hopper.chat-participant.create-roadmap',
       title: 'Create Roadmap'
     });
     return { metadata: { lastCommand: 'plan-phase' } };
@@ -316,6 +316,32 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
 
   // Check license - Phase 1 is free, Phase 2+ requires Pro license
   if (targetPhaseNum >= 2) {
+    // Ensure auth manager is initialized before checking
+    await licenseValidator.ensureInitialized();
+
+    // Debug: Log auth state
+    const isAuth = licenseValidator.isAuthenticated();
+    const session = licenseValidator.getSession();
+    console.log('[planPhase] Auth check - isAuthenticated:', isAuth, 'session:', session ? `${session.userId} (${session.authType})` : 'null');
+
+    // First check authentication
+    if (!isAuth) {
+      stream.markdown('## Pro License Required\n\n');
+      stream.markdown(`Planning **Phase ${targetPhaseNum}** requires a Hopper Pro license.\n\n`);
+      stream.markdown('**Already have a license?** Connect to verify it.\n\n');
+      stream.button({
+        command: 'hopper.connect',
+        title: 'Connect'
+      });
+      stream.markdown('\n**Need a license?** Upgrade to unlock Phase 2+ features.\n\n');
+      stream.button({
+        command: 'hopper.showUpgradeModal',
+        title: 'Get Pro License'
+      });
+      return { metadata: { lastCommand: 'plan-phase' } };
+    }
+
+    // Then check license status
     const licenseStatus = await licenseValidator.checkLicense();
     if (!licenseStatus?.isLicensed) {
       stream.markdown('## Pro License Required\n\n');
@@ -324,7 +350,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
       stream.markdown('- Planning and execution for Phase 2+\n');
       stream.markdown('- Full session management features\n\n');
       stream.button({
-        command: 'specflow.showUpgradeModal',
+        command: 'hopper.showUpgradeModal',
         title: 'Upgrade to Pro'
       });
       return { metadata: { lastCommand: 'plan-phase' } };
@@ -422,7 +448,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
       stream.markdown('- Add more details to PROJECT.md\n\n');
 
       stream.button({
-        command: 'specflow.chat-participant.plan-phase',
+        command: 'hopper.chat-participant.plan-phase',
         title: 'Try Again'
       });
 

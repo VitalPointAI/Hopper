@@ -255,21 +255,22 @@ export class UpgradeModalPanel {
    * Handle sign-in request
    * Routes to appropriate auth flow based on payment type
    *
+   * For crypto: Go directly to payment page (no auth required first)
+   * For Stripe: OAuth auth -> Stripe checkout -> success
+   *
    * @param paymentType - The payment type that triggered sign-in ('stripe' or 'crypto')
    */
   private async handleSignIn(paymentType: 'stripe' | 'crypto'): Promise<void> {
-    // Store pending payment intent so we can resume after auth
-    await this.context.globalState.update('specflow.pendingPayment', paymentType);
-
-    // For crypto payments, go directly to wallet auth (no picker needed)
+    // For crypto payments, go directly to payment page without requiring auth first
+    // The payment page has multi-chain wallet selector where users can connect any wallet
     if (paymentType === 'crypto') {
-      vscode.commands.executeCommand('specflow.startWalletAuth');
-      this.dispose();
+      await this.handleCryptoCheckout();
       return;
     }
 
-    // For Stripe payments, show auth method picker via connect command
-    vscode.commands.executeCommand('specflow.connect');
+    // For Stripe payments, show OAuth picker with payment flag
+    // The browser handles the entire flow (OAuth -> Stripe checkout -> success)
+    vscode.commands.executeCommand('specflow.startOAuthForPayment');
     this.dispose();
   }
 
@@ -540,7 +541,7 @@ ${isAuthenticated ? `    <div class="account-info">
         <div class="card-header">
           <div class="card-title">Credit Card</div>
           <div class="card-subtitle">Pay with Stripe</div>
-          <div class="price">$5</div>
+          <div class="price">$5 <span style="font-size: 18px; font-weight: normal;">USD</span></div>
           <div class="price-period">per month</div>
         </div>
         <div class="features">
@@ -571,7 +572,7 @@ ${isAuthenticated ? `    <div class="account-info">
         <div class="card-header">
           <div class="card-title">Crypto</div>
           <div class="card-subtitle">Pay with any token</div>
-          <div class="price">$4</div>
+          <div class="price">$4 <span style="font-size: 18px; font-weight: normal;">USDC</span></div>
           <div class="price-period">per month</div>
           <div class="discount">20% OFF</div>
         </div>

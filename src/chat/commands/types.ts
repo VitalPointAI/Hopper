@@ -3,9 +3,9 @@ import { LicenseValidator } from '../../licensing/validator';
 import { ProjectContext } from '../context/projectContext';
 
 /**
- * Result metadata returned by the SpecFlow chat participant
+ * Result metadata returned by the Hopper chat participant
  */
-export interface ISpecflowResult extends vscode.ChatResult {
+export interface IHopperResult extends vscode.ChatResult {
   metadata?: {
     lastCommand?: string;
     phaseNumber?: number;
@@ -27,7 +27,7 @@ export interface CommandContext {
 /**
  * Command handler function signature
  */
-export type CommandHandler = (ctx: CommandContext) => Promise<ISpecflowResult>;
+export type CommandHandler = (ctx: CommandContext) => Promise<IHopperResult>;
 
 /**
  * Registry mapping command names to handlers

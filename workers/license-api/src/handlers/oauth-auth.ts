@@ -4,6 +4,7 @@
  */
 
 import type { Context } from 'hono';
+import Stripe from 'stripe';
 import type { Env, OAuthUserLicense, OAuthState } from '../types';
 
 // ============================================================================
@@ -79,12 +80,14 @@ async function storeOAuthState(
   env: Env,
   state: string,
   provider: 'google' | 'github',
-  callback: string
+  callback: string,
+  payment?: 'stripe'
 ): Promise<void> {
   const oauthState: OAuthState = {
     provider,
     callback,
     createdAt: Date.now(),
+    payment,
   };
   await env.PROCESSED_EVENTS.put(`oauth_state:${state}`, JSON.stringify(oauthState), {
     expirationTtl: 300, // 5 minutes
@@ -193,14 +196,83 @@ function errorPage(title: string, message: string): Response {
 }
 
 // ============================================================================
+// Stripe Checkout Helper
+// ============================================================================
+
+/**
+ * Create Stripe checkout session for OAuth user and return the checkout URL
+ */
+async function createStripeCheckoutForOAuth(
+  env: Env,
+  userId: string,
+  email: string
+): Promise<string> {
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+    apiVersion: '2025-02-24.acacia',
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+
+  // Search for existing customer
+  const existingCustomers = await stripe.customers.search({
+    query: `metadata['user_id']:'${userId}'`,
+  });
+
+  let customer: Stripe.Customer;
+
+  if (existingCustomers.data.length > 0) {
+    customer = existingCustomers.data[0];
+  } else {
+    // Create new customer
+    customer = await stripe.customers.create({
+      email,
+      metadata: {
+        source: 'specflow_extension',
+        auth_type: 'oauth',
+        user_id: userId,
+      },
+    });
+  }
+
+  // Create checkout session
+  const session = await stripe.checkout.sessions.create({
+    customer: customer.id,
+    mode: 'subscription',
+    line_items: [
+      {
+        price: env.STRIPE_PRICE_ID,
+        quantity: 1,
+      },
+    ],
+    success_url: 'https://specflow.dev/success?session_id={CHECKOUT_SESSION_ID}',
+    cancel_url: 'https://specflow.dev/cancel',
+    subscription_data: {
+      metadata: {
+        auth_type: 'oauth',
+        user_id: userId,
+      },
+    },
+  });
+
+  if (!session.url) {
+    throw new Error('Failed to get checkout URL');
+  }
+
+  return session.url;
+}
+
+// ============================================================================
 // Google OAuth
 // ============================================================================
 
 /**
  * GET /auth/oauth/google - Start Google OAuth flow
+ * Query params:
+ *   - callback: Required. VSCode callback URL
+ *   - payment: Optional. If 'stripe', redirect to Stripe checkout after auth
  */
 export async function handleGoogleAuth(c: Context<{ Bindings: Env }>): Promise<Response> {
   const callback = c.req.query('callback');
+  const payment = c.req.query('payment') as 'stripe' | undefined;
 
   if (!callback) {
     return c.json({ error: 'Missing callback parameter' }, 400);
@@ -213,7 +285,7 @@ export async function handleGoogleAuth(c: Context<{ Bindings: Env }>): Promise<R
 
   // Generate state token for CSRF protection
   const state = generateStateToken();
-  await storeOAuthState(c.env, state, 'google', callback);
+  await storeOAuthState(c.env, state, 'google', callback, payment);
 
   // Build Google OAuth URL
   const workerUrl = new URL(c.req.url).origin;
@@ -306,7 +378,19 @@ export async function handleGoogleCallback(c: Context<{ Bindings: Env }>): Promi
     const token = await createOAuthJwt(c.env, userId, 'google');
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
 
-    // Redirect to callback with token
+    // If payment=stripe, create checkout session and redirect to Stripe
+    if (oauthState.payment === 'stripe') {
+      try {
+        const checkoutUrl = await createStripeCheckoutForOAuth(c.env, userId, user.email);
+        return Response.redirect(checkoutUrl, 302);
+      } catch (checkoutErr) {
+        console.error('Stripe checkout error:', checkoutErr);
+        // Fall back to VSCode redirect with error
+        return redirectWithError(oauthState.callback, 'Failed to create checkout session');
+      }
+    }
+
+    // Normal flow - redirect to VSCode callback with token
     const callbackUrl = new URL(oauthState.callback);
     callbackUrl.searchParams.set('token', token);
     callbackUrl.searchParams.set('expires_at', expiresAt.toString());
@@ -331,9 +415,13 @@ export async function handleGoogleCallback(c: Context<{ Bindings: Env }>): Promi
 
 /**
  * GET /auth/oauth/github - Start GitHub OAuth flow
+ * Query params:
+ *   - callback: Required. VSCode callback URL
+ *   - payment: Optional. If 'stripe', redirect to Stripe checkout after auth
  */
 export async function handleGitHubAuth(c: Context<{ Bindings: Env }>): Promise<Response> {
   const callback = c.req.query('callback');
+  const payment = c.req.query('payment') as 'stripe' | undefined;
 
   if (!callback) {
     return c.json({ error: 'Missing callback parameter' }, 400);
@@ -346,7 +434,7 @@ export async function handleGitHubAuth(c: Context<{ Bindings: Env }>): Promise<R
 
   // Generate state token for CSRF protection
   const state = generateStateToken();
-  await storeOAuthState(c.env, state, 'github', callback);
+  await storeOAuthState(c.env, state, 'github', callback, payment);
 
   // Build GitHub OAuth URL
   const params = new URLSearchParams({
@@ -475,7 +563,19 @@ export async function handleGitHubCallback(c: Context<{ Bindings: Env }>): Promi
     const token = await createOAuthJwt(c.env, userId, 'github');
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
 
-    // Redirect to callback with token
+    // If payment=stripe, create checkout session and redirect to Stripe
+    if (oauthState.payment === 'stripe') {
+      try {
+        const checkoutUrl = await createStripeCheckoutForOAuth(c.env, userId, email);
+        return Response.redirect(checkoutUrl, 302);
+      } catch (checkoutErr) {
+        console.error('Stripe checkout error:', checkoutErr);
+        // Fall back to VSCode redirect with error
+        return redirectWithError(oauthState.callback, 'Failed to create checkout session');
+      }
+    }
+
+    // Normal flow - redirect to VSCode callback with token
     const callbackUrl = new URL(oauthState.callback);
     callbackUrl.searchParams.set('token', token);
     callbackUrl.searchParams.set('expires_at', expiresAt.toString());

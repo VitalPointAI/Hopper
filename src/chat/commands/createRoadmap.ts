@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommandContext, ISpecflowResult } from './types';
+import { CommandContext, IHopperResult } from './types';
 import {
   PhaseConfig,
   RoadmapConfig,
@@ -202,7 +202,7 @@ function extractProjectName(projectMd: string): string {
  * 2. Using LLM to suggest phases based on requirements
  * 3. Generating files following GSD templates
  */
-export async function handleCreateRoadmap(ctx: CommandContext): Promise<ISpecflowResult> {
+export async function handleCreateRoadmap(ctx: CommandContext): Promise<IHopperResult> {
   const { request, stream, token, projectContext } = ctx;
 
   // Check for workspace
@@ -221,7 +221,7 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<ISpecflo
     stream.markdown('Cannot create roadmap without PROJECT.md.\n\n');
     stream.markdown('Use **/new-project** to initialize your project first.\n\n');
     stream.button({
-      command: 'specflow.chat-participant.new-project',
+      command: 'hopper.chat-participant.new-project',
       title: 'Create Project'
     });
     return { metadata: { lastCommand: 'create-roadmap' } };
@@ -252,12 +252,12 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<ISpecflo
     stream.markdown('- Delete `.planning/ROADMAP.md` manually to recreate\n\n');
 
     stream.button({
-      command: 'specflow.chat-participant.status',
+      command: 'hopper.chat-participant.status',
       title: 'View Status'
     });
 
     stream.button({
-      command: 'specflow.chat-participant.plan-phase',
+      command: 'hopper.chat-participant.plan-phase',
       title: 'Plan Phase 1'
     });
 
@@ -306,7 +306,7 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<ISpecflo
       stream.markdown('- Ensure PROJECT.md describes clear deliverables\n\n');
 
       stream.button({
-        command: 'specflow.chat-participant.create-roadmap',
+        command: 'hopper.chat-participant.create-roadmap',
         title: 'Try Again'
       });
 
@@ -398,7 +398,7 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<ISpecflo
     stream.markdown('Use **/plan-phase 1** to create the detailed execution plan for Phase 1.\n\n');
 
     stream.button({
-      command: 'specflow.chat-participant.plan-phase',
+      command: 'hopper.chat-participant.plan-phase',
       title: 'Plan Phase 1'
     });
 

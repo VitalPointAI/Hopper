@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 1.5.2 — Dual Auth (OAuth + wallet)
+**Current focus:** Phase 2 — Chat Participant (ready to resume)
 
 ## Current Position
 
-Phase: 1.5.2 (Dual Auth - INSERTED)
-Plan: 3 of 4 in current phase (+ FIX2, FIX3 complete)
-Status: In progress
-Last activity: 2026-01-16 — Completed 01.5.2-03-FIX3 (Crypto init endpoint fix)
+Phase: 1.5.2 (Dual Auth - COMPLETE)
+Plan: 4 of 4 complete (+ all FIX plans)
+Status: Complete
+Last activity: 2026-01-16 — Completed 01.5.2-04 UAT fixes (payment flow, license gating, multi-chain wallet)
 
-Progress: █████████████████░░░ 93%
+Progress: ████████████████████ 100%
 
 ## Performance Metrics
 
@@ -30,7 +30,7 @@ Progress: █████████████████░░░ 93%
 | 01-foundation | 4 | 15 min | 3.8 min |
 | 01.5-licensing | 6+FIX | 82 min | 11.7 min |
 | 01.5.1-infra-deploy | 2 | 57 min | 28.5 min |
-| 01.5.2-dual-auth | 3+FIX2+FIX3 | 27 min | 5.4 min |
+| 01.5.2-dual-auth | 4+FIX2+FIX3+UAT | 35 min | 5.0 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 
@@ -96,6 +96,10 @@ Recent decisions affecting current work:
 | 01.5.2-03-FIX2 | Session-based crypto init | Allows subscription before wallet is known |
 | 01.5.2-03-FIX2 | Link wallet before payment | Associate wallet before money moves for safety |
 | 01.5.2-03-FIX2 | VSCode redirect on success | Completes auth loop after payment |
+| 01.5.2-04 | Multi-chain wallet auth page | NEAR, EVM, Solana all use same flow |
+| 01.5.2-04 | Auth check before license check | Prevents access when disconnected |
+| 01.5.2-04 | Auto-open /status after auth | In-chat feedback instead of toast |
+| 01.5.2-04 | FastNEAR RPC endpoints | Better performance than official RPC |
 
 ### Deferred Issues
 
@@ -109,9 +113,11 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - Phase 1.5.1 inserted after Phase 1.5: Infrastructure Deploy (URGENT) — Discovered during 03-03 UAT that licensing was built but never deployed
+- Phase 1.5.3 inserted after Phase 1.5.2: Rebrand SpecFlow to Hopper (URGENT) — User-facing name change from @specflow to @hopper
 
 ## Session Continuity
 
-Last session: 2026-01-15
-Stopped at: Completed 01.5.2-03-FIX2 (Streamlined payment flows)
+Last session: 2026-01-16
+Stopped at: Completed 01.5.2-04 UAT fixes - payment flow APPROVED
 Resume file: None
+Next: Resume Phase 02 (Chat Participant) or continue with remaining roadmap

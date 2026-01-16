@@ -1,13 +1,24 @@
 use near_sdk::store::LookupMap;
 use near_sdk::{near, AccountId, env, require, PanicOnDefault};
 
-/// License contract for storing account license expiry timestamps.
-/// Uses LookupMap for efficient storage of account_id -> expiry_timestamp mappings.
+/// Old contract state for migration (AccountId keys)
+/// Only used for reading borsh-serialized state during migration
+#[derive(PanicOnDefault)]
+#[near(serializers = [borsh])]
+pub struct OldLicenseContract {
+    licenses: LookupMap<AccountId, u64>,
+    admin: AccountId,
+}
+
+/// License contract for storing wallet license expiry timestamps.
+/// Uses LookupMap for efficient storage of wallet_address -> expiry_timestamp mappings.
+/// Supports any wallet address string (NEAR accounts, EVM addresses, Solana pubkeys, etc.)
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct LicenseContract {
-    /// Mapping of account IDs to their license expiry timestamps (in nanoseconds)
-    licenses: LookupMap<AccountId, u64>,
+    /// Mapping of wallet addresses to their license expiry timestamps (in nanoseconds)
+    /// Keys can be NEAR account IDs or any other wallet address format
+    licenses: LookupMap<String, u64>,
     /// Admin account that can grant licenses
     admin: AccountId,
 }
@@ -26,17 +37,39 @@ impl LicenseContract {
         }
     }
 
-    /// Grant a license to an account for a specified duration.
-    /// If the account already has a license, extends from the current expiry.
+    /// Migrate from old contract state (AccountId keys) to new state (String keys).
+    /// This preserves the admin but creates a new empty licenses map.
+    /// Existing licenses will remain accessible if they were stored with the same prefix,
+    /// since String serialization of valid AccountIds is compatible.
+    ///
+    /// # Panics
+    /// Panics if caller is not the admin
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        let old_state: OldLicenseContract = env::state_read().expect("Failed to read old state");
+
+        // The old LookupMap used AccountId keys with prefix "l"
+        // The new LookupMap uses String keys with the same prefix "l"
+        // Since AccountId serializes to a string, existing entries are compatible
+        // We just need to create the new state with the same prefix
+        Self {
+            licenses: LookupMap::new(b"l"),
+            admin: old_state.admin,
+        }
+    }
+
+    /// Grant a license to a wallet for a specified duration.
+    /// If the wallet already has a license, extends from the current expiry.
     /// If no existing license or expired, starts from current block timestamp.
     ///
     /// # Arguments
-    /// * `account_id` - The account to grant the license to
+    /// * `wallet_address` - The wallet address to grant the license to (NEAR account, EVM address, etc.)
     /// * `duration_days` - Number of days to grant the license for
     ///
     /// # Panics
     /// Panics if caller is not the admin
-    pub fn grant_license(&mut self, account_id: AccountId, duration_days: u32) {
+    pub fn grant_license(&mut self, wallet_address: String, duration_days: u32) {
         require!(
             env::predecessor_account_id() == self.admin,
             "Unauthorized: only admin can grant licenses"
@@ -46,7 +79,7 @@ impl LicenseContract {
 
         // Get current expiry, use current timestamp if not set or already expired
         let base_timestamp = self.licenses
-            .get(&account_id)
+            .get(&wallet_address)
             .copied()
             .filter(|&expiry| expiry > current_timestamp)
             .unwrap_or(current_timestamp);
@@ -55,32 +88,32 @@ impl LicenseContract {
         let duration_ns = duration_days as u64 * 24 * 60 * 60 * 1_000_000_000;
         let new_expiry = base_timestamp + duration_ns;
 
-        self.licenses.insert(account_id, new_expiry);
+        self.licenses.insert(wallet_address, new_expiry);
     }
 
-    /// Check if an account has a valid (non-expired) license.
+    /// Check if a wallet has a valid (non-expired) license.
     ///
     /// # Arguments
-    /// * `account_id` - The account to check
+    /// * `wallet_address` - The wallet address to check
     ///
     /// # Returns
-    /// `true` if the account has a license that hasn't expired, `false` otherwise
-    pub fn is_licensed(&self, account_id: &AccountId) -> bool {
+    /// `true` if the wallet has a license that hasn't expired, `false` otherwise
+    pub fn is_licensed(&self, wallet_address: String) -> bool {
         self.licenses
-            .get(account_id)
+            .get(&wallet_address)
             .map(|&expiry| expiry > env::block_timestamp())
             .unwrap_or(false)
     }
 
-    /// Get the raw expiry timestamp for an account.
+    /// Get the raw expiry timestamp for a wallet.
     ///
     /// # Arguments
-    /// * `account_id` - The account to query
+    /// * `wallet_address` - The wallet address to query
     ///
     /// # Returns
-    /// `Some(timestamp)` if the account has a license entry, `None` otherwise
-    pub fn get_expiry(&self, account_id: &AccountId) -> Option<u64> {
-        self.licenses.get(account_id).copied()
+    /// `Some(timestamp)` if the wallet has a license entry, `None` otherwise
+    pub fn get_expiry(&self, wallet_address: String) -> Option<u64> {
+        self.licenses.get(&wallet_address).copied()
     }
 }
 
@@ -100,6 +133,14 @@ mod tests {
         "user.near".parse().unwrap()
     }
 
+    fn user_str() -> String {
+        "user.near".to_string()
+    }
+
+    fn evm_address() -> String {
+        "0x1234567890abcdef1234567890abcdef12345678".to_string()
+    }
+
     fn setup_context(predecessor: &AccountId, block_timestamp: u64) {
         let context = VMContextBuilder::new()
             .predecessor_account_id(predecessor.clone())
@@ -115,7 +156,7 @@ mod tests {
 
         // Verify admin is set by trying to grant license (only admin can do this)
         // If admin wasn't set correctly, this would panic
-        assert!(!contract.is_licensed(&user()));
+        assert!(!contract.is_licensed(user_str()));
     }
 
     #[test]
@@ -123,11 +164,26 @@ mod tests {
         setup_context(&admin(), 1_000_000_000);
         let mut contract = LicenseContract::new(admin());
 
-        contract.grant_license(user(), 30);
+        contract.grant_license(user_str(), 30);
 
-        assert!(contract.is_licensed(&user()));
+        assert!(contract.is_licensed(user_str()));
 
-        let expiry = contract.get_expiry(&user());
+        let expiry = contract.get_expiry(user_str());
+        assert!(expiry.is_some());
+        assert_eq!(expiry.unwrap(), 1_000_000_000 + 30 * ONE_DAY_NS);
+    }
+
+    #[test]
+    fn test_grant_license_to_evm_address() {
+        setup_context(&admin(), 1_000_000_000);
+        let mut contract = LicenseContract::new(admin());
+
+        // Grant license to an EVM address
+        contract.grant_license(evm_address(), 30);
+
+        assert!(contract.is_licensed(evm_address()));
+
+        let expiry = contract.get_expiry(evm_address());
         assert!(expiry.is_some());
         assert_eq!(expiry.unwrap(), 1_000_000_000 + 30 * ONE_DAY_NS);
     }
@@ -140,7 +196,7 @@ mod tests {
 
         // Switch to non-admin context
         setup_context(&user(), 0);
-        contract.grant_license(user(), 30);
+        contract.grant_license(user_str(), 30);
     }
 
     #[test]
@@ -150,17 +206,17 @@ mod tests {
         let mut contract = LicenseContract::new(admin());
 
         // Grant 1 day license
-        contract.grant_license(user(), 1);
-        assert!(contract.is_licensed(&user()));
+        contract.grant_license(user_str(), 1);
+        assert!(contract.is_licensed(user_str()));
 
         // Move time forward past expiry
         let after_expiry = initial_time + ONE_DAY_NS + 1;
         setup_context(&admin(), after_expiry);
 
-        assert!(!contract.is_licensed(&user()));
+        assert!(!contract.is_licensed(user_str()));
 
         // Expiry timestamp should still be readable
-        let expiry = contract.get_expiry(&user());
+        let expiry = contract.get_expiry(user_str());
         assert!(expiry.is_some());
         assert_eq!(expiry.unwrap(), initial_time + ONE_DAY_NS);
     }
@@ -172,20 +228,20 @@ mod tests {
         let mut contract = LicenseContract::new(admin());
 
         // Grant initial 30-day license
-        contract.grant_license(user(), 30);
-        let first_expiry = contract.get_expiry(&user()).unwrap();
+        contract.grant_license(user_str(), 30);
+        let first_expiry = contract.get_expiry(user_str()).unwrap();
         assert_eq!(first_expiry, initial_time + 30 * ONE_DAY_NS);
 
         // Extend by another 30 days (before expiry)
         let halfway = initial_time + 15 * ONE_DAY_NS;
         setup_context(&admin(), halfway);
-        contract.grant_license(user(), 30);
+        contract.grant_license(user_str(), 30);
 
         // New expiry should be first_expiry + 30 days (extends from existing, not current time)
-        let new_expiry = contract.get_expiry(&user()).unwrap();
+        let new_expiry = contract.get_expiry(user_str()).unwrap();
         assert_eq!(new_expiry, first_expiry + 30 * ONE_DAY_NS);
 
         // Verify it's still licensed
-        assert!(contract.is_licensed(&user()));
+        assert!(contract.is_licensed(user_str()));
     }
 }

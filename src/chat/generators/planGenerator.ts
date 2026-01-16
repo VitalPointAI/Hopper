@@ -34,7 +34,7 @@ ${task.done}
 }
 
 /**
- * Generate PLAN.md content following SpecFlow template
+ * Generate PLAN.md content following Hopper template
  *
  * @param config - Plan configuration
  * @returns Formatted PLAN.md content

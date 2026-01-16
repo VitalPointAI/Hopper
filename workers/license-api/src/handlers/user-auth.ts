@@ -316,6 +316,9 @@ export async function createUserJwt(env: Env, nearAccountId: string): Promise<st
 /**
  * User authentication sign page HTML
  * Professional branded page for VSCode extension users
+ *
+ * When payment='crypto', after auth the page creates a subscription
+ * and redirects to the payment page instead of back to VSCode.
  */
 export function userSignPage(
   network: string,
@@ -324,9 +327,10 @@ export function userSignPage(
     timestamp: string;
     message: string;
     callback: string;
+    payment?: string;
   }
 ): string {
-  const { nonce, timestamp, message, callback } = params;
+  const { nonce, timestamp, message, callback, payment } = params;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -390,11 +394,11 @@ export function userSignPage(
           <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
             <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
           </svg>
-          Connect NEAR Wallet
+          Connect Wallet
         </button>
 
         <p class="text-xs text-center text-gray-500">
-          Supports Meteor, HOT, MyNearWallet, Mintbase, and more
+          Supports NEAR wallets: Meteor, HOT, MyNearWallet, Mintbase, and more
         </p>
       </div>
 
@@ -466,7 +470,8 @@ export function userSignPage(
       nonce: '${nonce}',
       timestamp: '${timestamp}',
       message: decodeURIComponent('${encodeURIComponent(message)}'),
-      callback: decodeURIComponent('${encodeURIComponent(callback)}')
+      callback: decodeURIComponent('${encodeURIComponent(callback)}'),
+      payment: '${payment || ''}'
     };
 
     let connector = null;
@@ -543,13 +548,53 @@ export function userSignPage(
         const verifyData = await verifyResponse.json();
 
         if (verifyResponse.ok && verifyData.token) {
+          const accountId = signResult.accountId || connectedAccountId;
+
+          // If payment=crypto, create subscription and redirect to payment page
+          if (params.payment === 'crypto') {
+            setMessage('Setting up subscription...');
+
+            try {
+              // Create crypto subscription
+              const subscribeResponse = await fetch('/api/crypto/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nearAccountId: accountId })
+              });
+
+              const subscribeData = await subscribeResponse.json();
+
+              // Handle both new subscription and existing subscription (409)
+              if (subscribeResponse.ok && subscribeData.authorizationUrl) {
+                // New subscription created - redirect to payment page
+                showStep('success');
+                document.getElementById('success-message').textContent = 'Redirecting to payment...';
+                window.location.href = subscribeData.authorizationUrl;
+                return;
+              } else if (subscribeResponse.status === 409 && subscribeData.existingIntentId) {
+                // Existing subscription - redirect to its payment page
+                showStep('success');
+                document.getElementById('success-message').textContent = 'Redirecting to payment...';
+                window.location.href = '/pay/' + encodeURIComponent(subscribeData.existingIntentId);
+                return;
+              } else {
+                throw new Error(subscribeData.error || 'Failed to create subscription');
+              }
+            } catch (subErr) {
+              console.error('Subscription error:', subErr);
+              showError('Wallet connected, but failed to create subscription: ' + subErr.message);
+              return;
+            }
+          }
+
+          // Normal auth flow - redirect back to VSCode
           showStep('success');
 
           // Build callback URL with auth data
           // Use snake_case to match extension's expected parameter names
           // Include token and expires_at so extension can skip re-verification
           const callbackUrl = new URL(params.callback);
-          callbackUrl.searchParams.set('account_id', signResult.accountId || connectedAccountId);
+          callbackUrl.searchParams.set('account_id', accountId);
           callbackUrl.searchParams.set('signature', signResult.signature);
           callbackUrl.searchParams.set('public_key', signResult.publicKey);
           callbackUrl.searchParams.set('token', verifyData.token);
@@ -619,18 +664,22 @@ export function userSignPage(
 
 /**
  * GET /auth/sign - User authentication page
+ * Query params:
+ *   - nonce, timestamp, message, callback: Required auth params
+ *   - payment: Optional. If 'crypto', redirect to payment page after auth instead of VSCode
  */
 export function handleUserSignPage(c: Context<{ Bindings: Env }>): Response {
   const nonce = c.req.query('nonce') || '';
   const timestamp = c.req.query('timestamp') || '';
   const message = c.req.query('message') || '';
   const callback = c.req.query('callback') || '';
+  const payment = c.req.query('payment');
 
   if (!nonce || !timestamp || !message || !callback) {
     return c.json({ error: 'Missing required parameters' }, 400);
   }
 
-  return c.html(userSignPage(c.env.NEAR_NETWORK, { nonce, timestamp, message, callback }));
+  return c.html(userSignPage(c.env.NEAR_NETWORK, { nonce, timestamp, message, callback, payment }));
 }
 
 /**

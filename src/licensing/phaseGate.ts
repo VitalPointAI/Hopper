@@ -77,7 +77,9 @@ export async function checkPhaseAccess(
 
   if (status.isLicensed) {
     // Check if license is expired
-    if (status.expiresAt && status.expiresAt < Date.now() / 1000) {
+    // Note: expiresAt from contract is in nanoseconds, Date.now() is milliseconds
+    const expiresAtMs = status.expiresAt ? status.expiresAt / 1_000_000 : null;
+    if (expiresAtMs && expiresAtMs < Date.now()) {
       // License expired - clear cache and recheck
       validator.clearCache(userId);
       const refreshedStatus = await validator.checkLicense();
@@ -134,12 +136,13 @@ export async function connect(validator: LicenseValidator): Promise<void> {
   const option = await vscode.window.showQuickPick([
     { label: 'Google', description: 'Sign in with Google', provider: 'google' as const },
     { label: 'GitHub', description: 'Sign in with GitHub', provider: 'github' as const },
-    { label: 'NEAR Wallet', description: 'Sign in with NEAR wallet', provider: 'wallet' as const },
+    { label: 'Wallet', description: 'Connect any wallet (NEAR, Ethereum, Solana, etc.)', provider: 'wallet' as const },
   ], { placeHolder: 'Choose sign-in method' });
 
   if (option) {
     if (option.provider === 'wallet') {
-      await validator.startAuth();
+      // Opens multi-chain wallet connection page
+      await validator.getAuthManager().startWalletAuth();
     } else {
       await validator.getAuthManager().startOAuth(option.provider);
     }
@@ -150,7 +153,9 @@ export async function connect(validator: LicenseValidator): Promise<void> {
  * Disconnect / logout (unified disconnect)
  */
 export async function disconnect(validator: LicenseValidator): Promise<void> {
+  console.log('[disconnect] Before logout - isAuthenticated:', validator.isAuthenticated());
   await validator.logout();
+  console.log('[disconnect] After logout - isAuthenticated:', validator.isAuthenticated());
   vscode.window.showInformationMessage('Signed out successfully');
 }
 

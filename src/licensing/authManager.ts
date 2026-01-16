@@ -36,10 +36,20 @@ const CHALLENGE_STORAGE_KEY = 'specflow.pendingChallenge';
 export class AuthManager {
   private context: vscode.ExtensionContext;
   private session: AuthSession | null = null;
+  private initPromise: Promise<void>;
 
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
-    this.loadSession();
+    // Store the init promise so callers can await it if needed
+    this.initPromise = this.loadSession();
+  }
+
+  /**
+   * Wait for initialization to complete
+   * Call this before checking authentication if you need to ensure session is loaded
+   */
+  async ensureInitialized(): Promise<void> {
+    await this.initPromise;
   }
 
   /**
@@ -130,16 +140,24 @@ export class AuthManager {
    * Opens browser to OAuth provider
    *
    * @param provider - OAuth provider ('google' or 'github')
+   * @param options - Optional parameters
+   * @param options.payment - If 'stripe', redirect to Stripe checkout after auth instead of VSCode
    */
-  async startOAuth(provider: 'google' | 'github'): Promise<void> {
+  async startOAuth(provider: 'google' | 'github', options?: { payment?: 'stripe' }): Promise<void> {
     const config = vscode.workspace.getConfiguration('specflow');
     const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
 
-    // Build OAuth URL - callback is handled by Worker, then redirected to VSCode
-    const oauthUrl = `${apiUrl}/auth/oauth/${provider}?callback=${encodeURIComponent('vscode://vitalpointai.specflow/auth-callback')}`;
+    // Build OAuth URL - callback is handled by Worker
+    const oauthUrl = new URL(`${apiUrl}/auth/oauth/${provider}`);
+    oauthUrl.searchParams.set('callback', 'vscode://vitalpointai.specflow/auth-callback');
+
+    // If payment flow, tell OAuth to redirect to checkout after auth
+    if (options?.payment === 'stripe') {
+      oauthUrl.searchParams.set('payment', 'stripe');
+    }
 
     vscode.window.showInformationMessage(`Opening ${provider} sign-in...`);
-    await vscode.env.openExternal(vscode.Uri.parse(oauthUrl));
+    await vscode.env.openExternal(vscode.Uri.parse(oauthUrl.toString()));
   }
 
   /**
@@ -152,10 +170,32 @@ export class AuthManager {
   }
 
   /**
-   * Start the wallet authentication flow
-   * Opens a browser window for NEAR wallet signing
+   * Start the multi-chain wallet authentication flow
+   * Opens a browser window with wallet selection (NEAR, Ethereum, Solana, etc.)
    */
-  async startAuth(): Promise<void> {
+  async startWalletAuth(): Promise<void> {
+    const config = vscode.workspace.getConfiguration('specflow');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const network = config.get<string>('license.nearNetwork') ?? 'mainnet';
+
+    // Build wallet connection URL - opens multi-chain wallet page
+    const walletUrl = new URL(`${apiUrl}/auth/wallet`);
+    walletUrl.searchParams.set('network', network);
+    walletUrl.searchParams.set('callback', 'vscode://vitalpointai.specflow/auth-callback');
+
+    vscode.window.showInformationMessage('Opening wallet connection page...');
+    await vscode.env.openExternal(vscode.Uri.parse(walletUrl.toString()));
+  }
+
+  /**
+   * Start the NEAR wallet authentication flow (legacy)
+   * Opens a browser window for NEAR wallet signing
+   *
+   * @param options - Optional parameters
+   * @param options.payment - If 'crypto', stay in browser for payment after auth
+   * @deprecated Use startWalletAuth() for multi-chain support
+   */
+  async startAuth(options?: { payment?: 'crypto' }): Promise<void> {
     const config = vscode.workspace.getConfiguration('specflow');
     const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
     const network = config.get<string>('license.nearNetwork') ?? 'mainnet';
@@ -174,6 +214,11 @@ export class AuthManager {
     signingUrl.searchParams.set('message', challenge.message);
     signingUrl.searchParams.set('network', network);
     signingUrl.searchParams.set('callback', 'vscode://vitalpointai.specflow/auth-callback');
+
+    // If payment flow, tell sign page to handle checkout after auth
+    if (options?.payment === 'crypto') {
+      signingUrl.searchParams.set('payment', 'crypto');
+    }
 
     vscode.window.showInformationMessage('Opening NEAR wallet for authentication...');
     await vscode.env.openExternal(vscode.Uri.parse(signingUrl.toString()));
@@ -274,6 +319,7 @@ export class AuthManager {
     userId: string;
     authType: AuthType;
     provider: AuthProvider;
+    chain?: string;
     token: string;
     expiresAt: number;
     displayName?: string;
@@ -285,6 +331,7 @@ export class AuthManager {
         userId: sessionData.userId,
         authType: sessionData.authType,
         provider: sessionData.provider,
+        chain: sessionData.chain,
         token: sessionData.token,
         expiresAt: sessionData.expiresAt,
         displayName: sessionData.displayName,

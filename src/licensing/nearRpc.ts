@@ -88,18 +88,18 @@ async function callViewFunction<T>(
 }
 
 /**
- * Check if an account has a valid license
- * @param accountId - NEAR account ID to check
+ * Check if a wallet has a valid license
+ * @param walletAddress - Wallet address to check (NEAR account, EVM address, etc.)
  * @param config - License configuration
  * @returns true if licensed, false if not licensed or on error (fail-closed)
  */
 export async function viewIsLicensed(
-  accountId: string,
+  walletAddress: string,
   config: LicenseConfig
 ): Promise<boolean> {
   const result = await callViewFunction<boolean>(
     'is_licensed',
-    { account_id: accountId },
+    { wallet_address: walletAddress },
     config
   );
 
@@ -108,18 +108,18 @@ export async function viewIsLicensed(
 }
 
 /**
- * Get the license expiry timestamp for an account
- * @param accountId - NEAR account ID to check
+ * Get the license expiry timestamp for a wallet
+ * @param walletAddress - Wallet address to check (NEAR account, EVM address, etc.)
  * @param config - License configuration
- * @returns Unix timestamp (seconds) when license expires, or null if not licensed
+ * @returns Unix timestamp (nanoseconds) when license expires, or null if not licensed
  */
 export async function viewGetExpiry(
-  accountId: string,
+  walletAddress: string,
   config: LicenseConfig
 ): Promise<number | null> {
   const result = await callViewFunction<number | null>(
     'get_expiry',
-    { account_id: accountId },
+    { wallet_address: walletAddress },
     config
   );
 

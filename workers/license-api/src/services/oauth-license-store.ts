@@ -1,6 +1,6 @@
 /**
- * OAuth license storage service
- * Manages licenses for OAuth users in USER_LICENSES KV
+ * License storage service
+ * Manages licenses for OAuth users and wallet users in USER_LICENSES KV
  */
 
 import type { OAuthUserLicense } from '../types';
@@ -111,3 +111,4 @@ export async function revokeOAuthLicense(
 
   return true;
 }
+
