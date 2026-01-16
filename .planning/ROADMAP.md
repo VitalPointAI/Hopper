@@ -18,8 +18,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Extension scaffolding, NEAR AI model registration in VSCode
 - [x] **Phase 1.5: Licensing** - INSERTED - NEAR license contract, Stripe subscription, x402 crypto payments
-- [ ] **Phase 1.5.1: Infrastructure Deploy** - INSERTED - Deploy NEAR contract and Cloudflare Worker to production
-- [ ] **Phase 1.5.2: Dual Auth** - INSERTED - OAuth + wallet authentication with unified license management
+- [x] **Phase 1.5.1: Infrastructure Deploy** - INSERTED - Deploy NEAR contract and Cloudflare Worker to production
+- [x] **Phase 1.5.2: Dual Auth** - INSERTED - OAuth + wallet authentication with unified license management
 - [ ] **Phase 1.5.3: Rebrand to Hopper** - INSERTED - Rename extension from SpecFlow to Hopper in all user-facing items
 - [x] **Phase 2: Chat Participant** - @hopper agent with command routing
 - [x] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
@@ -76,16 +76,17 @@ Plans:
 - [x] 01.5.2-01: OAuth infrastructure in Worker (Google, GitHub, email+password)
 - [x] 01.5.2-02: Extension auth flow updates (unified connect command)
 - [x] 01.5.2-03: Stripe flow updates (OAuth user as customer ID)
-- [ ] 01.5.2-04: Testing and validation
+- [x] 01.5.2-04: Testing and validation
 
 ### Phase 1.5.3: Rebrand to Hopper (INSERTED)
 **Goal**: Rename extension from SpecFlow to Hopper in all user-facing items (@specflow → @hopper, display names, etc.)
 **Depends on**: Phase 1.5.2 (complete auth before rebranding)
 **Research**: Unlikely (find-and-replace with verification)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 01.5.3-01: Update all user-facing references from SpecFlow to Hopper
+- [x] 01.5.3-01: Update all user-facing references from SpecFlow to Hopper
+- [ ] 01.5.3-02: Update Worker and infrastructure references to Hopper
 
 ### Phase 2: Chat Participant
 **Goal**: @hopper chat participant responding to mentions with slash command routing
@@ -142,8 +143,8 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 1. Foundation | 3/3 | Complete | 2026-01-12 |
 | 1.5 Licensing | 6/6 | Complete | 2026-01-14 |
 | 1.5.1 Infrastructure Deploy | 2/2 | Complete | 2026-01-15 |
-| 1.5.2 Dual Auth | 3/4 | In progress | - |
-| 1.5.3 Rebrand to Hopper | 0/1 | Not started | - |
+| 1.5.2 Dual Auth | 4/4 | Complete | 2026-01-16 |
+| 1.5.3 Rebrand to Hopper | 1/2 | In progress | - |
 | 2. Chat Participant | 3/3 | Complete | 2026-01-15 |
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 0/3 | Not started | - |

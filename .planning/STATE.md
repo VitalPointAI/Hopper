@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 2 — Chat Participant (ready to resume)
+**Current focus:** Phase 1.5.3 — Rebrand to Hopper (in progress)
 
 ## Current Position
 
-Phase: 1.5.2 (Dual Auth - COMPLETE)
-Plan: 4 of 4 complete (+ all FIX plans)
-Status: Complete
-Last activity: 2026-01-16 — Completed 01.5.2-04 UAT fixes (payment flow, license gating, multi-chain wallet)
+Phase: 1.5.3 (Rebrand to Hopper)
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-01-16 — Completed 01.5.3-01 (Extension rebrand to Hopper)
 
-Progress: ████████████████████ 100%
+Progress: ████████████████████ 90%
 
 ## Performance Metrics
 
@@ -118,6 +118,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 01.5.2-04 UAT fixes - payment flow APPROVED
+Stopped at: Completed 01.5.3-01 (Extension rebrand to Hopper)
 Resume file: None
-Next: Resume Phase 02 (Chat Participant) or continue with remaining roadmap
+Next: Continue with 01.5.3-02 (Worker rebrand) to complete Phase 1.5.3
