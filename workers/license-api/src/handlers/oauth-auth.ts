@@ -311,8 +311,12 @@ export async function handleGoogleCallback(c: Context<{ Bindings: Env }>): Promi
     callbackUrl.searchParams.set('token', token);
     callbackUrl.searchParams.set('expires_at', expiresAt.toString());
     callbackUrl.searchParams.set('user_id', userId);
+    callbackUrl.searchParams.set('auth_type', 'oauth');
     callbackUrl.searchParams.set('email', user.email);
     callbackUrl.searchParams.set('provider', 'google');
+    if (user.name) {
+      callbackUrl.searchParams.set('display_name', user.name);
+    }
 
     return Response.redirect(callbackUrl.toString(), 302);
   } catch (err) {
@@ -476,8 +480,12 @@ export async function handleGitHubCallback(c: Context<{ Bindings: Env }>): Promi
     callbackUrl.searchParams.set('token', token);
     callbackUrl.searchParams.set('expires_at', expiresAt.toString());
     callbackUrl.searchParams.set('user_id', userId);
+    callbackUrl.searchParams.set('auth_type', 'oauth');
     callbackUrl.searchParams.set('email', email);
     callbackUrl.searchParams.set('provider', 'github');
+    if (user.name || user.login) {
+      callbackUrl.searchParams.set('display_name', user.name || user.login);
+    }
 
     return Response.redirect(callbackUrl.toString(), 302);
   } catch (err) {

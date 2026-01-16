@@ -426,8 +426,10 @@ export async function handleCryptoPaymentPage(
   c: Context<{ Bindings: Env }>
 ): Promise<Response> {
   const intentId = c.req.param('intentId');
+  console.log('[pay] Looking up intent:', intentId);
 
   if (!intentId) {
+    console.log('[pay] No intentId provided');
     return c.html(notFoundPage(), 404);
   }
 
@@ -436,8 +438,10 @@ export async function handleCryptoPaymentPage(
     c.env.CRYPTO_SUBSCRIPTIONS,
     intentId
   );
+  console.log('[pay] Subscription found:', !!subscription, subscription ? subscription.status : 'null');
 
   if (!subscription) {
+    console.log('[pay] Subscription not found for intentId:', intentId);
     return c.html(notFoundPage(), 404);
   }
 

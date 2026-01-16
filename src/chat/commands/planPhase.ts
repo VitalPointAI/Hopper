@@ -222,32 +222,6 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
 
   const workspaceUri = workspaceFolders[0].uri;
 
-  // Check license - /plan-phase requires Pro license
-  if (!licenseValidator.isAuthenticated()) {
-    stream.markdown('## Wallet Connection Required\n\n');
-    stream.markdown('Please connect your NEAR wallet to use planning commands.\n\n');
-    stream.button({
-      command: 'specflow.connectWallet',
-      title: 'Connect Wallet'
-    });
-    return { metadata: { lastCommand: 'plan-phase' } };
-  }
-
-  const licenseStatus = await licenseValidator.checkLicense();
-  if (!licenseStatus?.isLicensed) {
-    stream.markdown('## Pro License Required\n\n');
-    stream.markdown('The `/plan-phase` command requires a Pro license.\n\n');
-    stream.markdown('**Subscribe to unlock:**\n');
-    stream.markdown('- `/plan-phase` - Create detailed execution plans\n');
-    stream.markdown('- `/execute-plan` - Execute plans automatically\n');
-    stream.markdown('- Full session management features\n\n');
-    stream.button({
-      command: 'specflow.subscribe',
-      title: 'Subscribe'
-    });
-    return { metadata: { lastCommand: 'plan-phase' } };
-  }
-
   // Check if ROADMAP.md exists
   if (!projectContext.hasPlanning || !projectContext.roadmapMd) {
     stream.markdown('## No Roadmap Found\n\n');
@@ -338,6 +312,23 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<ISpecflowRes
     }
     stream.markdown('\n');
     return { metadata: { lastCommand: 'plan-phase' } };
+  }
+
+  // Check license - Phase 1 is free, Phase 2+ requires Pro license
+  if (targetPhaseNum >= 2) {
+    const licenseStatus = await licenseValidator.checkLicense();
+    if (!licenseStatus?.isLicensed) {
+      stream.markdown('## Pro License Required\n\n');
+      stream.markdown(`Planning **Phase ${targetPhaseNum}** requires a Pro license.\n\n`);
+      stream.markdown('Phase 1 is free. Upgrade to Pro to unlock:\n');
+      stream.markdown('- Planning and execution for Phase 2+\n');
+      stream.markdown('- Full session management features\n\n');
+      stream.button({
+        command: 'specflow.showUpgradeModal',
+        title: 'Upgrade to Pro'
+      });
+      return { metadata: { lastCommand: 'plan-phase' } };
+    }
   }
 
   // Check if dependent phases are complete (warning only, non-blocking)

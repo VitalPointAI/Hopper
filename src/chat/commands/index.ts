@@ -61,7 +61,51 @@ async function helpHandler(ctx: CommandContext): Promise<ISpecflowResult> {
  * Status command handler - shows current project status with clickable references
  */
 async function statusHandler(ctx: CommandContext): Promise<ISpecflowResult> {
-  const { projectContext } = ctx;
+  const { projectContext, licenseValidator } = ctx;
+
+  // Show authentication status first
+  ctx.stream.markdown('## Account Status\n\n');
+
+  if (licenseValidator.isAuthenticated()) {
+    const session = licenseValidator.getSession();
+    if (session) {
+      // Show user info based on auth type
+      if (session.authType === 'wallet') {
+        ctx.stream.markdown(`**Connected:** ${session.userId}\n`);
+        ctx.stream.markdown(`**Auth:** NEAR Wallet\n\n`);
+      } else {
+        const displayInfo = session.email || session.displayName || session.userId;
+        const providerLabel = session.provider === 'google' ? 'Google' :
+                             session.provider === 'github' ? 'GitHub' :
+                             session.provider === 'email' ? 'Email' : 'OAuth';
+        ctx.stream.markdown(`**Connected:** ${displayInfo}\n`);
+        ctx.stream.markdown(`**Auth:** ${providerLabel}\n\n`);
+      }
+
+      // Show license status
+      const licenseStatus = await licenseValidator.checkLicense();
+      if (licenseStatus?.isLicensed) {
+        const expiryDate = licenseStatus.expiresAt
+          ? new Date(licenseStatus.expiresAt).toLocaleDateString()
+          : 'Unknown';
+        ctx.stream.markdown(`**License:** Pro (expires ${expiryDate})\n\n`);
+      } else {
+        ctx.stream.markdown(`**License:** Free tier\n\n`);
+        ctx.stream.button({
+          command: 'specflow.showUpgradeModal',
+          title: 'Upgrade to Pro'
+        });
+        ctx.stream.markdown('\n\n');
+      }
+    }
+  } else {
+    ctx.stream.markdown('**Not connected**\n\n');
+    ctx.stream.button({
+      command: 'specflow.connect',
+      title: 'Connect'
+    });
+    ctx.stream.markdown('\n\n');
+  }
 
   // Check if project exists
   if (!projectContext.hasPlanning) {
@@ -120,21 +164,22 @@ async function statusHandler(ctx: CommandContext): Promise<ISpecflowResult> {
     try {
       // Read .planning directory to build file tree
       const entries = await vscode.workspace.fs.readDirectory(projectContext.planningUri);
-      const tree: [string, vscode.FileType][] = [];
+      const tree: vscode.ChatResponseFileTree[] = [];
 
       for (const [name, type] of entries) {
-        tree.push([name, type]);
-
-        // If directory, read first level of children
         if (type === vscode.FileType.Directory) {
+          // Read children for directories
           const subUri = vscode.Uri.joinPath(projectContext.planningUri, name);
           const subEntries = await vscode.workspace.fs.readDirectory(subUri);
-          for (const [subName, subType] of subEntries.slice(0, 5)) {
-            tree.push([`${name}/${subName}`, subType]);
-          }
+          const children: vscode.ChatResponseFileTree[] = subEntries.slice(0, 5).map(([subName]) => ({
+            name: subName
+          }));
           if (subEntries.length > 5) {
-            tree.push([`${name}/... (${subEntries.length - 5} more)`, vscode.FileType.Unknown]);
+            children.push({ name: `... (${subEntries.length - 5} more)` });
           }
+          tree.push({ name, children });
+        } else {
+          tree.push({ name });
         }
       }
 
