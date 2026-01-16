@@ -5,7 +5,7 @@ import { LicenseValidator } from './licensing/validator';
 import { checkPhaseAccess, showUpgradeModal, connect, disconnect } from './licensing/phaseGate';
 import { UpgradeModalPanel } from './licensing/upgradeModal';
 import { trackActivation } from './telemetry/telemetryService';
-import { createSpecflowParticipant } from './chat/specflowParticipant';
+import { createHopperParticipant } from './chat/hopperParticipant';
 import { AuthType, AuthProvider } from './licensing/types';
 
 // Export license validator for use by chat participant
@@ -16,7 +16,7 @@ let licenseValidator: LicenseValidator | undefined;
  * @param context - The extension context provided by VSCode
  */
 export function activate(context: vscode.ExtensionContext): void {
-  console.log('SpecFlow extension activated');
+  console.log('Hopper extension activated');
 
   // Track activation telemetry (async, non-blocking)
   trackActivation(context).catch(() => {
@@ -34,11 +34,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(providerDisposable);
 
-  // Create and register the @specflow chat participant
+  // Create and register the @hopper chat participant
   try {
-    const chatParticipant = createSpecflowParticipant(context, licenseValidator);
+    const chatParticipant = createHopperParticipant(context, licenseValidator);
     context.subscriptions.push(chatParticipant);
-    console.log('SpecFlow chat participant registered');
+    console.log('Hopper chat participant registered');
   } catch (err) {
     console.error('Failed to register chat participant:', err);
     // Don't crash - chat participant is optional, extension can still work
@@ -46,7 +46,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register the management command for API key setup
   const manageCommand = vscode.commands.registerCommand(
-    'specflow.manageNearAi',
+    'hopper.manageNearAi',
     async () => {
       const apiKey = await context.secrets.get(NEAR_AI_API_KEY_SECRET);
       const isConfigured = !!apiKey && isValidApiKeyFormat(apiKey);
@@ -76,7 +76,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register the upgrade modal command
   const upgradeCommand = vscode.commands.registerCommand(
-    'specflow.showUpgradeModal',
+    'hopper.showUpgradeModal',
     async () => {
       if (licenseValidator) {
         await showUpgradeModal(licenseValidator, context);
@@ -87,19 +87,20 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register unified connect command with auth method picker
   const connectCommand = vscode.commands.registerCommand(
-    'specflow.connect',
+    'hopper.connect',
     async () => {
       if (licenseValidator) {
-        // Show quick pick with auth options
+        // Show quick pick with auth options - wallet opens multi-chain page
         const option = await vscode.window.showQuickPick([
           { label: 'Google', description: 'Sign in with Google', provider: 'google' as const },
           { label: 'GitHub', description: 'Sign in with GitHub', provider: 'github' as const },
-          { label: 'NEAR Wallet', description: 'Sign in with NEAR wallet', provider: 'wallet' as const },
+          { label: 'Wallet', description: 'Connect any wallet (NEAR, Ethereum, Solana, etc.)', provider: 'wallet' as const },
         ], { placeHolder: 'Choose sign-in method' });
 
         if (option) {
           if (option.provider === 'wallet') {
-            await licenseValidator.startAuth();
+            // Opens multi-chain wallet connection page
+            await licenseValidator.getAuthManager().startWalletAuth();
           } else {
             await licenseValidator.getAuthManager().startOAuth(option.provider);
           }
@@ -111,7 +112,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register unified disconnect command
   const disconnectCommand = vscode.commands.registerCommand(
-    'specflow.disconnect',
+    'hopper.disconnect',
     async () => {
       if (licenseValidator) {
         await disconnect(licenseValidator);
@@ -122,7 +123,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Backward-compatible aliases for old command names
   const connectWalletCommand = vscode.commands.registerCommand(
-    'specflow.connectWallet',
+    'hopper.connectWallet',
     async () => {
       if (licenseValidator) {
         await connect(licenseValidator);
@@ -131,9 +132,9 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(connectWalletCommand);
 
-  // Direct wallet auth command (no picker) - used by upgrade modal for crypto payments
+  // Direct wallet auth command (no picker) - used for general wallet connection
   const startWalletAuthCommand = vscode.commands.registerCommand(
-    'specflow.startWalletAuth',
+    'hopper.startWalletAuth',
     async () => {
       if (licenseValidator) {
         await licenseValidator.startAuth();
@@ -142,8 +143,40 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(startWalletAuthCommand);
 
+  // Wallet auth with crypto payment - stays in browser for payment after auth
+  const startWalletAuthForPaymentCommand = vscode.commands.registerCommand(
+    'hopper.startWalletAuthForPayment',
+    async () => {
+      if (licenseValidator) {
+        // Don't store pending payment - the browser will handle the entire flow
+        await licenseValidator.startAuth({ payment: 'crypto' });
+      }
+    }
+  );
+  context.subscriptions.push(startWalletAuthForPaymentCommand);
+
+  // OAuth auth with Stripe payment - stays in browser for checkout after auth
+  const startOAuthForPaymentCommand = vscode.commands.registerCommand(
+    'hopper.startOAuthForPayment',
+    async () => {
+      if (licenseValidator) {
+        // Show quick pick for OAuth provider, then start OAuth with payment flag
+        const option = await vscode.window.showQuickPick([
+          { label: 'Google', description: 'Sign in with Google', provider: 'google' as const },
+          { label: 'GitHub', description: 'Sign in with GitHub', provider: 'github' as const },
+        ], { placeHolder: 'Choose sign-in method for Stripe checkout' });
+
+        if (option) {
+          // Don't store pending payment - the browser will handle the entire flow
+          await licenseValidator.getAuthManager().startOAuth(option.provider, { payment: 'stripe' });
+        }
+      }
+    }
+  );
+  context.subscriptions.push(startOAuthForPaymentCommand);
+
   const disconnectWalletCommand = vscode.commands.registerCommand(
-    'specflow.disconnectWallet',
+    'hopper.disconnectWallet',
     async () => {
       if (licenseValidator) {
         await disconnect(licenseValidator);
@@ -154,14 +187,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register chat participant command wrappers for stream.button() calls
   // These commands open the chat panel and send the appropriate slash command
-  // to the @specflow chat participant
+  // to the @hopper chat participant
   const chatParticipantCommands = [
-    { id: 'specflow.chat-participant.new-project', command: '/new-project' },
-    { id: 'specflow.chat-participant.create-roadmap', command: '/create-roadmap' },
-    { id: 'specflow.chat-participant.plan-phase', command: '/plan-phase' },
-    { id: 'specflow.chat-participant.status', command: '/status' },
-    { id: 'specflow.chat-participant.progress', command: '/progress' },
-    { id: 'specflow.chat-participant.help', command: '/help' }
+    { id: 'hopper.chat-participant.new-project', command: '/new-project' },
+    { id: 'hopper.chat-participant.create-roadmap', command: '/create-roadmap' },
+    { id: 'hopper.chat-participant.plan-phase', command: '/plan-phase' },
+    { id: 'hopper.chat-participant.status', command: '/status' },
+    { id: 'hopper.chat-participant.progress', command: '/progress' },
+    { id: 'hopper.chat-participant.help', command: '/help' }
   ];
 
   for (const { id, command } of chatParticipantCommands) {
@@ -169,14 +202,14 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         // Open the chat panel with the query pre-filled
         // The query parameter populates the chat input with the specified text
-        // Using @specflow with the command triggers the chat participant
+        // Using @hopper with the command triggers the chat participant
         await vscode.commands.executeCommand('workbench.action.chat.open', {
-          query: `@specflow ${command}`
+          query: `@hopper ${command}`
         });
       } catch (err) {
         // Fallback: show guidance if the chat command isn't available
         vscode.window.showInformationMessage(
-          `Use @specflow ${command} in the chat panel to run this command.`
+          `Use @hopper ${command} in the chat panel to run this command.`
         );
       }
     });
@@ -200,9 +233,13 @@ export function activate(context: vscode.ExtensionContext): void {
         }
 
         // Parse session data (both OAuth and wallet callbacks send these)
-        const userId = params.get('user_id') ?? params.get('account_id');
+        const userId = params.get('user_id') ?? params.get('account_id') ?? params.get('accountId');
         const authType = (params.get('auth_type') as AuthType) ?? 'wallet';
-        const provider = (params.get('provider') as AuthProvider) ?? 'near';
+        const chain = params.get('chain') ?? 'near';
+        // For wallet auth, use chain as provider; for oauth, use the provider param
+        const provider = authType === 'wallet'
+          ? (chain as AuthProvider)
+          : (params.get('provider') as AuthProvider) ?? 'near';
         const token = params.get('token');
         const expiresAt = params.get('expires_at');
         const displayName = params.get('display_name');
@@ -221,6 +258,7 @@ export function activate(context: vscode.ExtensionContext): void {
               userId,
               authType,
               provider,
+              chain,
               token,
               expiresAt: parseInt(expiresAt, 10),
               displayName: displayName ?? undefined,
@@ -233,6 +271,17 @@ export function activate(context: vscode.ExtensionContext): void {
               signature,
               publicKey
             );
+          } else if (authType === 'wallet' && !token) {
+            // Payment success callback - create session from wallet info
+            // This is for crypto payment completion where we get wallet info but no JWT
+            success = await licenseValidator.handleAuthCallbackWithToken({
+              userId,
+              authType: 'wallet',
+              provider,
+              chain,
+              token: '', // No token for payment callbacks
+              expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+            });
           }
 
           if (success) {
@@ -240,10 +289,10 @@ export function activate(context: vscode.ExtensionContext): void {
             await licenseValidator.checkLicense();
 
             // Check for pending payment to resume
-            const pendingPayment = context.globalState.get<'stripe' | 'crypto'>('specflow.pendingPayment');
+            const pendingPayment = context.globalState.get<'stripe' | 'crypto'>('hopper.pendingPayment');
             if (pendingPayment) {
               // Clear pending payment first
-              await context.globalState.update('specflow.pendingPayment', undefined);
+              await context.globalState.update('hopper.pendingPayment', undefined);
 
               // Get auth session and determine checkout type
               const authSession = licenseValidator.getSession();
@@ -263,11 +312,62 @@ export function activate(context: vscode.ExtensionContext): void {
                 );
                 UpgradeModalPanel.show(context, authSession);
               }
+            } else {
+              // No pending payment - user connected for license verification
+              // Auto-open chat with /status to show connection success and license info
+              // This provides immediate feedback in the chat interface
+              try {
+                await vscode.commands.executeCommand('workbench.action.chat.open', {
+                  query: '@hopper /status'
+                });
+              } catch {
+                // Fallback to notification if chat command not available
+                vscode.window.showInformationMessage('Connected successfully!');
+              }
             }
           }
         } else {
           vscode.window.showErrorMessage(
             'Invalid authentication callback. Missing required parameters.'
+          );
+        }
+      } else if (uri.path === '/payment-success') {
+        // Handle successful crypto payment callback
+        console.log('Payment success callback received');
+
+        // Show progress notification while activating license
+        await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Activating your Hopper Pro license...',
+            cancellable: false,
+          },
+          async (progress) => {
+            // Wait a moment for the backend to process the payment
+            progress.report({ increment: 30, message: 'Verifying payment...' });
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Refresh license status
+            progress.report({ increment: 50, message: 'Activating license...' });
+            if (licenseValidator) {
+              await licenseValidator.checkLicense();
+            }
+
+            progress.report({ increment: 20, message: 'Complete!' });
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        );
+
+        // Auto-open chat with /status to show license confirmation and next steps
+        // This provides immediate in-chat feedback consistent with auth callback
+        try {
+          await vscode.commands.executeCommand('workbench.action.chat.open', {
+            query: '@hopper /status'
+          });
+        } catch {
+          // Fallback to notification if chat command not available
+          vscode.window.showInformationMessage(
+            'Payment successful! Your Hopper Pro license is now active.'
           );
         }
       }
