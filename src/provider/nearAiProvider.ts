@@ -29,7 +29,7 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
     if (!this.client) {
       const apiKey = await this.context.secrets.get(NEAR_AI_API_KEY_SECRET);
       if (!apiKey || !isValidApiKeyFormat(apiKey)) {
-        throw new Error('NEAR AI API key not configured. Use "SpecFlow: Manage NEAR AI Connection" command.');
+        throw new Error('NEAR AI API key not configured. Use "Hopper: Manage NEAR AI Connection" command.');
       }
       this.client = createNearAiClient(apiKey);
     }
@@ -62,7 +62,7 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
     const isConfigured = await this.isApiKeyConfigured();
     if (!isConfigured && !options.silent) {
       vscode.window.showWarningMessage(
-        'NEAR AI API key not configured. Use "SpecFlow: Manage NEAR AI Connection" to set up.'
+        'NEAR AI API key not configured. Use "Hopper: Manage NEAR AI Connection" to set up.'
       );
     }
 
@@ -118,7 +118,7 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
       );
 
       if (action === 'Set Up API Key') {
-        await vscode.commands.executeCommand('specflow.manageNearAi');
+        await vscode.commands.executeCommand('hopper.manageNearAi');
       } else if (action === 'Get API Key') {
         await vscode.env.openExternal(vscode.Uri.parse('https://cloud.near.ai/'));
       }
@@ -127,7 +127,7 @@ export class NearAiChatModelProvider implements vscode.LanguageModelChatProvider
       progress.report(new vscode.LanguageModelTextPart(
         '⚠️ **NEAR AI API key not configured.**\n\n' +
         'To use NEAR AI models:\n' +
-        '1. Run command: `SpecFlow: Manage NEAR AI Connection`\n' +
+        '1. Run command: `Hopper: Manage NEAR AI Connection`\n' +
         '2. Or get an API key at [cloud.near.ai](https://cloud.near.ai/)\n\n' +
         '_After setting up your API key, try your request again._'
       ));

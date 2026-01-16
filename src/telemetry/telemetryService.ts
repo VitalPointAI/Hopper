@@ -8,17 +8,17 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 
 // Storage key for install ID
-const INSTALL_ID_KEY = 'specflow.installId';
+const INSTALL_ID_KEY = 'hopper.installId';
 
-// Default API URL - matches package.json specflow.licenseApiUrl default
-const DEFAULT_API_URL = 'https://specflow-license-api.vitalpointai.workers.dev';
+// Default API URL - matches package.json hopper.licenseApiUrl default
+const DEFAULT_API_URL = 'https://hopper-license-api.vitalpointai.workers.dev';
 
 /**
  * Get the API URL from VSCode configuration or use default
  * Uses same setting as phaseGate.ts for consistency
  */
 function getApiUrl(): string {
-  const config = vscode.workspace.getConfiguration('specflow');
+  const config = vscode.workspace.getConfiguration('hopper');
   return config.get<string>('licenseApiUrl') ?? DEFAULT_API_URL;
 }
 
@@ -69,7 +69,7 @@ function getMachineId(): string {
  * Get extension version from package.json
  */
 function getExtensionVersion(): string {
-  const ext = vscode.extensions.getExtension('vitalpoint.specflow');
+  const ext = vscode.extensions.getExtension('vitalpoint.hopper');
   return ext?.packageJSON?.version || 'unknown';
 }
 
@@ -107,7 +107,7 @@ async function sendTelemetryEvent(event: TelemetryEvent): Promise<boolean> {
  */
 export async function trackActivation(context: vscode.ExtensionContext): Promise<void> {
   const installId = await getInstallId(context);
-  const isFirstRun = !context.globalState.get<boolean>('specflow.hasActivatedBefore');
+  const isFirstRun = !context.globalState.get<boolean>('hopper.hasActivatedBefore');
 
   const event: TelemetryEvent = {
     event: isFirstRun ? 'install' : 'activate',
@@ -121,7 +121,7 @@ export async function trackActivation(context: vscode.ExtensionContext): Promise
   await sendTelemetryEvent(event);
 
   if (isFirstRun) {
-    await context.globalState.update('specflow.hasActivatedBefore', true);
+    await context.globalState.update('hopper.hasActivatedBefore', true);
   }
 }
 

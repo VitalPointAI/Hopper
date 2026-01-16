@@ -43,7 +43,7 @@ async function callViewFunction<T>(
 ): Promise<T | null> {
   const requestBody = {
     jsonrpc: '2.0',
-    id: 'specflow',
+    id: 'hopper',
     method: 'query',
     params: {
       request_type: 'call_function',

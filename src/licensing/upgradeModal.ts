@@ -11,7 +11,7 @@ import type { AuthSession } from './types';
  */
 export class UpgradeModalPanel {
   public static currentPanel: UpgradeModalPanel | undefined;
-  private static readonly viewType = 'specflowUpgrade';
+  private static readonly viewType = 'hopperUpgrade';
 
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
@@ -98,7 +98,7 @@ export class UpgradeModalPanel {
     // Otherwise, create a new panel
     const panel = vscode.window.createWebviewPanel(
       UpgradeModalPanel.viewType,
-      'Upgrade to SpecFlow Pro',
+      'Upgrade to Hopper Pro',
       column || vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -136,8 +136,8 @@ export class UpgradeModalPanel {
       return;
     }
 
-    const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const config = vscode.workspace.getConfiguration('hopper');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://hopper-license-api.vitalpointai.workers.dev';
 
     try {
       vscode.window.showInformationMessage('Starting Stripe checkout...');
@@ -183,8 +183,8 @@ export class UpgradeModalPanel {
    * Handle crypto checkout button click
    */
   private async handleCryptoCheckout(): Promise<void> {
-    const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const config = vscode.workspace.getConfiguration('hopper');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://hopper-license-api.vitalpointai.workers.dev';
 
     try {
       vscode.window.showInformationMessage('Opening crypto payment...');
@@ -270,7 +270,7 @@ export class UpgradeModalPanel {
 
     // For Stripe payments, show OAuth picker with payment flag
     // The browser handles the entire flow (OAuth -> Stripe checkout -> success)
-    vscode.commands.executeCommand('specflow.startOAuthForPayment');
+    vscode.commands.executeCommand('hopper.startOAuthForPayment');
     this.dispose();
   }
 
@@ -311,7 +311,7 @@ export class UpgradeModalPanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
-  <title>Upgrade to SpecFlow Pro</title>
+  <title>Upgrade to Hopper Pro</title>
   <style>
     * {
       box-sizing: border-box;
@@ -528,8 +528,8 @@ export class UpgradeModalPanel {
 
   <div class="container">
     <div class="header">
-      <h1>Upgrade to SpecFlow Pro</h1>
-      <p>Unlock unlimited phases and the full SpecFlow workflow</p>
+      <h1>Upgrade to Hopper Pro</h1>
+      <p>Unlock unlimited phases and the full Hopper workflow</p>
     </div>
 
 ${isAuthenticated ? `    <div class="account-info">
@@ -551,7 +551,7 @@ ${isAuthenticated ? `    <div class="account-info">
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
-            <span>Full SpecFlow workflow</span>
+            <span>Full Hopper workflow</span>
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
@@ -583,7 +583,7 @@ ${isAuthenticated ? `    <div class="account-info">
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
-            <span>Full SpecFlow workflow</span>
+            <span>Full Hopper workflow</span>
           </div>
           <div class="feature">
             <span class="feature-icon">&#10003;</span>
@@ -601,7 +601,7 @@ ${isAuthenticated ? `    <div class="account-info">
     </div>
 
     <div class="footer">
-      <p>Secure payment processing. <a href="https://specflow.dev/terms">Terms of Service</a> | <a href="https://specflow.dev/privacy">Privacy Policy</a></p>
+      <p>Secure payment processing. <a href="https://hopper.dev/terms">Terms of Service</a> | <a href="https://hopper.dev/privacy">Privacy Policy</a></p>
     </div>
   </div>
 

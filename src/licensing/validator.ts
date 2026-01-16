@@ -81,7 +81,7 @@ export class LicenseValidator {
    * Load configuration from VSCode settings
    */
   private loadConfig(): LicenseConfig {
-    const config = vscode.workspace.getConfiguration('specflow');
+    const config = vscode.workspace.getConfiguration('hopper');
     const contractId = config.get<string>('license.contractId')
       ?? DEFAULT_LICENSE_CONFIG.contractId!;
     const network = config.get<string>('license.nearNetwork') ?? 'mainnet';
@@ -165,8 +165,8 @@ export class LicenseValidator {
    * Check license on API (for OAuth users)
    */
   private async checkLicenseOnApi(session: AuthSession): Promise<LicenseStatus> {
-    const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const config = vscode.workspace.getConfiguration('hopper');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://hopper-license-api.vitalpointai.workers.dev';
 
     // Check cache first
     const cached = this.licenseCache.get(session.userId);

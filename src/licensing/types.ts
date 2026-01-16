@@ -59,7 +59,7 @@ export interface LicenseConfig {
  * Default configuration values
  */
 export const DEFAULT_LICENSE_CONFIG: Partial<LicenseConfig> = {
-  contractId: 'license.specflow.near',
+  contractId: 'license.hopper.near',
   cacheTtlMs: 3600000, // 1 hour
 };
 

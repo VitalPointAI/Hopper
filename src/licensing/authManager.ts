@@ -14,8 +14,8 @@ interface SigningChallenge {
   message: string;
 }
 
-const SESSION_STORAGE_KEY = 'specflow.authSession';
-const CHALLENGE_STORAGE_KEY = 'specflow.pendingChallenge';
+const SESSION_STORAGE_KEY = 'hopper.authSession';
+const CHALLENGE_STORAGE_KEY = 'hopper.pendingChallenge';
 
 /**
  * Unified authentication manager
@@ -144,12 +144,12 @@ export class AuthManager {
    * @param options.payment - If 'stripe', redirect to Stripe checkout after auth instead of VSCode
    */
   async startOAuth(provider: 'google' | 'github', options?: { payment?: 'stripe' }): Promise<void> {
-    const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const config = vscode.workspace.getConfiguration('hopper');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://hopper-license-api.vitalpointai.workers.dev';
 
     // Build OAuth URL - callback is handled by Worker
     const oauthUrl = new URL(`${apiUrl}/auth/oauth/${provider}`);
-    oauthUrl.searchParams.set('callback', 'vscode://vitalpointai.specflow/auth-callback');
+    oauthUrl.searchParams.set('callback', 'vscode://vitalpointai.hopper/auth-callback');
 
     // If payment flow, tell OAuth to redirect to checkout after auth
     if (options?.payment === 'stripe') {
@@ -174,14 +174,14 @@ export class AuthManager {
    * Opens a browser window with wallet selection (NEAR, Ethereum, Solana, etc.)
    */
   async startWalletAuth(): Promise<void> {
-    const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const config = vscode.workspace.getConfiguration('hopper');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://hopper-license-api.vitalpointai.workers.dev';
     const network = config.get<string>('license.nearNetwork') ?? 'mainnet';
 
     // Build wallet connection URL - opens multi-chain wallet page
     const walletUrl = new URL(`${apiUrl}/auth/wallet`);
     walletUrl.searchParams.set('network', network);
-    walletUrl.searchParams.set('callback', 'vscode://vitalpointai.specflow/auth-callback');
+    walletUrl.searchParams.set('callback', 'vscode://vitalpointai.hopper/auth-callback');
 
     vscode.window.showInformationMessage('Opening wallet connection page...');
     await vscode.env.openExternal(vscode.Uri.parse(walletUrl.toString()));
@@ -196,8 +196,8 @@ export class AuthManager {
    * @deprecated Use startWalletAuth() for multi-chain support
    */
   async startAuth(options?: { payment?: 'crypto' }): Promise<void> {
-    const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const config = vscode.workspace.getConfiguration('hopper');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://hopper-license-api.vitalpointai.workers.dev';
     const network = config.get<string>('license.nearNetwork') ?? 'mainnet';
 
     // Generate challenge
@@ -213,7 +213,7 @@ export class AuthManager {
     signingUrl.searchParams.set('timestamp', challenge.timestamp.toString());
     signingUrl.searchParams.set('message', challenge.message);
     signingUrl.searchParams.set('network', network);
-    signingUrl.searchParams.set('callback', 'vscode://vitalpointai.specflow/auth-callback');
+    signingUrl.searchParams.set('callback', 'vscode://vitalpointai.hopper/auth-callback');
 
     // If payment flow, tell sign page to handle checkout after auth
     if (options?.payment === 'crypto') {
@@ -230,7 +230,7 @@ export class AuthManager {
   private generateChallenge(): SigningChallenge {
     const nonce = crypto.randomBytes(32).toString('hex');
     const timestamp = Date.now();
-    const message = `Sign this message to authenticate with SpecFlow.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
+    const message = `Sign this message to authenticate with Hopper.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
 
     return { nonce, timestamp, message };
   }
@@ -244,8 +244,8 @@ export class AuthManager {
    * @param publicKey - Public key used for signing
    */
   async handleCallback(accountId: string, signature: string, publicKey: string): Promise<boolean> {
-    const config = vscode.workspace.getConfiguration('specflow');
-    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://specflow-license-api.vitalpointai.workers.dev';
+    const config = vscode.workspace.getConfiguration('hopper');
+    const apiUrl = config.get<string>('licenseApiUrl') ?? 'https://hopper-license-api.vitalpointai.workers.dev';
 
     // Retrieve stored challenge
     const storedChallenge = this.context.globalState.get<string>(CHALLENGE_STORAGE_KEY);

@@ -42,7 +42,7 @@ export async function checkPhaseAccess(
     }
 
     const action = await vscode.window.showWarningMessage(
-      'SpecFlow Pro requires wallet authentication to verify your license.',
+      'Hopper Pro requires wallet authentication to verify your license.',
       'Connect Wallet',
       'Learn More'
     );
@@ -50,7 +50,7 @@ export async function checkPhaseAccess(
     if (action === 'Connect Wallet') {
       await validator.startAuth();
     } else if (action === 'Learn More') {
-      await vscode.env.openExternal(vscode.Uri.parse('https://specflow.dev/pro'));
+      await vscode.env.openExternal(vscode.Uri.parse('https://hopper.dev/pro'));
     }
 
     return false;
@@ -88,7 +88,7 @@ export async function checkPhaseAccess(
         // In quiet mode, just return false without showing dialogs
         if (!options?.quiet) {
           vscode.window.showWarningMessage(
-            'Your SpecFlow Pro license has expired. Please renew to continue using Phase 2+ features.'
+            'Your Hopper Pro license has expired. Please renew to continue using Phase 2+ features.'
           );
           UpgradeModalPanel.show(context, authSession);
         }
