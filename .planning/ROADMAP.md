@@ -142,7 +142,7 @@ Plans:
 
 Plans:
 - [x] 05.1-01: Phase management (/add-phase, /insert-phase, /remove-phase)
-- [ ] 05.1-02: Pre-planning commands (/research-phase, /discuss-phase, /list-phase-assumptions)
+- [x] 05.1-02: Pre-planning commands (/research-phase, /discuss-phase, /list-phase-assumptions)
 - [ ] 05.1-03: UAT workflow (/verify-work, /plan-fix, /resume-task)
 - [ ] 05.1-04: Milestone management (/new-milestone, /complete-milestone, /discuss-milestone)
 - [ ] 05.1-05: Codebase mapping (/map-codebase) and parity verification
@@ -163,4 +163,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
-| 5.1 GSD Feature Parity | 1/5 | In progress | - |
+| 5.1 GSD Feature Parity | 2/5 | In progress | - |
