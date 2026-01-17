@@ -269,9 +269,12 @@ export async function handleRemovePhase(ctx: CommandContext): Promise<IHopperRes
     return { metadata: { lastCommand: 'remove-phase' } };
   }
 
-  // Parse phase number from prompt
+  // Parse phase number from prompt (may include --confirm flag)
   const promptText = request.prompt.trim();
-  if (!promptText) {
+  const hasConfirmFlag = promptText.includes('--confirm');
+  const cleanPrompt = promptText.replace('--confirm', '').trim();
+
+  if (!cleanPrompt) {
     stream.markdown('## Usage\n\n');
     stream.markdown('**`/remove-phase <phase-number>`**\n\n');
     stream.markdown('Remove a phase from your roadmap.\n\n');
@@ -286,7 +289,7 @@ export async function handleRemovePhase(ctx: CommandContext): Promise<IHopperRes
   }
 
   // Validate phase number format
-  const phaseNum = parseFloat(promptText);
+  const phaseNum = parseFloat(cleanPrompt);
   if (isNaN(phaseNum) || phaseNum < 1) {
     stream.markdown('## Invalid Phase Number\n\n');
     stream.markdown(`"${promptText}" is not a valid phase number.\n\n`);
@@ -334,17 +337,22 @@ export async function handleRemovePhase(ctx: CommandContext): Promise<IHopperRes
   const dependentPhases = findDependentPhases(phases, phaseNum);
   const isIntegerPhase = Number.isInteger(phaseNum);
 
-  if (isIntegerPhase && dependentPhases.length > 0) {
+  if (isIntegerPhase && dependentPhases.length > 0 && !hasConfirmFlag) {
+    // Show warning and require confirmation
     stream.markdown('## Warning: Dependent Phases Exist\n\n');
     stream.markdown(`Phase ${phaseNum} (${targetPhase.name}) has dependent phases:\n\n`);
     for (const dep of dependentPhases) {
       stream.markdown(`- Phase ${dep.number}: ${dep.name}\n`);
     }
     stream.markdown('\n');
-    stream.markdown('**What will happen:**\n');
+    stream.markdown('**What will happen if you proceed:**\n');
     stream.markdown(`- Phase ${phaseNum} will be removed\n`);
     stream.markdown('- Subsequent integer phases will be renumbered\n');
     stream.markdown('- Decimal phases between them will remain with their numbers\n\n');
+    stream.markdown('**To confirm removal**, type:\n\n');
+    stream.markdown(`\`/remove-phase ${phaseNum} --confirm\`\n\n`);
+    stream.markdown('Or use `/add-phase` to add new phases without affecting existing ones.\n');
+    return { metadata: { lastCommand: 'remove-phase' } };
   }
 
   stream.progress('Removing phase...');
