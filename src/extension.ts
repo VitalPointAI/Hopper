@@ -201,6 +201,7 @@ export function activate(context: vscode.ExtensionContext): void {
     { id: 'hopper.chat-participant.progress', command: '/progress' },
     { id: 'hopper.chat-participant.pause-work', command: '/pause-work' },
     { id: 'hopper.chat-participant.resume-work', command: '/resume-work' },
+    { id: 'hopper.chat-participant.consider-issues', command: '/consider-issues' },
     { id: 'hopper.chat-participant.help', command: '/help' }
   ];
 
@@ -222,6 +223,56 @@ export function activate(context: vscode.ExtensionContext): void {
     });
     context.subscriptions.push(disposable);
   }
+
+  // Register closeResolvedIssues command for consider-issues triage action
+  const closeIssuesCommand = vscode.commands.registerCommand(
+    'hopper.closeResolvedIssues',
+    async () => {
+      // Get stored analyses from globalState
+      const analyses = context.globalState.get<Array<{
+        issue: { id: string; description: string };
+        category: string;
+        reason: string;
+        evidence?: string;
+      }>>('hopper.issueAnalyses');
+
+      if (!analyses) {
+        vscode.window.showWarningMessage('No issue analyses found. Run /consider-issues first.');
+        return;
+      }
+
+      // Filter to resolved issues only
+      const resolvedAnalyses = analyses.filter(a => a.category === 'resolved');
+      if (resolvedAnalyses.length === 0) {
+        vscode.window.showInformationMessage('No resolved issues to close.');
+        return;
+      }
+
+      // Get workspace and planning directory
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder open.');
+        return;
+      }
+
+      const planningUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.planning');
+
+      // Import and call closeResolvedIssues from considerIssues module
+      const { closeResolvedIssues } = await import('./chat/commands/considerIssues');
+      const issueIds = resolvedAnalyses.map(a => a.issue.id);
+
+      const result = await closeResolvedIssues(planningUri, issueIds, analyses as Parameters<typeof closeResolvedIssues>[2]);
+
+      if (result.closed > 0) {
+        vscode.window.showInformationMessage(`Closed ${result.closed} resolved issue(s) in ISSUES.md`);
+        // Clear stored analyses
+        await context.globalState.update('hopper.issueAnalyses', undefined);
+      } else {
+        vscode.window.showWarningMessage(result.error || 'No issues were closed.');
+      }
+    }
+  );
+  context.subscriptions.push(closeIssuesCommand);
 
   // Register URI handler for auth callbacks (both OAuth and wallet)
   const uriHandler = vscode.window.registerUriHandler({

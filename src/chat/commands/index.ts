@@ -8,6 +8,7 @@ import { handleExecutePlan } from './executePlan';
 import { handleProgress } from './progress';
 import { handlePauseWork } from './pauseWork';
 import { handleResumeWork } from './resumeWork';
+import { handleConsiderIssues } from './considerIssues';
 
 /**
  * Command definitions with descriptions for help output
@@ -20,6 +21,7 @@ const COMMAND_DEFINITIONS = [
   { name: 'progress', description: 'Check project progress and route to next action' },
   { name: 'pause-work', description: 'Save work state for later resumption' },
   { name: 'resume-work', description: 'Resume work from previous session' },
+  { name: 'consider-issues', description: 'Review and triage deferred issues' },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -249,6 +251,7 @@ registry.set('execute-plan', handleExecutePlan);
 registry.set('progress', handleProgress);
 registry.set('pause-work', handlePauseWork);
 registry.set('resume-work', handleResumeWork);
+registry.set('consider-issues', handleConsiderIssues);
 
 /**
  * Get a command handler by name
