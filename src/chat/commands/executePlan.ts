@@ -15,6 +15,7 @@ import {
   SummaryConfig,
   TaskCommitInfo
 } from '../executor';
+import { clearHandoffAfterCompletion } from './resumeWork';
 
 /**
  * Execute a chat request with tool calling loop.
@@ -1153,6 +1154,11 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       }
     } else {
       stream.markdown(`*Summary generation failed: ${summaryResult.error}*\n\n`);
+    }
+
+    // Clean up any handoff file from paused session now that plan is complete
+    if (projectContext.planningUri) {
+      await clearHandoffAfterCompletion(projectContext.planningUri, phaseDir);
     }
   }
 

@@ -6,18 +6,6 @@
 
 ## Open Issues
 
-### UAT-003: .continue-here.md not deleted after resume
-
-**Discovered:** 2026-01-17
-**Phase/Plan:** 05-02
-**Severity:** Minor
-**Feature:** Handoff file lifecycle
-**Description:** After clicking "Continue from Here" or "Start Fresh" in /resume-work, the `.continue-here.md` file is not deleted. The code has a `clearHandoffAfterCompletion()` helper exported from resumeWork.ts, but it's not called by execute-plan after completion.
-**Expected:** Handoff file deleted after plan completes (per SUMMARY.md: "Handoff file will be deleted after the plan completes")
-**Actual:** File persists indefinitely
-**Note:** This is by-design - the helper exists but execute-plan integration is planned for later. Documenting for completeness.
-**Fix:** Call `clearHandoffAfterCompletion()` from execute-plan's completion path.
-
 ### UAT-004: "Start Fresh" and "Continue from Here" appear identical
 
 **Discovered:** 2026-01-17
@@ -38,6 +26,10 @@
 ### UAT-002: stream.button() buttons don't work for execute-plan, pause-work, resume-work
 **Resolved:** 2026-01-17 - Fixed during UAT session
 **Fix:** Added command wrappers to extension.ts chatParticipantCommands array
+
+### UAT-003: .continue-here.md not deleted after resume
+**Resolved:** 2026-01-17 - Fixed during consider-issues review
+**Fix:** Integrated `clearHandoffAfterCompletion()` call into executePlan.ts completion path
 
 ---
 
