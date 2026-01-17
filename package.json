@@ -54,6 +54,22 @@
             "description": "Resume work from previous session"
           },
           {
+            "name": "consider-issues",
+            "description": "Review and triage deferred issues"
+          },
+          {
+            "name": "add-phase",
+            "description": "Add a new phase to end of roadmap"
+          },
+          {
+            "name": "insert-phase",
+            "description": "Insert urgent phase between existing phases"
+          },
+          {
+            "name": "remove-phase",
+            "description": "Remove a phase from roadmap"
+          },
+          {
             "name": "status",
             "description": "Show current project status and phase"
           },
