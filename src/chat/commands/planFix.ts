@@ -336,11 +336,6 @@ Source: ${issuesInfo.phase}-${issuesInfo.plan.padStart(2, '0')}-ISSUES.md
 Priority: ${counts.Blocker} blocker, ${counts.Major} major, ${counts.Minor} minor
 </objective>
 
-<execution_context>
-~/.claude/get-shit-done/workflows/execute-phase.md
-~/.claude/get-shit-done/templates/summary.md
-</execution_context>
-
 <context>
 @.planning/STATE.md
 @.planning/ROADMAP.md
