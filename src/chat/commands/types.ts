@@ -22,6 +22,8 @@ export interface CommandContext {
   token: vscode.CancellationToken;
   licenseValidator: LicenseValidator;
   projectContext: ProjectContext;
+  /** Extension context for globalState access (execution state persistence) */
+  extensionContext: vscode.ExtensionContext;
 }
 
 /**

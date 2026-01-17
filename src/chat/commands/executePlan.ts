@@ -1,6 +1,13 @@
 import * as vscode from 'vscode';
 import { CommandContext, IHopperResult } from './types';
-import { parsePlanMd, ExecutionTask } from '../executor';
+import {
+  parsePlanMd,
+  ExecutionTask,
+  AutoExecutionTask,
+  CheckpointVerifyTask,
+  CheckpointDecisionTask,
+  ExecutionState
+} from '../executor';
 
 /**
  * Execute a chat request with tool calling loop.
@@ -109,9 +116,162 @@ async function executeWithTools(
 }
 
 /**
+ * Get execution state storage key for a plan
+ */
+function getStateKey(planPath: string): string {
+  return `hopper.executionState.${planPath}`;
+}
+
+/**
+ * Save execution state to extension globalState
+ */
+async function saveExecutionState(
+  context: vscode.ExtensionContext,
+  state: ExecutionState
+): Promise<void> {
+  const key = getStateKey(state.planPath);
+  await context.globalState.update(key, state);
+}
+
+/**
+ * Load execution state from extension globalState
+ */
+function loadExecutionState(
+  context: vscode.ExtensionContext,
+  planPath: string
+): ExecutionState | undefined {
+  const key = getStateKey(planPath);
+  return context.globalState.get<ExecutionState>(key);
+}
+
+/**
+ * Clear execution state from extension globalState
+ */
+async function clearExecutionState(
+  context: vscode.ExtensionContext,
+  planPath: string
+): Promise<void> {
+  const key = getStateKey(planPath);
+  await context.globalState.update(key, undefined);
+}
+
+/**
+ * Type guard to check if a task is an auto task
+ */
+function isAutoTask(task: ExecutionTask): task is AutoExecutionTask {
+  return task.type === 'auto';
+}
+
+/**
+ * Type guard to check if a task is a human-verify checkpoint
+ */
+function isCheckpointVerify(task: ExecutionTask): task is CheckpointVerifyTask {
+  return task.type === 'checkpoint:human-verify';
+}
+
+/**
+ * Type guard to check if a task is a decision checkpoint
+ */
+function isCheckpointDecision(task: ExecutionTask): task is CheckpointDecisionTask {
+  return task.type === 'checkpoint:decision';
+}
+
+/**
+ * Render checkpoint:human-verify task
+ */
+function renderCheckpointVerify(
+  task: CheckpointVerifyTask,
+  taskIndex: number,
+  totalTasks: number,
+  stream: vscode.ChatResponseStream,
+  planPath: string
+): void {
+  stream.markdown(`### Task ${taskIndex + 1}/${totalTasks}: Checkpoint - Verify Implementation\n\n`);
+  stream.markdown('---\n\n');
+  stream.markdown(`**What was built:** ${task.whatBuilt}\n\n`);
+
+  if (task.howToVerify.length > 0) {
+    stream.markdown('**Please verify:**\n');
+    for (let i = 0; i < task.howToVerify.length; i++) {
+      stream.markdown(`${i + 1}. ${task.howToVerify[i]}\n`);
+    }
+    stream.markdown('\n');
+  }
+
+  stream.markdown('---\n\n');
+
+  // Add approve button
+  stream.button({
+    command: 'hopper.chat-participant.execute-plan',
+    arguments: [planPath, 'approved'],
+    title: 'Approve'
+  });
+
+  stream.markdown(' ');
+
+  // Add report issue button
+  stream.button({
+    command: 'hopper.chat-participant.execute-plan',
+    arguments: [planPath, 'issue'],
+    title: 'Report Issue'
+  });
+
+  stream.markdown('\n\n');
+  stream.markdown(`*${task.resumeSignal}*\n`);
+}
+
+/**
+ * Render checkpoint:decision task
+ */
+function renderCheckpointDecision(
+  task: CheckpointDecisionTask,
+  taskIndex: number,
+  totalTasks: number,
+  stream: vscode.ChatResponseStream,
+  planPath: string
+): void {
+  stream.markdown(`### Task ${taskIndex + 1}/${totalTasks}: Checkpoint - Decision Required\n\n`);
+  stream.markdown('---\n\n');
+  stream.markdown(`**Decision:** ${task.decision}\n\n`);
+
+  if (task.context) {
+    stream.markdown(`**Context:** ${task.context}\n\n`);
+  }
+
+  if (task.options.length > 0) {
+    stream.markdown('**Options:**\n\n');
+    for (const option of task.options) {
+      stream.markdown(`**${option.id}: ${option.name}**\n`);
+      if (option.pros) {
+        stream.markdown(`- *Pros:* ${option.pros}\n`);
+      }
+      if (option.cons) {
+        stream.markdown(`- *Cons:* ${option.cons}\n`);
+      }
+      stream.markdown('\n');
+    }
+  }
+
+  stream.markdown('---\n\n');
+
+  // Add button for each option
+  for (const option of task.options) {
+    stream.button({
+      command: 'hopper.chat-participant.execute-plan',
+      arguments: [planPath, `decision:${option.id}`],
+      title: option.name
+    });
+    stream.markdown(' ');
+  }
+
+  stream.markdown('\n\n');
+  stream.markdown(`*${task.resumeSignal}*\n`);
+}
+
+/**
  * Build a prompt for executing a single task (agent mode)
  */
-function buildTaskPrompt(task: ExecutionTask, planContext: string, supportsTools: boolean, workspaceRoot: string): string {
+function buildTaskPrompt(task: AutoExecutionTask, planContext: string, supportsTools: boolean, workspaceRoot: string): string {
   const filesLine = task.files && task.files.length > 0
     ? `**Files to modify:** ${task.files.join(', ')}\n\n`
     : '';
@@ -549,11 +709,105 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   const results: { taskId: number; success: boolean; name: string; files?: string[] }[] = [];
 
   // Always enable agent mode - VSCode handles tool capability internally
-  // Passing tools: [] in request options enables built-in VSCode tools
   const usedAgentMode = true;
 
-  // Execute tasks sequentially
-  for (let i = 0; i < plan.tasks.length; i++) {
+  // Check for existing execution state (resuming from checkpoint)
+  const planPath = planUri.fsPath;
+  let existingState = loadExecutionState(ctx.extensionContext, planPath);
+  let startTaskIndex = 0;
+
+  // Parse resume signal from prompt if any (e.g., "approved", "decision:option-a")
+  const resumeMatch = promptText.match(/\s+(approved|issue|decision:\w+)$/i);
+  const resumeSignal = resumeMatch ? resumeMatch[1].toLowerCase() : null;
+
+  if (existingState && existingState.pausedAtCheckpoint) {
+    if (resumeSignal === 'approved') {
+      // Checkpoint approved - resume from next task
+      stream.markdown('**Checkpoint approved.** Resuming execution...\n\n');
+      startTaskIndex = existingState.currentTaskIndex + 1;
+
+      // Mark completed tasks
+      for (const taskId of existingState.completedTasks) {
+        const task = plan.tasks.find(t => t.id === taskId);
+        if (task) {
+          results.push({
+            taskId,
+            success: true,
+            name: task.name,
+            files: isAutoTask(task) ? task.files : undefined
+          });
+        }
+      }
+
+      // Clear the paused state
+      existingState.pausedAtCheckpoint = false;
+      existingState.checkpointType = undefined;
+      await saveExecutionState(ctx.extensionContext, existingState);
+
+    } else if (resumeSignal === 'issue') {
+      // Issue reported - pause and ask for details
+      stream.markdown('## Issue Reported\n\n');
+      stream.markdown('Please describe the issue you encountered:\n\n');
+      stream.markdown('Then run `/execute-plan` with `approved` when the issue is resolved.\n\n');
+
+      stream.button({
+        command: 'hopper.chat-participant.execute-plan',
+        arguments: [planPath, 'approved'],
+        title: 'Resume After Fix'
+      });
+
+      return { metadata: { lastCommand: 'execute-plan' } };
+
+    } else if (resumeSignal?.startsWith('decision:')) {
+      // Decision made - record and resume
+      const decisionId = resumeSignal.replace('decision:', '');
+      stream.markdown(`**Decision recorded:** ${decisionId}\n\n`);
+      stream.markdown('Resuming execution...\n\n');
+
+      // Record the decision
+      existingState.decisions[`task-${existingState.currentTaskIndex + 1}`] = decisionId;
+      startTaskIndex = existingState.currentTaskIndex + 1;
+
+      // Mark completed tasks
+      for (const taskId of existingState.completedTasks) {
+        const task = plan.tasks.find(t => t.id === taskId);
+        if (task) {
+          results.push({
+            taskId,
+            success: true,
+            name: task.name,
+            files: isAutoTask(task) ? task.files : undefined
+          });
+        }
+      }
+
+      // Clear the paused state
+      existingState.pausedAtCheckpoint = false;
+      existingState.checkpointType = undefined;
+      await saveExecutionState(ctx.extensionContext, existingState);
+
+    } else {
+      // No resume signal but we have paused state - show where we paused
+      stream.markdown('## Execution Paused\n\n');
+      stream.markdown(`Paused at task ${existingState.currentTaskIndex + 1} (checkpoint).\n\n`);
+      stream.markdown('**Options:**\n');
+      stream.markdown('- Click **Approve** to continue\n');
+      stream.markdown('- Click **Report Issue** to describe a problem\n\n');
+
+      // Re-render the checkpoint
+      const pausedTask = plan.tasks[existingState.currentTaskIndex];
+      if (isCheckpointVerify(pausedTask)) {
+        renderCheckpointVerify(pausedTask, existingState.currentTaskIndex, plan.tasks.length, stream, planPath);
+      } else if (isCheckpointDecision(pausedTask)) {
+        renderCheckpointDecision(pausedTask, existingState.currentTaskIndex, plan.tasks.length, stream, planPath);
+      }
+
+      return { metadata: { lastCommand: 'execute-plan' } };
+    }
+  }
+
+  // Execute tasks sequentially starting from startTaskIndex
+  for (let i = startTaskIndex; i < plan.tasks.length; i++) {
     // Check for cancellation before each task
     if (token.isCancellationRequested) {
       stream.markdown('\n\n---\n\n');
@@ -570,73 +824,112 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     const task = plan.tasks[i];
     stream.progress(`Executing task ${i + 1} of ${plan.tasks.length}...`);
 
-    stream.markdown(`### Task ${task.id}/${plan.tasks.length}: ${task.name}\n\n`);
+    // Handle checkpoint tasks
+    if (isCheckpointVerify(task)) {
+      // Save state and pause at human-verify checkpoint
+      const state: ExecutionState = {
+        planPath,
+        currentTaskIndex: i,
+        completedTasks: results.filter(r => r.success).map(r => r.taskId),
+        decisions: existingState?.decisions || {},
+        pausedAtCheckpoint: true,
+        checkpointType: 'human-verify',
+        savedAt: Date.now()
+      };
+      await saveExecutionState(ctx.extensionContext, state);
 
-    if (task.files && task.files.length > 0) {
-      stream.markdown(`**Files:** ${task.files.join(', ')}\n\n`);
+      // Render checkpoint UI
+      renderCheckpointVerify(task, i, plan.tasks.length, stream, planPath);
+
+      return { metadata: { lastCommand: 'execute-plan' } };
     }
 
-    try {
-      // Build prompt for this task
-      const prompt = buildTaskPrompt(task, planContext, usedAgentMode, workspaceUri.fsPath);
+    if (isCheckpointDecision(task)) {
+      // Save state and pause at decision checkpoint
+      const state: ExecutionState = {
+        planPath,
+        currentTaskIndex: i,
+        completedTasks: results.filter(r => r.success).map(r => r.taskId),
+        decisions: existingState?.decisions || {},
+        pausedAtCheckpoint: true,
+        checkpointType: 'decision',
+        savedAt: Date.now()
+      };
+      await saveExecutionState(ctx.extensionContext, state);
 
-      // Get available tools from vscode.lm.tools
-      // Filter to workspace-relevant tools (file editing, terminal, etc.)
-      const tools = vscode.lm.tools.filter(tool =>
-        tool.tags.includes('workspace') ||
-        tool.tags.includes('vscode') ||
-        !tool.tags.length // Include tools without tags
-      );
+      // Render decision UI
+      renderCheckpointDecision(task, i, plan.tasks.length, stream, planPath);
 
-      // Select a model for execution
-      const models = await vscode.lm.selectChatModels({
-        vendor: 'copilot',
-        family: 'gpt-4o'
-      });
+      return { metadata: { lastCommand: 'execute-plan' } };
+    }
 
-      if (models.length === 0) {
-        throw new Error('No language model available. Please ensure GitHub Copilot is active.');
+    // Handle auto tasks
+    if (isAutoTask(task)) {
+      stream.markdown(`### Task ${task.id}/${plan.tasks.length}: ${task.name}\n\n`);
+
+      if (task.files && task.files.length > 0) {
+        stream.markdown(`**Files:** ${task.files.join(', ')}\n\n`);
       }
-      const model = models[0];
 
-      // Build messages for the model
-      const messages = [
-        vscode.LanguageModelChatMessage.User(prompt)
-      ];
+      try {
+        // Build prompt for this task
+        const prompt = buildTaskPrompt(task, planContext, usedAgentMode, workspaceUri.fsPath);
 
-      // Execute with manual tool orchestration
-      // Pass toolInvocationToken from chat request for proper UI integration and file operations
-      stream.markdown('**Agent executing...**\n\n');
+        // Get available tools from vscode.lm.tools
+        const tools = vscode.lm.tools.filter(tool =>
+          tool.tags.includes('workspace') ||
+          tool.tags.includes('vscode') ||
+          !tool.tags.length
+        );
 
-      await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken);
-
-      stream.markdown('\n\n');
-
-      // Show completion status - always agent mode
-      stream.markdown(`**Status:** Executed via agent mode\n\n`);
-
-      stream.markdown('---\n\n');
-
-      // Track result with files info
-      results.push({ taskId: task.id, success: true, name: task.name, files: task.files });
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      stream.markdown(`**Error executing task:** ${errorMessage}\n\n`);
-
-      if (error instanceof vscode.LanguageModelError) {
-        stream.markdown('Model error occurred. Try again or check your model connection.\n\n');
-        stream.button({
-          command: 'hopper.chat-participant.execute-plan',
-          title: 'Retry'
+        // Select a model for execution
+        const models = await vscode.lm.selectChatModels({
+          vendor: 'copilot',
+          family: 'gpt-4o'
         });
+
+        if (models.length === 0) {
+          throw new Error('No language model available. Please ensure GitHub Copilot is active.');
+        }
+        const model = models[0];
+
+        // Build messages for the model
+        const messages = [
+          vscode.LanguageModelChatMessage.User(prompt)
+        ];
+
+        // Execute with manual tool orchestration
+        stream.markdown('**Agent executing...**\n\n');
+
+        await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken);
+
+        stream.markdown('\n\n');
+        stream.markdown(`**Status:** Executed via agent mode\n\n`);
+        stream.markdown('---\n\n');
+
+        // Track result with files info
+        results.push({ taskId: task.id, success: true, name: task.name, files: task.files });
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        stream.markdown(`**Error executing task:** ${errorMessage}\n\n`);
+
+        if (error instanceof vscode.LanguageModelError) {
+          stream.markdown('Model error occurred. Try again or check your model connection.\n\n');
+          stream.button({
+            command: 'hopper.chat-participant.execute-plan',
+            title: 'Retry'
+          });
+        }
+
+        stream.markdown('---\n\n');
+        results.push({ taskId: task.id, success: false, name: task.name });
       }
-
-      stream.markdown('---\n\n');
-
-      results.push({ taskId: task.id, success: false, name: task.name });
     }
   }
+
+  // Clear execution state on completion
+  await clearExecutionState(ctx.extensionContext, planPath);
 
   // Show completion summary
   const successCount = results.filter(r => r.success).length;
@@ -669,7 +962,6 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   stream.markdown('\n### Next Steps\n\n');
 
   if (usedAgentMode) {
-    // Agent mode: files were modified, focus on review
     stream.markdown('1. **Review changes** made by the agent\n');
     stream.button({
       command: 'git.viewChanges',
@@ -677,7 +969,6 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     });
     stream.markdown('\n2. **Run verification** from the plan:\n');
   } else {
-    // Manual mode: user needs to apply changes
     stream.markdown('1. **Apply the changes** shown above to your codebase\n');
     stream.markdown('2. **Run verification** from the plan:\n');
   }

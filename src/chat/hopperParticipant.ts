@@ -49,7 +49,8 @@ export function createHopperParticipant(
           stream,
           token,
           licenseValidator,
-          projectContext
+          projectContext,
+          extensionContext: context
         };
 
         return commandHandler(ctx);
