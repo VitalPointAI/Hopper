@@ -429,7 +429,8 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   const planContext = contextParts.join('');
 
   // Track execution results
-  const results: { taskId: number; success: boolean; name: string }[] = [];
+  const results: { taskId: number; success: boolean; name: string; files?: string[] }[] = [];
+  let usedAgentMode = false;
 
   // Execute tasks sequentially
   for (let i = 0; i < plan.tasks.length; i++) {
@@ -504,7 +505,11 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       stream.markdown('---\n\n');
 
-      results.push({ taskId: task.id, success: true, name: task.name });
+      // Track result with files info
+      if (supportsTools) {
+        usedAgentMode = true;
+      }
+      results.push({ taskId: task.id, success: true, name: task.name, files: task.files });
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -530,6 +535,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   const skippedCount = plan.tasks.length - results.length;
 
   stream.markdown('## Execution Complete\n\n');
+  stream.markdown(`**Mode:** ${usedAgentMode ? 'Agent (file modifications)' : 'Suggestions (manual apply)'}\n`);
   stream.markdown(`**Completed:** ${successCount}/${plan.tasks.length} tasks\n`);
   if (failedCount > 0) {
     stream.markdown(`**Failed:** ${failedCount} tasks\n`);
@@ -539,24 +545,49 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   }
   stream.markdown('\n');
 
-  // Show task summary
+  // Show task summary with files
+  stream.markdown('### Task Summary\n\n');
   for (const result of results) {
-    const icon = result.success ? 'Pass' : 'Fail';
-    stream.markdown(`- [${icon}] Task ${result.taskId}: ${result.name}\n`);
+    const icon = result.success ? '✓' : '✗';
+    stream.markdown(`${icon} **Task ${result.taskId}:** ${result.name}\n`);
+    if (result.files && result.files.length > 0) {
+      for (const file of result.files) {
+        stream.markdown(`   - \`${file}\`\n`);
+      }
+    }
   }
 
   stream.markdown('\n### Next Steps\n\n');
-  stream.markdown('1. Review the implementation suggestions above\n');
-  stream.markdown('2. Apply the changes to your codebase\n');
-  stream.markdown('3. Run verification checks from the plan\n');
+
+  if (usedAgentMode) {
+    // Agent mode: files were modified, focus on review
+    stream.markdown('1. **Review changes** made by the agent\n');
+    stream.button({
+      command: 'git.viewChanges',
+      title: 'View Git Changes'
+    });
+    stream.markdown('\n2. **Run verification** from the plan:\n');
+  } else {
+    // Manual mode: user needs to apply changes
+    stream.markdown('1. **Apply the changes** shown above to your codebase\n');
+    stream.markdown('2. **Run verification** from the plan:\n');
+  }
+
   if (plan.verification.length > 0) {
-    stream.markdown('\n**Verification:**\n');
     for (const v of plan.verification) {
-      stream.markdown(`- [ ] ${v}\n`);
+      stream.markdown(`   - [ ] ${v}\n`);
     }
   }
-  stream.markdown('\n4. Use `/progress` to update project state\n\n');
 
+  stream.markdown('\n');
+  if (usedAgentMode) {
+    stream.markdown('3. **Commit** if verification passes\n');
+  } else {
+    stream.markdown('3. **Test** your changes\n');
+    stream.markdown('4. **Commit** when ready\n');
+  }
+
+  stream.markdown('\n');
   stream.reference(planUri);
 
   return {
