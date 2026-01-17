@@ -11,13 +11,15 @@ import { parsePlanMd, ExecutionTask } from '../executor';
  * @param tools Available tools for the model to use
  * @param stream The chat response stream to write to
  * @param token Cancellation token
+ * @param toolInvocationToken Token from chat request for proper UI integration (required for file operations)
  */
 async function executeWithTools(
   model: vscode.LanguageModelChat,
   messages: vscode.LanguageModelChatMessage[],
   tools: vscode.LanguageModelChatTool[],
   stream: vscode.ChatResponseStream,
-  token: vscode.CancellationToken
+  token: vscode.CancellationToken,
+  toolInvocationToken?: vscode.ChatParticipantToolToken
 ): Promise<void> {
   const MAX_ITERATIONS = 10;
   let iteration = 0;
@@ -46,10 +48,14 @@ async function executeWithTools(
         stream.markdown(`\n\n*Executing tool: ${part.name}...*\n\n`);
 
         try {
-          // Invoke the tool
+          // Invoke the tool with toolInvocationToken for proper chat UI integration
+          // The token is required for file operations like copilot_createFile
           const result = await vscode.lm.invokeTool(
             part.name,
-            { input: part.input },
+            {
+              input: part.input,
+              toolInvocationToken
+            },
             token
           );
 
@@ -583,9 +589,10 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       ];
 
       // Execute with manual tool orchestration
+      // Pass toolInvocationToken from chat request for proper UI integration and file operations
       stream.markdown('**Agent executing...**\n\n');
 
-      await executeWithTools(model, messages, tools, stream, token);
+      await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken);
 
       stream.markdown('\n\n');
 
