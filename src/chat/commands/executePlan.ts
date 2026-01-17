@@ -6,7 +6,11 @@ import {
   AutoExecutionTask,
   CheckpointVerifyTask,
   CheckpointDecisionTask,
-  ExecutionState
+  ExecutionState,
+  checkGitRepo,
+  stageFiles,
+  commit,
+  generateCommitMessage
 } from '../executor';
 
 /**
@@ -706,10 +710,23 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   const planContext = contextParts.join('');
 
   // Track execution results
-  const results: { taskId: number; success: boolean; name: string; files?: string[] }[] = [];
+  const results: { taskId: number; success: boolean; name: string; files?: string[]; commitHash?: string }[] = [];
+
+  // Track commit hashes for all tasks
+  const taskCommits: { taskId: number; hash: string; message: string }[] = [];
 
   // Always enable agent mode - VSCode handles tool capability internally
   const usedAgentMode = true;
+
+  // Check if workspace is a git repository
+  const isGitRepo = await checkGitRepo(workspaceUri);
+  const autoCommitEnabled = vscode.workspace.getConfiguration('hopper').get('autoCommit', true);
+
+  if (isGitRepo) {
+    stream.markdown(`**Git integration:** Enabled${autoCommitEnabled ? ' (auto-commit)' : ''}\n\n`);
+  } else {
+    stream.markdown('**Git integration:** Not available (not a git repository)\n\n');
+  }
 
   // Check for existing execution state (resuming from checkpoint)
   const planPath = planUri.fsPath;
@@ -913,11 +930,40 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
           stream.markdown(`**Done when:** ${task.done}\n\n`);
         }
 
-        stream.markdown(`**Status:** ✓ Task ${task.id}/${plan.tasks.length} completed\n\n`);
+        stream.markdown(`**Status:** Task ${task.id}/${plan.tasks.length} completed\n\n`);
+
+        // Auto-commit after task completion if git is available and enabled
+        let commitHash: string | undefined;
+        if (isGitRepo && autoCommitEnabled && task.files && task.files.length > 0) {
+          try {
+            // Stage the files that were modified by this task
+            await stageFiles(workspaceUri, task.files);
+
+            // Generate commit message
+            const commitMessage = generateCommitMessage(plan.phase, plan.planNumber, task.name, task.action);
+
+            // Create commit
+            const commitResult = await commit(workspaceUri, commitMessage);
+
+            if (commitResult.success && commitResult.hash) {
+              commitHash = commitResult.hash;
+              taskCommits.push({ taskId: task.id, hash: commitResult.hash, message: commitMessage });
+              stream.markdown(`**Committed:** \`${commitResult.hash}\` - ${commitMessage}\n\n`);
+            } else if (commitResult.error === 'Nothing to commit') {
+              stream.markdown('*No changes to commit for this task.*\n\n');
+            } else if (commitResult.error) {
+              stream.markdown(`*Commit skipped: ${commitResult.error}*\n\n`);
+            }
+          } catch (gitError) {
+            const gitErrorMsg = gitError instanceof Error ? gitError.message : String(gitError);
+            stream.markdown(`*Git commit failed: ${gitErrorMsg}*\n\n`);
+          }
+        }
+
         stream.markdown('---\n\n');
 
-        // Track result with files info
-        results.push({ taskId: task.id, success: true, name: task.name, files: task.files });
+        // Track result with files info and commit hash
+        results.push({ taskId: task.id, success: true, name: task.name, files: task.files, commitHash });
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -971,25 +1017,29 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   stream.markdown('\n');
   stream.markdown(`**Files touched:** ${allFiles.size}\n\n`);
 
-  // Show task summary with status icons
+  // Show task summary with status icons and commit hashes
   stream.markdown('### Task Summary\n\n');
   for (const task of plan.tasks) {
     const result = results.find(r => r.taskId === task.id);
     let icon: string;
     let status: string;
+    let commitInfo = '';
 
     if (!result) {
-      icon = '○';
+      icon = '-';
       status = 'not executed';
     } else if (result.success) {
-      icon = '✓';
+      icon = '+';
       status = 'completed';
+      if (result.commitHash) {
+        commitInfo = ` [\`${result.commitHash}\`]`;
+      }
     } else {
-      icon = '✗';
+      icon = 'x';
       status = 'failed';
     }
 
-    stream.markdown(`${icon} **Task ${task.id}:** ${task.name} *(${status})*\n`);
+    stream.markdown(`${icon} **Task ${task.id}:** ${task.name} *(${status})*${commitInfo}\n`);
   }
   stream.markdown('\n');
 
