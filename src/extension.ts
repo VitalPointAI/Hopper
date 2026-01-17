@@ -7,6 +7,7 @@ import { UpgradeModalPanel } from './licensing/upgradeModal';
 import { trackActivation } from './telemetry/telemetryService';
 import { createHopperParticipant } from './chat/hopperParticipant';
 import { AuthType, AuthProvider } from './licensing/types';
+import { registerFileTools } from './tools/fileTools';
 
 // Export license validator for use by chat participant
 let licenseValidator: LicenseValidator | undefined;
@@ -33,6 +34,9 @@ export function activate(context: vscode.ExtensionContext): void {
     provider
   );
   context.subscriptions.push(providerDisposable);
+
+  // Register custom file tools (bypasses buggy copilot_createFile)
+  registerFileTools(context);
 
   // Create and register the @hopper chat participant
   try {

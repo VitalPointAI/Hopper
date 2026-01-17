@@ -63,6 +63,46 @@
         "managementCommand": "hopper.manageNearAi"
       }
     ],
+    "languageModelTools": [
+      {
+        "name": "hopper_createFile",
+        "displayName": "Hopper Create File",
+        "description": "Creates a file at the specified absolute path with the given content. Use this for creating new files in the workspace.",
+        "tags": ["workspace", "file"],
+        "modelDescription": "Creates a file at the specified absolute path with the given content. The filePath must be an absolute path. Use this tool when you need to create new files. Example: filePath='/home/user/project/src/file.ts', content='export const x = 1;'",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "The absolute path where the file should be created"
+            },
+            "content": {
+              "type": "string",
+              "description": "The content to write to the file"
+            }
+          },
+          "required": ["filePath", "content"]
+        }
+      },
+      {
+        "name": "hopper_createDirectory",
+        "displayName": "Hopper Create Directory",
+        "description": "Creates a directory at the specified absolute path. Creates parent directories if they don't exist.",
+        "tags": ["workspace", "file"],
+        "modelDescription": "Creates a directory at the specified absolute path. The dirPath must be an absolute path. Parent directories are created automatically if they don't exist.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "dirPath": {
+              "type": "string",
+              "description": "The absolute path where the directory should be created"
+            }
+          },
+          "required": ["dirPath"]
+        }
+      }
+    ],
     "commands": [
       {
         "command": "hopper.manageNearAi",

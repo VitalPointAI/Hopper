@@ -48,6 +48,11 @@ async function executeWithTools(
         stream.markdown(`\n\n*Executing tool: ${part.name}...*\n\n`);
 
         try {
+          // Log tool input for debugging
+          console.log(`[Hopper] Invoking tool: ${part.name}`);
+          console.log(`[Hopper] Tool input:`, JSON.stringify(part.input, null, 2));
+          console.log(`[Hopper] Has toolInvocationToken:`, !!toolInvocationToken);
+
           // Invoke the tool with toolInvocationToken for proper chat UI integration
           // The token is required for file operations like copilot_createFile
           const result = await vscode.lm.invokeTool(
@@ -59,6 +64,10 @@ async function executeWithTools(
             token
           );
 
+          // Log the result for debugging
+          console.log(`[Hopper] Tool ${part.name} result:`, result);
+          console.log(`[Hopper] Result content:`, result?.content);
+
           // Collect tool result for next iteration
           // invokeTool returns LanguageModelToolResult, we need its content array
           toolResults.push(
@@ -68,6 +77,7 @@ async function executeWithTools(
           stream.markdown(`*Tool ${part.name} completed.*\n\n`);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[Hopper] Tool ${part.name} error:`, err);
           stream.markdown(`*Tool ${part.name} failed: ${errorMsg}*\n\n`);
 
           toolResults.push(
@@ -116,6 +126,12 @@ function buildTaskPrompt(task: ExecutionTask, planContext: string, supportsTools
 All file paths MUST be absolute paths. The workspace root is: ${workspaceRoot}
 When creating or modifying files, always use the full absolute path.
 Example: Instead of "src/types/user.ts", use "${workspaceRoot}/src/types/user.ts"
+
+**CRITICAL: Tool Selection**
+For file operations, you MUST use the hopper_* tools (NOT copilot_* tools):
+- Use hopper_createFile to create new files (with filePath and content)
+- Use hopper_createDirectory to create directories (with dirPath)
+These tools are reliable and work correctly with absolute paths.
 
 **Task:** ${task.name}
 
