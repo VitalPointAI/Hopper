@@ -6,6 +6,8 @@ import { handleCreateRoadmap } from './createRoadmap';
 import { handlePlanPhase } from './planPhase';
 import { handleExecutePlan } from './executePlan';
 import { handleProgress } from './progress';
+import { handlePauseWork } from './pauseWork';
+import { handleResumeWork } from './resumeWork';
 
 /**
  * Command definitions with descriptions for help output
@@ -16,6 +18,8 @@ const COMMAND_DEFINITIONS = [
   { name: 'plan-phase', description: 'Create detailed execution plan for a phase' },
   { name: 'execute-plan', description: 'Execute a PLAN.md file' },
   { name: 'progress', description: 'Check project progress and route to next action' },
+  { name: 'pause-work', description: 'Save work state for later resumption' },
+  { name: 'resume-work', description: 'Resume work from previous session' },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -243,6 +247,8 @@ registry.set('create-roadmap', handleCreateRoadmap);
 registry.set('plan-phase', handlePlanPhase);
 registry.set('execute-plan', handleExecutePlan);
 registry.set('progress', handleProgress);
+registry.set('pause-work', handlePauseWork);
+registry.set('resume-work', handleResumeWork);
 
 /**
  * Get a command handler by name

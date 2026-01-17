@@ -3,6 +3,42 @@ import { CommandContext, IHopperResult } from './types';
 import { truncateContent } from '../context/projectContext';
 
 /**
+ * Check for .continue-here.md handoff files in phase directories
+ *
+ * @param planningUri - URI to .planning directory
+ * @returns Array of { phaseName, path } for found handoff files
+ */
+async function findHandoffFiles(
+  planningUri: vscode.Uri
+): Promise<{ phaseName: string; path: string }[]> {
+  const handoffs: { phaseName: string; path: string }[] = [];
+  const phasesUri = vscode.Uri.joinPath(planningUri, 'phases');
+
+  try {
+    const phaseEntries = await vscode.workspace.fs.readDirectory(phasesUri);
+
+    for (const [phaseName, phaseType] of phaseEntries) {
+      if (phaseType !== vscode.FileType.Directory) continue;
+
+      const handoffUri = vscode.Uri.joinPath(phasesUri, phaseName, '.continue-here.md');
+      try {
+        await vscode.workspace.fs.stat(handoffUri);
+        handoffs.push({
+          phaseName,
+          path: `.planning/phases/${phaseName}/.continue-here.md`
+        });
+      } catch {
+        // No handoff file in this phase
+      }
+    }
+  } catch {
+    // phases directory doesn't exist
+  }
+
+  return handoffs;
+}
+
+/**
  * Find the most recent SUMMARY.md files in the phases directory
  *
  * @param planningUri - URI to .planning directory
@@ -570,7 +606,32 @@ export async function handleProgress(ctx: CommandContext): Promise<IHopperResult
     }
   }
 
+  // Check for handoff files (paused work)
+  const handoffs = await findHandoffFiles(projectContext.planningUri);
+
   stream.markdown('---\n\n');
+
+  // Route 0: Handoff file exists (paused work from previous session)
+  if (handoffs.length > 0) {
+    const handoff = handoffs[0];
+
+    stream.markdown('## Paused Work Detected\n\n');
+    stream.markdown(`**Handoff file:** \`${handoff.path}\`\n\n`);
+    stream.markdown('A previous session was paused. Use `/resume-work` to restore context.\n\n');
+
+    stream.button({
+      command: 'hopper.chat-participant.resume-work',
+      title: 'Resume Work'
+    });
+
+    stream.markdown('\n\n');
+
+    stream.markdown('**Also available:**\n');
+    stream.markdown('- `/execute-plan [path]` - ignore handoff and execute a specific plan\n');
+    stream.markdown('- `/pause-work` - update the handoff with current context\n\n');
+
+    return { metadata: { lastCommand: 'progress', nextAction: 'resume-work', handoffPath: handoff.path } };
+  }
 
   // Route A: Unexecuted fix plans exist
   if (fixesWithoutSummary.length > 0 && phaseDir) {
