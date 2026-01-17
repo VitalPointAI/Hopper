@@ -202,7 +202,9 @@ export function activate(context: vscode.ExtensionContext): void {
     { id: 'hopper.chat-participant.pause-work', command: '/pause-work' },
     { id: 'hopper.chat-participant.resume-work', command: '/resume-work' },
     { id: 'hopper.chat-participant.consider-issues', command: '/consider-issues' },
-    { id: 'hopper.chat-participant.help', command: '/help' }
+    { id: 'hopper.chat-participant.help', command: '/help' },
+    { id: 'hopper.chat-participant.plan-fix', command: '/plan-fix' },
+    { id: 'hopper.chat-participant.verify-work', command: '/verify-work' }
   ];
 
   for (const { id, command } of chatParticipantCommands) {
