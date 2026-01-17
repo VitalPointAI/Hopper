@@ -118,7 +118,6 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "@vscode/chat-extension-utils": "^0.0.0-alpha.5",
     "openai": "^6.16.0"
   }
 }
