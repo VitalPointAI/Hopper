@@ -431,11 +431,9 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   // Track execution results
   const results: { taskId: number; success: boolean; name: string; files?: string[] }[] = [];
 
-  // Check if model supports tool calling once before the loop
-  // This ensures consistent mode indicator throughout execution
-  // @ts-ignore - supportsToolCalling may not be in all VSCode versions
-  const supportsTools = Boolean(request.model.supportsToolCalling);
-  const usedAgentMode = supportsTools;
+  // Always enable agent mode - VSCode handles tool capability internally
+  // Passing tools: [] in request options enables built-in VSCode tools
+  const usedAgentMode = true;
 
   // Execute tasks sequentially
   for (let i = 0; i < plan.tasks.length; i++) {
@@ -463,29 +461,23 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
     try {
       // Build prompt for this task
-      const prompt = buildTaskPrompt(task, planContext, supportsTools);
+      const prompt = buildTaskPrompt(task, planContext, usedAgentMode);
 
       // Send to LLM with tool options if supported
       const messages: vscode.LanguageModelChatMessage[] = [
         vscode.LanguageModelChatMessage.User(prompt)
       ];
 
-      // Request options - enable tools if available
+      // Request options - always enable built-in VSCode tools
       const requestOptions: vscode.LanguageModelChatRequestOptions = {};
-      if (supportsTools) {
-        // Empty tools array enables built-in VSCode tools (file editing, terminal, etc.)
-        // @ts-ignore - tools may not be in all VSCode versions
-        requestOptions.tools = [];
-      }
+      // Empty tools array enables built-in VSCode tools (file editing, terminal, etc.)
+      // @ts-ignore - tools may not be in all VSCode versions
+      requestOptions.tools = [];
 
       const response = await request.model.sendRequest(messages, requestOptions, token);
 
-      // Stream the response
-      if (supportsTools) {
-        stream.markdown('**Agent executing...**\n\n');
-      } else {
-        stream.markdown('**Implementation (apply manually):**\n\n');
-      }
+      // Stream the response - always in agent mode
+      stream.markdown('**Agent executing...**\n\n');
 
       for await (const fragment of response.text) {
         if (token.isCancellationRequested) {
@@ -496,13 +488,8 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       stream.markdown('\n\n');
 
-      // Show completion status
-      if (supportsTools) {
-        stream.markdown(`**Status:** Executed via agent mode\n\n`);
-      } else {
-        stream.markdown(`**Done when:** ${task.done}\n\n`);
-        stream.markdown(`**Verify:** ${task.verify}\n\n`);
-      }
+      // Show completion status - always agent mode
+      stream.markdown(`**Status:** Executed via agent mode\n\n`);
 
       stream.markdown('---\n\n');
 
