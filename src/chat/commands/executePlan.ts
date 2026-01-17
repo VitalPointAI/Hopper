@@ -904,7 +904,16 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken);
 
         stream.markdown('\n\n');
-        stream.markdown(`**Status:** Executed via agent mode\n\n`);
+
+        // Show verification criteria after task execution
+        if (task.verify) {
+          stream.markdown(`**Verify:** ${task.verify}\n\n`);
+        }
+        if (task.done) {
+          stream.markdown(`**Done when:** ${task.done}\n\n`);
+        }
+
+        stream.markdown(`**Status:** ✓ Task ${task.id}/${plan.tasks.length} completed\n\n`);
         stream.markdown('---\n\n');
 
         // Track result with files info
@@ -931,35 +940,97 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   // Clear execution state on completion
   await clearExecutionState(ctx.extensionContext, planPath);
 
+  // Gather decisions made during execution
+  const decisionsFromState = existingState?.decisions || {};
+
   // Show completion summary
   const successCount = results.filter(r => r.success).length;
   const failedCount = results.filter(r => !r.success).length;
   const skippedCount = plan.tasks.length - results.length;
 
-  stream.markdown('## Execution Complete\n\n');
-  stream.markdown(`**Mode:** ${usedAgentMode ? 'Agent (file modifications)' : 'Suggestions (manual apply)'}\n`);
-  stream.markdown(`**Completed:** ${successCount}/${plan.tasks.length} tasks\n`);
-  if (failedCount > 0) {
-    stream.markdown(`**Failed:** ${failedCount} tasks\n`);
-  }
-  if (skippedCount > 0) {
-    stream.markdown(`**Skipped:** ${skippedCount} tasks\n`);
-  }
-  stream.markdown('\n');
-
-  // Show task summary with files
-  stream.markdown('### Task Summary\n\n');
+  // Collect all unique files from tasks
+  const allFiles = new Set<string>();
   for (const result of results) {
-    const icon = result.success ? '✓' : '✗';
-    stream.markdown(`${icon} **Task ${result.taskId}:** ${result.name}\n`);
-    if (result.files && result.files.length > 0) {
+    if (result.files) {
       for (const file of result.files) {
-        stream.markdown(`   - \`${file}\`\n`);
+        allFiles.add(file);
       }
     }
   }
 
-  stream.markdown('\n### Next Steps\n\n');
+  stream.markdown('## Execution Complete\n\n');
+  stream.markdown(`**Plan:** ${plan.phase} - Plan ${plan.planNumber}\n`);
+  stream.markdown(`**Mode:** ${usedAgentMode ? 'Agent (file modifications)' : 'Suggestions (manual apply)'}\n`);
+  stream.markdown(`**Tasks:** ${successCount}/${plan.tasks.length} completed`);
+  if (failedCount > 0) {
+    stream.markdown(`, ${failedCount} failed`);
+  }
+  if (skippedCount > 0) {
+    stream.markdown(`, ${skippedCount} skipped`);
+  }
+  stream.markdown('\n');
+  stream.markdown(`**Files touched:** ${allFiles.size}\n\n`);
+
+  // Show task summary with status icons
+  stream.markdown('### Task Summary\n\n');
+  for (const task of plan.tasks) {
+    const result = results.find(r => r.taskId === task.id);
+    let icon: string;
+    let status: string;
+
+    if (!result) {
+      icon = '○';
+      status = 'not executed';
+    } else if (result.success) {
+      icon = '✓';
+      status = 'completed';
+    } else {
+      icon = '✗';
+      status = 'failed';
+    }
+
+    stream.markdown(`${icon} **Task ${task.id}:** ${task.name} *(${status})*\n`);
+  }
+  stream.markdown('\n');
+
+  // Show decisions made (if any)
+  if (Object.keys(decisionsFromState).length > 0) {
+    stream.markdown('### Decisions Made\n\n');
+    for (const [taskKey, decision] of Object.entries(decisionsFromState)) {
+      stream.markdown(`- **${taskKey}:** ${decision}\n`);
+    }
+    stream.markdown('\n');
+  }
+
+  // Show files modified
+  if (allFiles.size > 0) {
+    stream.markdown('### Files Modified\n\n');
+    for (const file of Array.from(allFiles).sort()) {
+      stream.markdown(`- \`${file}\`\n`);
+    }
+    stream.markdown('\n');
+  }
+
+  // Show plan verification checklist
+  if (plan.verification.length > 0) {
+    stream.markdown('### Plan Verification\n\n');
+    stream.markdown('*Verify manually before committing:*\n\n');
+    for (const v of plan.verification) {
+      stream.markdown(`- [ ] ${v}\n`);
+    }
+    stream.markdown('\n');
+  }
+
+  // Show success criteria
+  if (plan.successCriteria.length > 0) {
+    stream.markdown('### Success Criteria\n\n');
+    for (const criterion of plan.successCriteria) {
+      stream.markdown(`- [ ] ${criterion}\n`);
+    }
+    stream.markdown('\n');
+  }
+
+  stream.markdown('### Next Steps\n\n');
 
   if (usedAgentMode) {
     stream.markdown('1. **Review changes** made by the agent\n');
@@ -967,27 +1038,21 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       command: 'git.viewChanges',
       title: 'View Git Changes'
     });
-    stream.markdown('\n2. **Run verification** from the plan:\n');
-  } else {
-    stream.markdown('1. **Apply the changes** shown above to your codebase\n');
-    stream.markdown('2. **Run verification** from the plan:\n');
-  }
-
-  if (plan.verification.length > 0) {
-    for (const v of plan.verification) {
-      stream.markdown(`   - [ ] ${v}\n`);
-    }
-  }
-
-  stream.markdown('\n');
-  if (usedAgentMode) {
+    stream.markdown('\n2. **Verify** all criteria above\n');
     stream.markdown('3. **Commit** if verification passes\n');
   } else {
-    stream.markdown('3. **Test** your changes\n');
-    stream.markdown('4. **Commit** when ready\n');
+    stream.markdown('1. **Apply the changes** shown above to your codebase\n');
+    stream.markdown('2. **Test** your changes\n');
+    stream.markdown('3. **Commit** when ready\n');
   }
 
-  stream.markdown('\n');
+  stream.markdown('\n4. **Update progress** to track completion\n');
+  stream.button({
+    command: 'hopper.chat-participant.progress',
+    title: 'Check Progress'
+  });
+
+  stream.markdown('\n\n');
   stream.reference(planUri);
 
   return {
