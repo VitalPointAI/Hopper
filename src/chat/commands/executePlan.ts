@@ -430,7 +430,12 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
   // Track execution results
   const results: { taskId: number; success: boolean; name: string; files?: string[] }[] = [];
-  let usedAgentMode = false;
+
+  // Check if model supports tool calling once before the loop
+  // This ensures consistent mode indicator throughout execution
+  // @ts-ignore - supportsToolCalling may not be in all VSCode versions
+  const supportsTools = Boolean(request.model.supportsToolCalling);
+  const usedAgentMode = supportsTools;
 
   // Execute tasks sequentially
   for (let i = 0; i < plan.tasks.length; i++) {
@@ -457,10 +462,6 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     }
 
     try {
-      // Check if model supports tool calling for agent mode
-      // @ts-ignore - supportsToolCalling may not be in all VSCode versions
-      const supportsTools = Boolean(request.model.supportsToolCalling);
-
       // Build prompt for this task
       const prompt = buildTaskPrompt(task, planContext, supportsTools);
 
@@ -506,9 +507,6 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       stream.markdown('---\n\n');
 
       // Track result with files info
-      if (supportsTools) {
-        usedAgentMode = true;
-      }
       results.push({ taskId: task.id, success: true, name: task.name, files: task.files });
 
     } catch (error) {
