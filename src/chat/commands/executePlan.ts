@@ -26,16 +26,113 @@ Please implement this task. Show the code changes needed.`;
 }
 
 /**
+ * Parse current phase info from STATE.md
+ * Returns phase number, directory name, and current plan number
+ */
+interface CurrentPhaseInfo {
+  phaseNumber: number;
+  phaseName: string;
+  phaseDir: string;
+}
+
+/**
+ * Extract current phase information from STATE.md content
+ */
+function parseCurrentPhaseFromState(stateMd: string, roadmapMd?: string): CurrentPhaseInfo | null {
+  // Look for "Phase: X.Y (Phase Name)" or similar patterns
+  // Common pattern: "Phase: 1.5.3 (Rebrand to Hopper)"
+  const phaseMatch = stateMd.match(/Phase:\s*(\d+(?:\.\d+)*)\s*(?:\(([^)]+)\))?/);
+  if (!phaseMatch) {
+    return null;
+  }
+
+  const phaseNumber = parseFloat(phaseMatch[1]);
+  let phaseName = phaseMatch[2]?.trim() || '';
+
+  // If no name from STATE.md, try to get from ROADMAP.md
+  if (!phaseName && roadmapMd) {
+    // Match phase in roadmap: "**Phase X: Name**"
+    const roadmapPattern = new RegExp(`\\*\\*Phase\\s+${phaseMatch[1]}:?\\s*([^*]+)\\*\\*`, 'i');
+    const roadmapMatch = roadmapMd.match(roadmapPattern);
+    if (roadmapMatch) {
+      phaseName = roadmapMatch[1].trim();
+    }
+  }
+
+  // Generate directory name from phase number and name
+  const phaseNumStr = phaseMatch[1].replace(/\./g, '.');
+  const nameSlug = phaseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const phaseDir = `${phaseNumStr.padStart(2, '0')}-${nameSlug}`;
+
+  return {
+    phaseNumber,
+    phaseName,
+    phaseDir
+  };
+}
+
+/**
+ * Find the latest unexecuted PLAN.md in a phase directory
+ * A plan is unexecuted if it doesn't have a matching SUMMARY.md
+ */
+async function findLatestUnexecutedPlan(
+  workspaceUri: vscode.Uri,
+  phaseDir: string
+): Promise<vscode.Uri | null> {
+  const phasePath = vscode.Uri.joinPath(workspaceUri, '.planning', 'phases', phaseDir);
+
+  try {
+    const entries = await vscode.workspace.fs.readDirectory(phasePath);
+
+    // Find all PLAN.md files
+    const planFiles = entries
+      .filter(([name]) => name.endsWith('-PLAN.md'))
+      .map(([name]) => name)
+      .sort();
+
+    // For each plan, check if there's a matching SUMMARY.md
+    for (const planFile of planFiles) {
+      const summaryFile = planFile.replace('-PLAN.md', '-SUMMARY.md');
+      const hasSummary = entries.some(([name]) => name === summaryFile);
+
+      if (!hasSummary) {
+        // Found an unexecuted plan
+        return vscode.Uri.joinPath(phasePath, planFile);
+      }
+    }
+
+    // All plans have summaries
+    return null;
+  } catch {
+    // Phase directory doesn't exist or can't be read
+    return null;
+  }
+}
+
+/**
+ * Extract phase number from plan phase identifier
+ * e.g., "04-execution-commands" -> 4, "01.5.3-rebrand" -> 1.53
+ */
+function extractPhaseNumber(phase: string): number {
+  const match = phase.match(/^(\d+(?:\.\d+)*)/);
+  if (match) {
+    return parseFloat(match[1]);
+  }
+  return 1;
+}
+
+/**
  * Handle /execute-plan command
  *
  * Executes a PLAN.md file by:
  * 1. Parsing the plan path argument or auto-detecting from STATE.md
- * 2. Loading and parsing the PLAN.md file
- * 3. Executing each task sequentially via LLM
- * 4. Reporting progress and completion status
+ * 2. Checking license for Phase 2+ plans
+ * 3. Loading and parsing the PLAN.md file
+ * 4. Executing each task sequentially via LLM
+ * 5. Reporting progress and completion status
  */
 export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperResult> {
-  const { request, stream, token, projectContext } = ctx;
+  const { request, stream, token, projectContext, licenseValidator } = ctx;
 
   // Check for workspace
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -59,14 +156,25 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     return { metadata: { lastCommand: 'execute-plan' } };
   }
 
-  // Parse plan path from prompt
+  // Check for ROADMAP.md
+  if (!projectContext.roadmapMd) {
+    stream.markdown('## No Roadmap Found\n\n');
+    stream.markdown('Cannot execute plans without ROADMAP.md.\n\n');
+    stream.markdown('Use **/create-roadmap** to create your roadmap first.\n\n');
+    stream.button({
+      command: 'hopper.chat-participant.create-roadmap',
+      title: 'Create Roadmap'
+    });
+    return { metadata: { lastCommand: 'execute-plan' } };
+  }
+
+  // Parse plan path from prompt or auto-detect
+  stream.progress('Loading plan...');
   const promptText = request.prompt.trim();
   let planUri: vscode.Uri | undefined;
 
   if (promptText) {
     // User provided a path
-    stream.progress('Loading plan...');
-
     // Handle relative or absolute paths
     if (promptText.startsWith('/') || promptText.includes(':')) {
       planUri = vscode.Uri.file(promptText);
@@ -75,23 +183,50 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       planUri = vscode.Uri.joinPath(workspaceUri, promptText);
     }
   } else {
-    // Show usage help when no argument provided
-    stream.markdown('## Usage\n\n');
-    stream.markdown('**`/execute-plan <path-to-plan>`**\n\n');
-    stream.markdown('Execute a PLAN.md file by sending each task to the LLM.\n\n');
-    stream.markdown('**Examples:**\n');
-    stream.markdown('- `/execute-plan .planning/phases/04-execution-commands/04-01-PLAN.md`\n');
-    stream.markdown('- `/execute-plan` (auto-detect coming in Task 3)\n\n');
+    // Auto-detect plan from STATE.md
+    stream.progress('Auto-detecting current plan...');
 
-    if (projectContext.planningUri) {
-      stream.markdown('**Create a plan first:**\n\n');
+    if (!projectContext.stateMd) {
+      stream.markdown('## No State Found\n\n');
+      stream.markdown('Cannot auto-detect plan without STATE.md.\n\n');
+      stream.markdown('**Options:**\n');
+      stream.markdown('- Provide an explicit path: `/execute-plan .planning/phases/XX-name/XX-YY-PLAN.md`\n');
+      stream.markdown('- Create a roadmap to generate STATE.md\n\n');
+      stream.button({
+        command: 'hopper.chat-participant.create-roadmap',
+        title: 'Create Roadmap'
+      });
+      return { metadata: { lastCommand: 'execute-plan' } };
+    }
+
+    const phaseInfo = parseCurrentPhaseFromState(projectContext.stateMd, projectContext.roadmapMd);
+
+    if (!phaseInfo) {
+      stream.markdown('## Unable to Detect Phase\n\n');
+      stream.markdown('Could not parse current phase from STATE.md.\n\n');
+      stream.markdown('**Provide an explicit path:**\n');
+      stream.markdown('`/execute-plan .planning/phases/XX-name/XX-YY-PLAN.md`\n\n');
+      return { metadata: { lastCommand: 'execute-plan' } };
+    }
+
+    // Find unexecuted plan in current phase directory
+    const detectedPlan = await findLatestUnexecutedPlan(workspaceUri, phaseInfo.phaseDir);
+
+    if (!detectedPlan) {
+      stream.markdown('## No Plan Found\n\n');
+      stream.markdown(`No unexecuted plans found for Phase ${phaseInfo.phaseNumber}${phaseInfo.phaseName ? ` (${phaseInfo.phaseName})` : ''}.\n\n`);
+      stream.markdown('**Options:**\n');
+      stream.markdown('- Create a plan with `/plan-phase`\n');
+      stream.markdown('- Provide an explicit path: `/execute-plan <path>`\n\n');
       stream.button({
         command: 'hopper.chat-participant.plan-phase',
         title: 'Plan Phase'
       });
+      return { metadata: { lastCommand: 'execute-plan' } };
     }
 
-    return { metadata: { lastCommand: 'execute-plan' } };
+    planUri = detectedPlan;
+    stream.markdown(`**Auto-detected:** ${planUri.fsPath.replace(workspaceUri.fsPath, '.')}\n\n`);
   }
 
   // Try to load the plan file
@@ -136,6 +271,47 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     });
 
     return { metadata: { lastCommand: 'execute-plan' } };
+  }
+
+  // License gating: Phase 2+ requires Pro license
+  const phaseNumber = extractPhaseNumber(plan.phase);
+  if (phaseNumber >= 2) {
+    stream.progress('Checking license...');
+
+    // Ensure auth manager is initialized
+    await licenseValidator.ensureInitialized();
+
+    // Check authentication first
+    if (!licenseValidator.isAuthenticated()) {
+      stream.markdown('## Pro License Required\n\n');
+      stream.markdown(`Executing **Phase ${phaseNumber}** plans requires a Hopper Pro license.\n\n`);
+      stream.markdown('**Already have a license?** Connect to verify it.\n\n');
+      stream.button({
+        command: 'hopper.connect',
+        title: 'Connect'
+      });
+      stream.markdown('\n**Need a license?** Upgrade to unlock Phase 2+ features.\n\n');
+      stream.button({
+        command: 'hopper.showUpgradeModal',
+        title: 'Get Pro License'
+      });
+      return { metadata: { lastCommand: 'execute-plan' } };
+    }
+
+    // Check license status
+    const licenseStatus = await licenseValidator.checkLicense();
+    if (!licenseStatus?.isLicensed) {
+      stream.markdown('## Pro License Required\n\n');
+      stream.markdown(`Executing **Phase ${phaseNumber}** plans requires a Pro license.\n\n`);
+      stream.markdown('Phase 1 plans are free. Upgrade to Pro to unlock:\n');
+      stream.markdown('- Execution for Phase 2+ plans\n');
+      stream.markdown('- Full session management features\n\n');
+      stream.button({
+        command: 'hopper.showUpgradeModal',
+        title: 'Upgrade to Pro'
+      });
+      return { metadata: { lastCommand: 'execute-plan' } };
+    }
   }
 
   // Show plan overview
@@ -221,6 +397,10 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       if (error instanceof vscode.LanguageModelError) {
         stream.markdown('Model error occurred. Try again or check your model connection.\n\n');
+        stream.button({
+          command: 'hopper.chat-participant.execute-plan',
+          title: 'Retry'
+        });
       }
 
       stream.markdown('---\n\n');
@@ -232,11 +412,15 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   // Show completion summary
   const successCount = results.filter(r => r.success).length;
   const failedCount = results.filter(r => !r.success).length;
+  const skippedCount = plan.tasks.length - results.length;
 
   stream.markdown('## Execution Complete\n\n');
   stream.markdown(`**Completed:** ${successCount}/${plan.tasks.length} tasks\n`);
   if (failedCount > 0) {
     stream.markdown(`**Failed:** ${failedCount} tasks\n`);
+  }
+  if (skippedCount > 0) {
+    stream.markdown(`**Skipped:** ${skippedCount} tasks\n`);
   }
   stream.markdown('\n');
 
@@ -249,14 +433,21 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   stream.markdown('\n### Next Steps\n\n');
   stream.markdown('1. Review the implementation suggestions above\n');
   stream.markdown('2. Apply the changes to your codebase\n');
-  stream.markdown('3. Run verification: check the plan\'s verification section\n');
-  stream.markdown('4. Use `/progress` to update project state\n\n');
+  stream.markdown('3. Run verification checks from the plan\n');
+  if (plan.verification.length > 0) {
+    stream.markdown('\n**Verification:**\n');
+    for (const v of plan.verification) {
+      stream.markdown(`- [ ] ${v}\n`);
+    }
+  }
+  stream.markdown('\n4. Use `/progress` to update project state\n\n');
 
   stream.reference(planUri);
 
   return {
     metadata: {
-      lastCommand: 'execute-plan'
+      lastCommand: 'execute-plan',
+      phaseNumber: phaseNumber
     }
   };
 }
