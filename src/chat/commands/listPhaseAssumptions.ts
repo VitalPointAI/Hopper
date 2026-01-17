@@ -114,7 +114,7 @@ function extractJsonFromResponse(response: string): string {
 /**
  * Handle /list-phase-assumptions command
  *
- * Surfaces Claude's assumptions about a phase approach before planning:
+ * Surfaces Hopper's assumptions about a phase approach before planning:
  * 1. Validates phase number
  * 2. Analyzes phase description
  * 3. Surfaces assumptions about technical approach, implementation order,

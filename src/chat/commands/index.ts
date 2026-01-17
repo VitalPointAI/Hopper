@@ -33,7 +33,7 @@ const COMMAND_DEFINITIONS = [
   { name: 'remove-phase', description: 'Remove a phase from roadmap' },
   { name: 'research-phase', description: 'Research how to implement a phase before planning' },
   { name: 'discuss-phase', description: 'Gather phase context through adaptive questioning' },
-  { name: 'list-phase-assumptions', description: "Surface Claude's assumptions about a phase approach" },
+  { name: 'list-phase-assumptions', description: "Surface Hopper's assumptions about a phase approach" },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
