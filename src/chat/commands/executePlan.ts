@@ -3,26 +3,34 @@ import { CommandContext, IHopperResult } from './types';
 import { parsePlanMd, ExecutionPlan, ExecutionTask } from '../executor';
 
 /**
- * Build a prompt for executing a single task
+ * Build a prompt for executing a single task (agent mode)
  */
-function buildTaskPrompt(task: ExecutionTask, planContext: string): string {
+function buildTaskPrompt(task: ExecutionTask, planContext: string, supportsTools: boolean): string {
   const filesLine = task.files && task.files.length > 0
-    ? `Files to modify: ${task.files.join(', ')}\n\n`
+    ? `**Files to modify:** ${task.files.join(', ')}\n\n`
     : '';
 
-  return `You are executing a task from a Hopper plan.
+  const agentInstruction = supportsTools
+    ? `Execute this task by making the necessary file changes. Create or modify files as needed. Do not just describe what to do - actually implement it.`
+    : `Provide the complete implementation for this task. Show the full file contents that should be created or modified.`;
 
-Task: ${task.name}
-${filesLine}Action:
+  return `You are an AI assistant executing a task from a Hopper plan.
+
+**Task:** ${task.name}
+
+${filesLine}**Action to perform:**
 ${task.action}
 
-Verification: ${task.verify}
-Done when: ${task.done}
+**Done when:**
+${task.done}
 
-Project context:
+**Verification:**
+${task.verify}
+
+**Project context:**
 ${planContext}
 
-Please implement this task. Show the code changes needed.`;
+${agentInstruction}`;
 }
 
 /**
@@ -448,18 +456,35 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     }
 
     try {
-      // Build prompt for this task
-      const prompt = buildTaskPrompt(task, planContext);
+      // Check if model supports tool calling for agent mode
+      // @ts-ignore - supportsToolCalling may not be in all VSCode versions
+      const supportsTools = Boolean(request.model.supportsToolCalling);
 
-      // Send to LLM
+      // Build prompt for this task
+      const prompt = buildTaskPrompt(task, planContext, supportsTools);
+
+      // Send to LLM with tool options if supported
       const messages: vscode.LanguageModelChatMessage[] = [
         vscode.LanguageModelChatMessage.User(prompt)
       ];
 
-      const response = await request.model.sendRequest(messages, {}, token);
+      // Request options - enable tools if available
+      const requestOptions: vscode.LanguageModelChatRequestOptions = {};
+      if (supportsTools) {
+        // Empty tools array enables built-in VSCode tools (file editing, terminal, etc.)
+        // @ts-ignore - tools may not be in all VSCode versions
+        requestOptions.tools = [];
+      }
+
+      const response = await request.model.sendRequest(messages, requestOptions, token);
 
       // Stream the response
-      stream.markdown('**Implementation:**\n\n');
+      if (supportsTools) {
+        stream.markdown('**Agent executing...**\n\n');
+      } else {
+        stream.markdown('**Implementation (apply manually):**\n\n');
+      }
+
       for await (const fragment of response.text) {
         if (token.isCancellationRequested) {
           break;
@@ -469,9 +494,13 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       stream.markdown('\n\n');
 
-      // Show done criteria
-      stream.markdown(`**Done when:** ${task.done}\n\n`);
-      stream.markdown(`**Verify:** ${task.verify}\n\n`);
+      // Show completion status
+      if (supportsTools) {
+        stream.markdown(`**Status:** Executed via agent mode\n\n`);
+      } else {
+        stream.markdown(`**Done when:** ${task.done}\n\n`);
+        stream.markdown(`**Verify:** ${task.verify}\n\n`);
+      }
 
       stream.markdown('---\n\n');
 
