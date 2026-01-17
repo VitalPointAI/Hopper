@@ -356,12 +356,7 @@ export async function handleAddPhase(ctx: CommandContext): Promise<IHopperResult
     stream.markdown(`**Directory created:** \`.planning/phases/${dirName}/\`\n\n`);
 
     stream.markdown('### Next Steps\n\n');
-    stream.markdown(`Use **/plan-phase ${newPhaseNum}** to create the execution plan.\n\n`);
-
-    stream.button({
-      command: 'hopper.chat-participant.plan-phase',
-      title: `Plan Phase ${newPhaseNum}`
-    });
+    stream.markdown(`Type \`/plan-phase ${newPhaseNum}\` to create the execution plan.\n\n`);
 
     return {
       metadata: {
