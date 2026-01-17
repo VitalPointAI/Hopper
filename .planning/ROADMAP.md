@@ -25,6 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
 - [x] **Phase 4: Execution Commands** - PLAN.md execution, verification, git integration
 - [ ] **Phase 5: Session Management** - Progress tracking, resumption, issue logging
+- [ ] **Phase 5.1: GSD Feature Parity** - INSERTED - Complete all GSD framework commands
 
 ## Phase Details
 
@@ -133,10 +134,23 @@ Plans:
 - [ ] 05-02: Session resumption (/resume-work, /pause-work)
 - [ ] 05-03: Issue logging (/consider-issues)
 
+### Phase 5.1: GSD Feature Parity (INSERTED)
+**Goal**: Implement all remaining GSD framework commands for 100% feature parity
+**Depends on**: Phase 5 (session management provides foundation)
+**Research**: Unlikely (implementing known GSD patterns)
+**Plans**: 5
+
+Plans:
+- [ ] 05.1-01: Phase management (/add-phase, /insert-phase, /remove-phase)
+- [ ] 05.1-02: Pre-planning commands (/research-phase, /discuss-phase, /list-phase-assumptions)
+- [ ] 05.1-03: UAT workflow (/verify-work, /plan-fix, /resume-task)
+- [ ] 05.1-04: Milestone management (/new-milestone, /complete-milestone, /discuss-milestone)
+- [ ] 05.1-05: Codebase mapping (/map-codebase) and parity verification
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5 → 5.1
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -149,3 +163,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
 | 5. Session Management | 0/3 | Not started | - |
+| 5.1 GSD Feature Parity | 0/5 | Not started | - |
