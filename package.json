@@ -182,6 +182,11 @@
         "command": "hopper.disconnect",
         "title": "Disconnect",
         "category": "Hopper"
+      },
+      {
+        "command": "hopper.verifyWorkResult",
+        "title": "Report UAT Result",
+        "category": "Hopper"
       }
     ],
     "configuration": {

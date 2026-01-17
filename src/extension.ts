@@ -274,6 +274,115 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(closeIssuesCommand);
 
+  // Register verifyWorkResult command for UAT test result buttons
+  const verifyWorkResultCommand = vscode.commands.registerCommand(
+    'hopper.verifyWorkResult',
+    async (phase: string, plan: string, phaseDir: string, resultType: 'all-pass' | 'has-issues') => {
+      if (resultType === 'all-pass') {
+        vscode.window.showInformationMessage(
+          `All tests passed for Phase ${phase} Plan ${plan}. Feature validated.`
+        );
+        return;
+      }
+
+      // For 'has-issues', collect issue details via input dialogs
+      const issues: Array<{
+        id: string;
+        feature: string;
+        severity: 'Blocker' | 'Major' | 'Minor' | 'Cosmetic';
+        description: string;
+      }> = [];
+
+      let issueCount = 1;
+      let addMore = true;
+
+      while (addMore) {
+        // Get feature name
+        const feature = await vscode.window.showInputBox({
+          title: `Issue ${issueCount}: Feature Name`,
+          prompt: 'What feature has an issue?',
+          placeHolder: 'e.g., Login button, Form validation'
+        });
+
+        if (!feature) {
+          break; // User cancelled
+        }
+
+        // Get severity
+        const severity = await vscode.window.showQuickPick(
+          ['Blocker', 'Major', 'Minor', 'Cosmetic'],
+          {
+            title: `Issue ${issueCount}: Severity`,
+            placeHolder: 'How severe is this issue?'
+          }
+        ) as 'Blocker' | 'Major' | 'Minor' | 'Cosmetic' | undefined;
+
+        if (!severity) {
+          break; // User cancelled
+        }
+
+        // Get description
+        const description = await vscode.window.showInputBox({
+          title: `Issue ${issueCount}: Description`,
+          prompt: 'Describe the issue',
+          placeHolder: 'What went wrong? What did you expect?'
+        });
+
+        if (!description) {
+          break; // User cancelled
+        }
+
+        issues.push({
+          id: `UAT-${String(issueCount).padStart(3, '0')}`,
+          feature,
+          severity,
+          description
+        });
+
+        issueCount++;
+
+        // Ask if more issues to add
+        const more = await vscode.window.showQuickPick(
+          ['Add another issue', 'Done - log these issues'],
+          { placeHolder: 'Add more issues?' }
+        );
+
+        addMore = more === 'Add another issue';
+      }
+
+      if (issues.length > 0) {
+        // Import and call handleVerifyWorkResult
+        const { handleVerifyWorkResult } = await import('./chat/commands/verifyWork');
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+
+        if (workspaceFolders && workspaceFolders.length > 0) {
+          const planningUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.planning');
+          const result = await handleVerifyWorkResult(
+            context,
+            planningUri,
+            phase,
+            plan,
+            phaseDir,
+            'has-issues',
+            issues
+          );
+
+          if (result.success && result.issuesFile) {
+            vscode.window.showInformationMessage(result.message);
+            // Open the issues file
+            const doc = await vscode.workspace.openTextDocument(result.issuesFile);
+            await vscode.window.showTextDocument(doc);
+          } else {
+            vscode.window.showWarningMessage(result.message);
+          }
+        }
+      } else {
+        vscode.window.showInformationMessage('No issues logged.');
+      }
+    }
+  );
+  context.subscriptions.push(verifyWorkResultCommand);
+
   // Register URI handler for auth callbacks (both OAuth and wallet)
   const uriHandler = vscode.window.registerUriHandler({
     handleUri: async (uri: vscode.Uri) => {
