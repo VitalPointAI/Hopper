@@ -342,11 +342,6 @@ export async function handleInsertPhase(ctx: CommandContext): Promise<IHopperRes
   if (!nextIntegerPhase) {
     stream.markdown('## Use Add-Phase Instead\n\n');
     stream.markdown(`There is no Phase ${afterPhaseNum + 1} after Phase ${afterPhaseNum}.\n\n`);
-    stream.markdown('**Detected phases:**\n');
-    for (const p of phases) {
-      stream.markdown(`- Phase ${p.number}: ${p.name} (integer: ${Number.isInteger(p.number)})\n`);
-    }
-    stream.markdown('\n');
     stream.markdown('Use **/add-phase** to add a new phase at the end of your roadmap.\n\n');
     stream.button({
       command: 'hopper.chat-participant.add-phase',
