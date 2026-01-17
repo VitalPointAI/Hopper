@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as chatUtils from '@vscode/chat-extension-utils';
 import { CommandContext, IHopperResult } from './types';
 import { parsePlanMd, ExecutionPlan, ExecutionTask } from '../executor';
 
@@ -463,28 +464,35 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       // Build prompt for this task
       const prompt = buildTaskPrompt(task, planContext, usedAgentMode);
 
-      // Send to LLM with tool options if supported
-      const messages: vscode.LanguageModelChatMessage[] = [
-        vscode.LanguageModelChatMessage.User(prompt)
-      ];
+      // Get available tools from vscode.lm.tools
+      // Filter to workspace-relevant tools (file editing, terminal, etc.)
+      const tools = vscode.lm.tools.filter(tool =>
+        tool.tags.includes('workspace') ||
+        tool.tags.includes('vscode') ||
+        !tool.tags.length // Include tools without tags
+      );
 
-      // Request options - always enable built-in VSCode tools
-      const requestOptions: vscode.LanguageModelChatRequestOptions = {};
-      // Empty tools array enables built-in VSCode tools (file editing, terminal, etc.)
-      // @ts-ignore - tools may not be in all VSCode versions
-      requestOptions.tools = [];
-
-      const response = await request.model.sendRequest(messages, requestOptions, token);
-
-      // Stream the response - always in agent mode
+      // Use sendChatParticipantRequest for automatic tool orchestration
+      // This handles the tool calling loop, invoking tools, and streaming results
       stream.markdown('**Agent executing...**\n\n');
 
-      for await (const fragment of response.text) {
-        if (token.isCancellationRequested) {
-          break;
-        }
-        stream.markdown(fragment);
-      }
+      const libResult = chatUtils.sendChatParticipantRequest(
+        request,
+        ctx.context,  // Chat context from the handler
+        {
+          prompt,
+          responseStreamOptions: {
+            stream,
+            references: true,
+            responseText: true
+          },
+          tools
+        },
+        token
+      );
+
+      // Wait for the request to complete
+      await libResult.result;
 
       stream.markdown('\n\n');
 
