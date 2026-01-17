@@ -1,7 +1,95 @@
 import * as vscode from 'vscode';
-import * as chatUtils from '@vscode/chat-extension-utils';
 import { CommandContext, IHopperResult } from './types';
-import { parsePlanMd, ExecutionPlan, ExecutionTask } from '../executor';
+import { parsePlanMd, ExecutionTask } from '../executor';
+
+/**
+ * Execute a chat request with tool calling loop.
+ * Handles invoking tools when the model requests them.
+ *
+ * @param model The language model to use
+ * @param messages The conversation messages
+ * @param tools Available tools for the model to use
+ * @param stream The chat response stream to write to
+ * @param token Cancellation token
+ */
+async function executeWithTools(
+  model: vscode.LanguageModelChat,
+  messages: vscode.LanguageModelChatMessage[],
+  tools: vscode.LanguageModelChatTool[],
+  stream: vscode.ChatResponseStream,
+  token: vscode.CancellationToken
+): Promise<void> {
+  const MAX_ITERATIONS = 10;
+  let iteration = 0;
+
+  while (iteration < MAX_ITERATIONS && !token.isCancellationRequested) {
+    iteration++;
+
+    const response = await model.sendRequest(
+      messages,
+      { tools },
+      token
+    );
+
+    let hasToolCalls = false;
+    const toolResults: vscode.LanguageModelToolResultPart[] = [];
+    const toolCallParts: vscode.LanguageModelToolCallPart[] = [];
+
+    for await (const part of response.stream) {
+      if (part instanceof vscode.LanguageModelTextPart) {
+        stream.markdown(part.value);
+      } else if (part instanceof vscode.LanguageModelToolCallPart) {
+        hasToolCalls = true;
+        toolCallParts.push(part);
+
+        // Show tool invocation in stream
+        stream.markdown(`\n\n*Executing tool: ${part.name}...*\n\n`);
+
+        try {
+          // Invoke the tool
+          const result = await vscode.lm.invokeTool(
+            part.name,
+            { input: part.input },
+            token
+          );
+
+          // Collect tool result for next iteration
+          toolResults.push(
+            new vscode.LanguageModelToolResultPart(part.callId, result)
+          );
+
+          stream.markdown(`*Tool ${part.name} completed.*\n\n`);
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          stream.markdown(`*Tool ${part.name} failed: ${errorMsg}*\n\n`);
+
+          toolResults.push(
+            new vscode.LanguageModelToolResultPart(
+              part.callId,
+              [new vscode.LanguageModelTextPart(`Error: ${errorMsg}`)]
+            )
+          );
+        }
+      }
+    }
+
+    // If no tool calls, we're done
+    if (!hasToolCalls) {
+      break;
+    }
+
+    // Add assistant message with tool calls to history
+    // Add tool results as user message for next iteration
+    messages.push(
+      vscode.LanguageModelChatMessage.Assistant(toolCallParts),
+      vscode.LanguageModelChatMessage.User(toolResults)
+    );
+  }
+
+  if (iteration >= MAX_ITERATIONS) {
+    stream.markdown('\n\n*Maximum tool iterations reached.*\n\n');
+  }
+}
 
 /**
  * Build a prompt for executing a single task (agent mode)
@@ -472,27 +560,26 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         !tool.tags.length // Include tools without tags
       );
 
-      // Use sendChatParticipantRequest for automatic tool orchestration
-      // This handles the tool calling loop, invoking tools, and streaming results
+      // Select a model for execution
+      const models = await vscode.lm.selectChatModels({
+        vendor: 'copilot',
+        family: 'gpt-4o'
+      });
+
+      if (models.length === 0) {
+        throw new Error('No language model available. Please ensure GitHub Copilot is active.');
+      }
+      const model = models[0];
+
+      // Build messages for the model
+      const messages = [
+        vscode.LanguageModelChatMessage.User(prompt)
+      ];
+
+      // Execute with manual tool orchestration
       stream.markdown('**Agent executing...**\n\n');
 
-      const libResult = chatUtils.sendChatParticipantRequest(
-        request,
-        ctx.context,  // Chat context from the handler
-        {
-          prompt,
-          responseStreamOptions: {
-            stream,
-            references: true,
-            responseText: true
-          },
-          tools
-        },
-        token
-      );
-
-      // Wait for the request to complete
-      await libResult.result;
+      await executeWithTools(model, messages, tools, stream, token);
 
       stream.markdown('\n\n');
 
