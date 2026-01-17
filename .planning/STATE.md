@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 1.5.3 — Rebrand to Hopper (complete)
+**Current focus:** Phase 4 — Execution Commands (in progress)
 
 ## Current Position
 
-Phase: 1.5.3 (Rebrand to Hopper)
-Plan: 2 of 2 complete
-Status: Phase complete
-Last activity: 2026-01-16 — Completed 01.5.3-02 (Complete rebrand verification)
+Phase: 4 (Execution Commands)
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-01-16 — Completed 04-01 (/execute-plan command)
 
-Progress: ████████████████████ 100%
+Progress: ██████░░░░░░░░░░░░░░ 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28 (including FIX plans)
-- Average duration: 8.2 min
-- Total execution time: 231 min
+- Total plans completed: 29 (including FIX plans)
+- Average duration: 8.4 min
+- Total execution time: 243 min
 
 **By Phase:**
 
@@ -33,6 +33,7 @@ Progress: ████████████████████ 100%
 | 01.5.2-dual-auth | 4+FIX2+FIX3+UAT | 35 min | 5.0 min |
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
+| 04-execution-commands | 1 | 12 min | 12.0 min |
 
 **Recent Trend:**
 - Last 5 plans: 01.5.2-02 (6 min), 01.5.2-03 (7 min), 01.5.2-03-FIX2 (6 min), 01.5.2-03-FIX3 (3 min)
@@ -100,6 +101,10 @@ Recent decisions affecting current work:
 | 01.5.2-04 | Auth check before license check | Prevents access when disconnected |
 | 01.5.2-04 | Auto-open /status after auth | In-chat feedback instead of toast |
 | 01.5.2-04 | FastNEAR RPC endpoints | Better performance than official RPC |
+| 04-01 | Regex-based plan parsing | Simple regex sufficient for PLAN.md format |
+| 04-01 | Auto-detect from STATE.md | Parse current phase, find unexecuted plans |
+| 04-01 | License check after parse | Extract phase number from plan's phase field |
+| 04-01 | Stream without auto-apply | Show LLM suggestions, user applies manually |
 
 ### Deferred Issues
 
@@ -118,6 +123,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-16
-Stopped at: Completed 01.5.3-02 (Complete rebrand verification)
+Stopped at: Completed 04-01 (/execute-plan command)
 Resume file: None
-Next: Phase 1.5.3 complete. Ready for Phase 4 (Execution Commands) or next roadmap item.
+Next: Continue Phase 4 with 04-02 (Verification criteria checking) or 04-03 (Git commit integration).
