@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 5.1 of 10 (GSD Feature Parity)
-Plan: 2 of 5 complete
+Plan: 3 of 5 complete
 Status: In progress
-Last activity: 2026-01-17 — Completed 05.1-02-PLAN.md (pre-planning commands)
+Last activity: 2026-01-17 — Completed 05.1-03-PLAN.md (UAT workflow)
 
-Progress: ██████████░░░░░░░░░░ 59%
+Progress: ███████████░░░░░░░░░ 61%
 
 ## Performance Metrics
 
@@ -35,10 +35,10 @@ Progress: ██████████░░░░░░░░░░ 59%
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 | 04-execution-commands | 3+FIX+FIX-FIX+FIX-FIX-FIX+FIX-FIX-FIX-FIX+FIX5+FIX6+FIX7+FIX8+04-03-FIX | 66 min | 5.1 min |
 | 05-session-management | 3 | 10 min | 3.3 min |
-| 05.1-gsd-parity | 2 | 14 min | 7.0 min |
+| 05.1-gsd-parity | 3 | 19 min | 6.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (4 min), 05-03 (3 min), 05.1-01 (6 min), 05.1-02 (8 min)
+- Last 5 plans: 05-03 (3 min), 05.1-01 (6 min), 05.1-02 (8 min), 05.1-03 (5 min)
 - Trend: Regular plans executing efficiently (~5 min avg)
 
 ## Accumulated Context
@@ -140,6 +140,10 @@ Recent decisions affecting current work:
 | 05.1-02 | Skip research for commodity work | Auth, CRUD, REST don't need research |
 | 05.1-02 | Command args for discuss-phase context | VSCode Chat doesn't support multi-turn questioning |
 | 05.1-02 | list-phase-assumptions is informational | No files created, just surfaces assumptions |
+| 05.1-03 | LLM generates test checklist from SUMMARY.md | More useful UAT guidance than raw accomplishments |
+| 05.1-03 | Phase-scoped ISSUES.md with UAT-XXX prefix | Distinguish from global ISS-XXX issues |
+| 05.1-03 | Fix plans use type: fix | Standard plan structure for consistent execution |
+| 05.1-03 | Resume-task guides to re-execution | Agent context may have expired |
 
 ### Deferred Issues
 
@@ -158,6 +162,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 05.1-02-PLAN.md (pre-planning commands)
+Stopped at: Completed 05.1-03-PLAN.md (UAT workflow)
 Resume file: None
-Next: Execute 05.1-03-PLAN.md (UAT workflow)
+Next: Execute 05.1-04-PLAN.md (milestone and codebase commands)
