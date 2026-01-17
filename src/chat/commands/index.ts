@@ -9,6 +9,9 @@ import { handleProgress } from './progress';
 import { handlePauseWork } from './pauseWork';
 import { handleResumeWork } from './resumeWork';
 import { handleConsiderIssues } from './considerIssues';
+import { handleAddPhase } from './addPhase';
+import { handleInsertPhase } from './insertPhase';
+import { handleRemovePhase } from './removePhase';
 
 /**
  * Command definitions with descriptions for help output
@@ -22,6 +25,9 @@ const COMMAND_DEFINITIONS = [
   { name: 'pause-work', description: 'Save work state for later resumption' },
   { name: 'resume-work', description: 'Resume work from previous session' },
   { name: 'consider-issues', description: 'Review and triage deferred issues' },
+  { name: 'add-phase', description: 'Add a new phase to end of roadmap' },
+  { name: 'insert-phase', description: 'Insert urgent phase between existing phases' },
+  { name: 'remove-phase', description: 'Remove a phase from roadmap' },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -252,6 +258,9 @@ registry.set('progress', handleProgress);
 registry.set('pause-work', handlePauseWork);
 registry.set('resume-work', handleResumeWork);
 registry.set('consider-issues', handleConsiderIssues);
+registry.set('add-phase', handleAddPhase);
+registry.set('insert-phase', handleInsertPhase);
+registry.set('remove-phase', handleRemovePhase);
 
 /**
  * Get a command handler by name
