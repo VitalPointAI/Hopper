@@ -290,11 +290,116 @@ async function writeIssuesFile(
 }
 
 /**
+ * Run interactive test flow using VSCode dialogs
+ * Guides user through tests one-by-one with per-test reporting
+ */
+async function runInteractiveTests(
+  testItems: string[],
+  planName: string,
+  stream: vscode.ChatResponseStream
+): Promise<TestResult[]> {
+  const results: TestResult[] = [];
+
+  stream.markdown('### Interactive Testing\n\n');
+  stream.markdown('A dialog will appear for each test. Please perform the test and report the result.\n\n');
+
+  for (let i = 0; i < testItems.length; i++) {
+    const testItem = testItems[i];
+
+    stream.markdown(`**Test ${i + 1}/${testItems.length}:** ${testItem}\n`);
+
+    // Show QuickPick for test result
+    const statusResult = await vscode.window.showQuickPick(
+      [
+        { label: 'Pass', description: 'Test works correctly', value: 'pass' as const },
+        { label: 'Fail', description: 'Test does not work', value: 'fail' as const },
+        { label: 'Partial', description: 'Works but has issues', value: 'partial' as const },
+        { label: 'Skip', description: 'Cannot test right now', value: 'skip' as const }
+      ],
+      {
+        title: `Test ${i + 1} of ${testItems.length}`,
+        placeHolder: testItem
+      }
+    );
+
+    if (!statusResult) {
+      // User cancelled - treat remaining tests as skipped
+      stream.markdown(`  - *Cancelled*\n\n`);
+      for (let j = i; j < testItems.length; j++) {
+        results.push({
+          feature: testItems[j],
+          status: 'skip'
+        });
+      }
+      break;
+    }
+
+    const result: TestResult = {
+      feature: testItem,
+      status: statusResult.value
+    };
+
+    // If fail or partial, get more details
+    if (statusResult.value === 'fail' || statusResult.value === 'partial') {
+      // Get severity
+      const severityResult = await vscode.window.showQuickPick(
+        [
+          { label: 'Blocker', description: 'Cannot use feature at all', value: 'blocker' as const },
+          { label: 'Major', description: 'Feature works but significant problem', value: 'major' as const },
+          { label: 'Minor', description: 'Small issue, feature still usable', value: 'minor' as const },
+          { label: 'Cosmetic', description: 'Visual only, no functional impact', value: 'cosmetic' as const }
+        ],
+        {
+          title: 'Issue Severity',
+          placeHolder: 'How severe is this issue?'
+        }
+      );
+
+      if (severityResult) {
+        result.severity = severityResult.value;
+      }
+
+      // Get description
+      const description = await vscode.window.showInputBox({
+        title: 'Issue Description',
+        prompt: 'What went wrong?',
+        placeHolder: 'Describe what happened vs what you expected'
+      });
+
+      if (description) {
+        result.description = description;
+      }
+    }
+
+    results.push(result);
+
+    // Show result in chat
+    const statusEmoji = {
+      pass: '✓',
+      fail: '✗',
+      partial: '⚠',
+      skip: '⏭'
+    }[result.status];
+
+    stream.markdown(`  - ${statusEmoji} **${statusResult.label}**`);
+    if (result.severity) {
+      stream.markdown(` (${result.severity})`);
+    }
+    if (result.description) {
+      stream.markdown(`: ${result.description}`);
+    }
+    stream.markdown('\n\n');
+  }
+
+  return results;
+}
+
+/**
  * Handle /verify-work command
  *
  * Guides manual user acceptance testing of recently built features.
  * Extracts deliverables from SUMMARY.md, generates test checklist,
- * guides user through each test, logs issues to phase-scoped file.
+ * guides user through each test interactively, logs issues to phase-scoped file.
  */
 export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResult> {
   const { request, stream, projectContext } = ctx;
@@ -373,46 +478,108 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
   }
   stream.markdown('\n');
 
-  stream.markdown('### Test Checklist\n\n');
-  stream.markdown('Please manually verify each item and report results:\n\n');
+  stream.markdown(`**${testItems.length} tests generated.** Starting interactive testing...\n\n`);
 
-  for (let i = 0; i < testItems.length; i++) {
-    stream.markdown(`${i + 1}. ${testItems[i]}\n`);
-  }
-  stream.markdown('\n');
+  // Run interactive test flow
+  const results = await runInteractiveTests(testItems, planName, stream);
 
-  // Create buttons for test results
+  // Calculate summary
+  const passed = results.filter(r => r.status === 'pass').length;
+  const failed = results.filter(r => r.status === 'fail').length;
+  const partial = results.filter(r => r.status === 'partial').length;
+  const skipped = results.filter(r => r.status === 'skip').length;
+
+  // Display summary
   stream.markdown('---\n\n');
-  stream.markdown('### Report Results\n\n');
-  stream.markdown('After testing each item:\n\n');
+  stream.markdown('## Test Results Summary\n\n');
+  stream.markdown(`| Status | Count |\n`);
+  stream.markdown(`|--------|-------|\n`);
+  stream.markdown(`| ✓ Passed | ${passed} |\n`);
+  stream.markdown(`| ✗ Failed | ${failed} |\n`);
+  stream.markdown(`| ⚠ Partial | ${partial} |\n`);
+  stream.markdown(`| ⏭ Skipped | ${skipped} |\n\n`);
 
-  stream.button({
-    command: 'hopper.verifyWorkResult',
-    arguments: [target.phase, target.plan, phaseDir, 'all-pass'],
-    title: 'All Tests Pass'
-  });
+  // Collect issues (failed and partial)
+  const issueResults = results.filter(r => r.status === 'fail' || r.status === 'partial');
 
-  stream.markdown(' ');
+  if (issueResults.length > 0) {
+    // Convert to UATIssue format
+    const issues: UATIssue[] = issueResults.map((r, idx) => ({
+      id: `UAT-${String(idx + 1).padStart(3, '0')}`,
+      feature: r.feature,
+      severity: (r.severity?.charAt(0).toUpperCase() + r.severity?.slice(1)) as UATIssue['severity'] || 'Major',
+      description: r.description || `Test ${r.status}: ${r.feature}`
+    }));
 
-  stream.button({
-    command: 'hopper.verifyWorkResult',
-    arguments: [target.phase, target.plan, phaseDir, 'has-issues'],
-    title: 'Report Issues'
-  });
+    // Write issues file
+    const issuesUri = await writeIssuesFile(
+      projectContext.planningUri,
+      phaseDir,
+      target.phase,
+      target.plan,
+      issues
+    );
 
-  stream.markdown('\n\n');
+    if (issuesUri) {
+      stream.markdown(`### Issues Logged\n\n`);
+      stream.markdown(`**${issues.length} issue(s)** saved to: \`${target.phase}-${target.plan.padStart(2, '0')}-ISSUES.md\`\n\n`);
 
-  stream.markdown('**Tips:**\n');
-  stream.markdown('- Test in a fresh environment if possible\n');
-  stream.markdown('- Try edge cases (empty inputs, long text, etc.)\n');
-  stream.markdown('- Check both happy path and error handling\n\n');
+      for (const issue of issues) {
+        stream.markdown(`- **${issue.id}** (${issue.severity}): ${issue.feature}\n`);
+      }
+      stream.markdown('\n');
 
+      stream.reference(issuesUri);
+    }
+
+    // Determine verdict
+    const blockers = issues.filter(i => i.severity === 'Blocker').length;
+    const majors = issues.filter(i => i.severity === 'Major').length;
+
+    stream.markdown('### Verdict\n\n');
+    if (blockers > 0) {
+      stream.markdown(`**BLOCKERS FOUND** — ${blockers} blocking issue(s) must be fixed before continuing.\n\n`);
+    } else if (majors > 0) {
+      stream.markdown(`**MAJOR ISSUES** — ${majors} significant issue(s) found. Review before proceeding.\n\n`);
+    } else {
+      stream.markdown(`**MINOR ISSUES** — Feature works with minor issues logged.\n\n`);
+    }
+
+    // Offer next steps
+    stream.markdown('### Next Steps\n\n');
+    stream.markdown('Use **/plan-fix** to create a fix plan for logged issues:\n\n');
+    stream.button({
+      command: 'hopper.chat-participant.plan-fix',
+      title: `Plan Fixes for ${target.phase}-${target.plan}`
+    });
+  } else if (passed === results.length) {
+    stream.markdown('### Verdict\n\n');
+    stream.markdown('**ALL TESTS PASSED** — Feature validated!\n\n');
+
+    stream.markdown('### Next Steps\n\n');
+    stream.markdown('Ready to continue to the next phase:\n\n');
+    stream.button({
+      command: 'hopper.chat-participant.progress',
+      title: 'Check Progress'
+    });
+  } else {
+    stream.markdown('### Verdict\n\n');
+    stream.markdown(`**TESTING INCOMPLETE** — ${skipped} test(s) were skipped.\n\n`);
+
+    stream.button({
+      command: 'hopper.chat-participant.progress',
+      title: 'Check Progress'
+    });
+  }
+
+  stream.markdown('\n');
   stream.reference(target.uri);
 
   return {
     metadata: {
       lastCommand: 'verify-work',
-      phase: `${target.phase}-${target.plan}`
+      phase: `${target.phase}-${target.plan}`,
+      testResults: { passed, failed, partial, skipped }
     }
   };
 }
