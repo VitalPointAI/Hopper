@@ -12,6 +12,9 @@ import { handleConsiderIssues } from './considerIssues';
 import { handleAddPhase } from './addPhase';
 import { handleInsertPhase } from './insertPhase';
 import { handleRemovePhase } from './removePhase';
+import { handleResearchPhase } from './researchPhase';
+import { handleDiscussPhase } from './discussPhase';
+import { handleListPhaseAssumptions } from './listPhaseAssumptions';
 
 /**
  * Command definitions with descriptions for help output
@@ -28,6 +31,9 @@ const COMMAND_DEFINITIONS = [
   { name: 'add-phase', description: 'Add a new phase to end of roadmap' },
   { name: 'insert-phase', description: 'Insert urgent phase between existing phases' },
   { name: 'remove-phase', description: 'Remove a phase from roadmap' },
+  { name: 'research-phase', description: 'Research how to implement a phase before planning' },
+  { name: 'discuss-phase', description: 'Gather phase context through adaptive questioning' },
+  { name: 'list-phase-assumptions', description: "Surface Claude's assumptions about a phase approach" },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -261,6 +267,9 @@ registry.set('consider-issues', handleConsiderIssues);
 registry.set('add-phase', handleAddPhase);
 registry.set('insert-phase', handleInsertPhase);
 registry.set('remove-phase', handleRemovePhase);
+registry.set('research-phase', handleResearchPhase);
+registry.set('discuss-phase', handleDiscussPhase);
+registry.set('list-phase-assumptions', handleListPhaseAssumptions);
 
 /**
  * Get a command handler by name
