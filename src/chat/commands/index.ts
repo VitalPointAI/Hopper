@@ -15,6 +15,9 @@ import { handleRemovePhase } from './removePhase';
 import { handleResearchPhase } from './researchPhase';
 import { handleDiscussPhase } from './discussPhase';
 import { handleListPhaseAssumptions } from './listPhaseAssumptions';
+import { handleVerifyWork } from './verifyWork';
+import { handlePlanFix } from './planFix';
+import { handleResumeTask } from './resumeTask';
 
 /**
  * Command definitions with descriptions for help output
@@ -34,6 +37,9 @@ const COMMAND_DEFINITIONS = [
   { name: 'research-phase', description: 'Research how to implement a phase before planning' },
   { name: 'discuss-phase', description: 'Gather phase context through adaptive questioning' },
   { name: 'list-phase-assumptions', description: "Surface Hopper's assumptions about a phase approach" },
+  { name: 'verify-work', description: 'Guide manual user acceptance testing' },
+  { name: 'plan-fix', description: 'Plan fixes for UAT issues' },
+  { name: 'resume-task', description: 'Resume interrupted task execution' },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -270,6 +276,9 @@ registry.set('remove-phase', handleRemovePhase);
 registry.set('research-phase', handleResearchPhase);
 registry.set('discuss-phase', handleDiscussPhase);
 registry.set('list-phase-assumptions', handleListPhaseAssumptions);
+registry.set('verify-work', handleVerifyWork);
+registry.set('plan-fix', handlePlanFix);
+registry.set('resume-task', handleResumeTask);
 
 /**
  * Get a command handler by name

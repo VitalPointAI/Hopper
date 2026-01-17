@@ -82,6 +82,18 @@
             "description": "Surface Hopper's assumptions about a phase approach"
           },
           {
+            "name": "verify-work",
+            "description": "Guide manual user acceptance testing"
+          },
+          {
+            "name": "plan-fix",
+            "description": "Plan fixes for UAT issues"
+          },
+          {
+            "name": "resume-task",
+            "description": "Resume interrupted task execution"
+          },
+          {
             "name": "status",
             "description": "Show current project status and phase"
           },
