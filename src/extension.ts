@@ -208,13 +208,15 @@ export function activate(context: vscode.ExtensionContext): void {
   ];
 
   for (const { id, command } of chatParticipantCommands) {
-    const disposable = vscode.commands.registerCommand(id, async () => {
+    const disposable = vscode.commands.registerCommand(id, async (...args: unknown[]) => {
       try {
         // Open the chat panel with the query pre-filled
         // The query parameter populates the chat input with the specified text
         // Using @hopper with the command triggers the chat participant
+        // If arguments are provided (from stream.button({ arguments: [...] })), append them
+        const argString = args.length > 0 ? ` ${args.join(' ')}` : '';
         await vscode.commands.executeCommand('workbench.action.chat.open', {
-          query: `@hopper ${command}`
+          query: `@hopper ${command}${argString}`
         });
       } catch (err) {
         // Fallback: show guidance if the chat command isn't available

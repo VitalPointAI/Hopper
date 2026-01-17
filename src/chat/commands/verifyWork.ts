@@ -550,6 +550,7 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
     stream.markdown('Use **/plan-fix** to create a fix plan for logged issues:\n\n');
     stream.button({
       command: 'hopper.chat-participant.plan-fix',
+      arguments: [`${target.phase}-${target.plan.padStart(2, '0')}`],
       title: `Plan Fixes for ${target.phase}-${target.plan}`
     });
   } else if (passed === results.length) {
