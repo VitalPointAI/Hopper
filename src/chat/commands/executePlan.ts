@@ -122,6 +122,67 @@ function extractPhaseNumber(phase: string): number {
 }
 
 /**
+ * Resolve a short plan identifier to a full file URI.
+ * Handles formats: 04-01, 04-01-PLAN, 04-01-FIX-PLAN, 04-01-PLAN.md
+ * All resolve to the matching PLAN.md in .planning/phases/
+ * Full paths (containing slash) are returned as-is.
+ */
+async function resolvePlanPath(
+  workspaceUri: vscode.Uri,
+  pathArg: string
+): Promise<{ uri: vscode.Uri | null; availablePlans?: string[] }> {
+  // If it's already a full path (contains '/'), use as-is
+  if (pathArg.includes('/')) {
+    if (pathArg.startsWith('/') || pathArg.includes(':')) {
+      return { uri: vscode.Uri.file(pathArg) };
+    }
+    return { uri: vscode.Uri.joinPath(workspaceUri, pathArg) };
+  }
+
+  // Short identifier: normalize to plan filename
+  let normalizedName = pathArg;
+
+  // Strip .md if present
+  if (normalizedName.endsWith('.md')) {
+    normalizedName = normalizedName.slice(0, -3);
+  }
+
+  // Check if it already has -PLAN suffix (including -FIX-PLAN, etc.)
+  if (!normalizedName.toUpperCase().includes('-PLAN')) {
+    normalizedName = normalizedName + '-PLAN';
+  }
+
+  // Search for matching file in .planning/phases/*/
+  const pattern = new vscode.RelativePattern(
+    workspaceUri,
+    `.planning/phases/*/${normalizedName}.md`
+  );
+
+  try {
+    const files = await vscode.workspace.findFiles(pattern, null, 1);
+
+    if (files.length > 0) {
+      return { uri: files[0] };
+    }
+
+    // Not found - gather available plans to show in error message
+    const allPlansPattern = new vscode.RelativePattern(
+      workspaceUri,
+      '.planning/phases/*/*-PLAN.md'
+    );
+    const allPlans = await vscode.workspace.findFiles(allPlansPattern, null, 20);
+    const availablePlans = allPlans.map(f => {
+      const parts = f.fsPath.split('/');
+      return parts[parts.length - 1].replace('.md', '');
+    }).sort();
+
+    return { uri: null, availablePlans };
+  } catch {
+    return { uri: null };
+  }
+}
+
+/**
  * Handle /execute-plan command
  *
  * Executes a PLAN.md file by:
@@ -174,13 +235,38 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   let planUri: vscode.Uri | undefined;
 
   if (promptText) {
-    // User provided a path
-    // Handle relative or absolute paths
-    if (promptText.startsWith('/') || promptText.includes(':')) {
-      planUri = vscode.Uri.file(promptText);
+    // User provided a path - resolve it (handles short identifiers like "04-01")
+    const resolved = await resolvePlanPath(workspaceUri, promptText);
+
+    if (resolved.uri) {
+      planUri = resolved.uri;
     } else {
-      // Relative to workspace
-      planUri = vscode.Uri.joinPath(workspaceUri, promptText);
+      // Plan not found - show helpful error
+      stream.markdown('## Plan Not Found\n\n');
+      stream.markdown(`Could not find plan matching: **${promptText}**\n\n`);
+
+      if (resolved.availablePlans && resolved.availablePlans.length > 0) {
+        stream.markdown('**Available plans:**\n');
+        for (const plan of resolved.availablePlans.slice(0, 10)) {
+          stream.markdown(`- \`${plan}\`\n`);
+        }
+        if (resolved.availablePlans.length > 10) {
+          stream.markdown(`- ... and ${resolved.availablePlans.length - 10} more\n`);
+        }
+        stream.markdown('\n');
+      }
+
+      stream.markdown('**Usage examples:**\n');
+      stream.markdown('- `/execute-plan 04-01` - short identifier\n');
+      stream.markdown('- `/execute-plan 04-01-PLAN` - with suffix\n');
+      stream.markdown('- `/execute-plan .planning/phases/04-name/04-01-PLAN.md` - full path\n\n');
+
+      stream.button({
+        command: 'hopper.chat-participant.plan-phase',
+        title: 'Create a Plan'
+      });
+
+      return { metadata: { lastCommand: 'execute-plan' } };
     }
   } else {
     // Auto-detect plan from STATE.md
