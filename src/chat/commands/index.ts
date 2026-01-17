@@ -5,6 +5,7 @@ import { handleNewProject } from './newProject';
 import { handleCreateRoadmap } from './createRoadmap';
 import { handlePlanPhase } from './planPhase';
 import { handleExecutePlan } from './executePlan';
+import { handleProgress } from './progress';
 
 /**
  * Command definitions with descriptions for help output
@@ -14,7 +15,7 @@ const COMMAND_DEFINITIONS = [
   { name: 'create-roadmap', description: 'Create roadmap with phases for the project' },
   { name: 'plan-phase', description: 'Create detailed execution plan for a phase' },
   { name: 'execute-plan', description: 'Execute a PLAN.md file' },
-  { name: 'progress', description: 'Check project progress and current state' },
+  { name: 'progress', description: 'Check project progress and route to next action' },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -241,13 +242,7 @@ registry.set('new-project', handleNewProject);
 registry.set('create-roadmap', handleCreateRoadmap);
 registry.set('plan-phase', handlePlanPhase);
 registry.set('execute-plan', handleExecutePlan);
-
-// Register placeholder handlers for all other commands
-for (const cmd of COMMAND_DEFINITIONS) {
-  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project' && cmd.name !== 'create-roadmap' && cmd.name !== 'plan-phase' && cmd.name !== 'execute-plan') {
-    registry.set(cmd.name, createPlaceholderHandler(cmd.name, cmd.description));
-  }
-}
+registry.set('progress', handleProgress);
 
 /**
  * Get a command handler by name
