@@ -131,7 +131,7 @@ Plans:
 
 Plans:
 - [x] 05-01: Progress tracking (/progress command)
-- [ ] 05-02: Session resumption (/resume-work, /pause-work)
+- [x] 05-02: Session resumption (/resume-work, /pause-work)
 - [ ] 05-03: Issue logging (/consider-issues)
 
 ### Phase 5.1: GSD Feature Parity (INSERTED)
@@ -162,5 +162,5 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 2. Chat Participant | 3/3 | Complete | 2026-01-15 |
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
-| 5. Session Management | 1/3 | In progress | - |
+| 5. Session Management | 2/3 | In progress | - |
 | 5.1 GSD Feature Parity | 0/5 | Not started | - |
