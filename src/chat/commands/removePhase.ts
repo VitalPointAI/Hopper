@@ -294,9 +294,18 @@ export async function handleRemovePhase(ctx: CommandContext): Promise<IHopperRes
     return { metadata: { lastCommand: 'remove-phase' } };
   }
 
-  // Parse existing phases
+  // Read the FULL roadmap file (projectContext.roadmapMd may be truncated)
   stream.progress('Reading roadmap...');
-  const phases = parseRoadmapPhases(projectContext.roadmapMd);
+  const roadmapUri = vscode.Uri.joinPath(workspaceUri, '.planning', 'ROADMAP.md');
+  let fullRoadmapContent: string;
+  try {
+    const roadmapBytes = await vscode.workspace.fs.readFile(roadmapUri);
+    fullRoadmapContent = Buffer.from(roadmapBytes).toString('utf-8');
+  } catch {
+    stream.markdown('**Error:** Could not read ROADMAP.md\n');
+    return { metadata: { lastCommand: 'remove-phase' } };
+  }
+  const phases = parseRoadmapPhases(fullRoadmapContent);
 
   // Find the target phase
   const targetPhase = phases.find(p => p.number === phaseNum);
@@ -341,7 +350,7 @@ export async function handleRemovePhase(ctx: CommandContext): Promise<IHopperRes
   stream.progress('Removing phase...');
 
   try {
-    let roadmapContent = projectContext.roadmapMd;
+    let roadmapContent = fullRoadmapContent;
 
     // 1. Remove phase list entry
     roadmapContent = removePhaseListEntry(roadmapContent, phaseNum);

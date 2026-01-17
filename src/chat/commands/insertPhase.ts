@@ -310,9 +310,18 @@ export async function handleInsertPhase(ctx: CommandContext): Promise<IHopperRes
     return { metadata: { lastCommand: 'insert-phase' } };
   }
 
-  // Parse existing phases
+  // Read the FULL roadmap file (projectContext.roadmapMd may be truncated)
   stream.progress('Reading roadmap...');
-  const phases = parseRoadmapPhases(projectContext.roadmapMd);
+  const roadmapUri = vscode.Uri.joinPath(workspaceUri, '.planning', 'ROADMAP.md');
+  let fullRoadmapContent: string;
+  try {
+    const roadmapBytes = await vscode.workspace.fs.readFile(roadmapUri);
+    fullRoadmapContent = Buffer.from(roadmapBytes).toString('utf-8');
+  } catch {
+    stream.markdown('**Error:** Could not read ROADMAP.md\n');
+    return { metadata: { lastCommand: 'insert-phase' } };
+  }
+  const phases = parseRoadmapPhases(fullRoadmapContent);
 
   // Find the target phase
   const targetPhase = phases.find(p => p.number === afterPhaseNum);
@@ -333,6 +342,11 @@ export async function handleInsertPhase(ctx: CommandContext): Promise<IHopperRes
   if (!nextIntegerPhase) {
     stream.markdown('## Use Add-Phase Instead\n\n');
     stream.markdown(`There is no Phase ${afterPhaseNum + 1} after Phase ${afterPhaseNum}.\n\n`);
+    stream.markdown('**Detected phases:**\n');
+    for (const p of phases) {
+      stream.markdown(`- Phase ${p.number}: ${p.name} (integer: ${Number.isInteger(p.number)})\n`);
+    }
+    stream.markdown('\n');
     stream.markdown('Use **/add-phase** to add a new phase at the end of your roadmap.\n\n');
     stream.button({
       command: 'hopper.chat-participant.add-phase',
@@ -407,9 +421,9 @@ export async function handleInsertPhase(ctx: CommandContext): Promise<IHopperRes
     );
     const progressRow = generateProgressRow(newPhaseNum, parsed.name);
 
-    // Update ROADMAP.md
+    // Update ROADMAP.md (use full content, not truncated context)
     stream.progress('Updating roadmap...');
-    let roadmapContent = projectContext.roadmapMd;
+    let roadmapContent = fullRoadmapContent;
 
     // 1. Insert in phase list at correct position
     const listInsertPos = findPhaseListInsertPosition(roadmapContent, afterPhaseNum, phases);
