@@ -18,7 +18,7 @@ export function convertMessages(
 ): Array<{ role: 'user' | 'assistant' | 'system'; content: string }> {
   return messages.map(msg => ({
     role: mapRole(msg.role),
-    content: extractTextContent(msg.content)
+    content: extractTextContent(msg.content as readonly (vscode.LanguageModelTextPart | vscode.LanguageModelToolResultPart | vscode.LanguageModelToolCallPart)[])
   }));
 }
 

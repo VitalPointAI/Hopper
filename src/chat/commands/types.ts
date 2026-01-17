@@ -9,6 +9,18 @@ export interface IHopperResult extends vscode.ChatResult {
   metadata?: {
     lastCommand?: string;
     phaseNumber?: number;
+    /** Suggested next action for follow-up prompts */
+    nextAction?: string;
+    /** Path to handoff file if paused work exists */
+    handoffPath?: string;
+    /** Path to plan file for execution */
+    planPath?: string | null;
+    /** Generic path for file references */
+    path?: string;
+    /** Phase identifier */
+    phase?: string;
+    /** Issue reference */
+    issue?: string;
   };
 }
 

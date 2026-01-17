@@ -306,7 +306,6 @@ export async function handleResumeWork(ctx: CommandContext): Promise<IHopperResu
     return {
       metadata: {
         lastCommand: 'resume-work',
-        // @ts-expect-error - extending metadata
         handoffPath: handoff.path,
         planPath
       }
@@ -349,7 +348,6 @@ export async function handleResumeWork(ctx: CommandContext): Promise<IHopperResu
     return {
       metadata: {
         lastCommand: 'resume-work',
-        // @ts-expect-error - extending metadata
         planPath: next.planPath
       }
     };
