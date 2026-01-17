@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { CommandContext, IHopperResult } from './types';
 import { ProjectConfig, saveProject, planningExists } from '../generators';
+
+const execAsync = promisify(exec);
 
 /**
  * System prompt for extracting project details from user input
@@ -216,6 +220,28 @@ export async function handleNewProject(ctx: CommandContext): Promise<IHopperResu
         arguments: [result.filePath],
         title: 'Open PROJECT.md'
       });
+    }
+
+    // Initialize git repository for new projects
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    try {
+      // Check if git repo already exists
+      await execAsync('git rev-parse --git-dir', { cwd: workspacePath });
+      // Git already initialized - skip
+    } catch {
+      // No git repo exists - initialize one
+      stream.progress('Initializing git repository...');
+      try {
+        await execAsync('git init', { cwd: workspacePath });
+        await execAsync('git add .planning/', { cwd: workspacePath });
+        await execAsync('git commit -m "chore: initialize project with Hopper"', { cwd: workspacePath });
+        stream.markdown('\n✓ Git repository initialized with initial commit\n\n');
+      } catch (gitError) {
+        // Git not available or error - warn but continue
+        const errorMsg = gitError instanceof Error ? gitError.message : String(gitError);
+        stream.markdown(`\n⚠️ Could not initialize git: ${errorMsg}\n\n`);
+        stream.markdown('*Git commit integration will be unavailable. Install git and run `git init` manually.*\n\n');
+      }
     }
 
     // Next steps
