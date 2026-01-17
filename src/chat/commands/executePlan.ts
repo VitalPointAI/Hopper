@@ -54,8 +54,9 @@ async function executeWithTools(
           );
 
           // Collect tool result for next iteration
+          // invokeTool returns LanguageModelToolResult, we need its content array
           toolResults.push(
-            new vscode.LanguageModelToolResultPart(part.callId, result)
+            new vscode.LanguageModelToolResultPart(part.callId, result.content)
           );
 
           stream.markdown(`*Tool ${part.name} completed.*\n\n`);
@@ -94,7 +95,7 @@ async function executeWithTools(
 /**
  * Build a prompt for executing a single task (agent mode)
  */
-function buildTaskPrompt(task: ExecutionTask, planContext: string, supportsTools: boolean): string {
+function buildTaskPrompt(task: ExecutionTask, planContext: string, supportsTools: boolean, workspaceRoot: string): string {
   const filesLine = task.files && task.files.length > 0
     ? `**Files to modify:** ${task.files.join(', ')}\n\n`
     : '';
@@ -104,6 +105,11 @@ function buildTaskPrompt(task: ExecutionTask, planContext: string, supportsTools
     : `Provide the complete implementation for this task. Show the full file contents that should be created or modified.`;
 
   return `You are an AI assistant executing a task from a Hopper plan.
+
+**CRITICAL: File Path Requirements**
+All file paths MUST be absolute paths. The workspace root is: ${workspaceRoot}
+When creating or modifying files, always use the full absolute path.
+Example: Instead of "src/types/user.ts", use "${workspaceRoot}/src/types/user.ts"
 
 **Task:** ${task.name}
 
@@ -550,7 +556,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
     try {
       // Build prompt for this task
-      const prompt = buildTaskPrompt(task, planContext, usedAgentMode);
+      const prompt = buildTaskPrompt(task, planContext, usedAgentMode, workspaceUri.fsPath);
 
       // Get available tools from vscode.lm.tools
       // Filter to workspace-relevant tools (file editing, terminal, etc.)
