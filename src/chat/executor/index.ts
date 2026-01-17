@@ -10,3 +10,16 @@ export type {
   ExecutionStatus,
   ExecutionState
 } from './types';
+
+// Git service exports
+export {
+  checkGitRepo,
+  getStagedFiles,
+  stageAll,
+  stageFiles,
+  commit,
+  getRecentCommits,
+  detectCommitType,
+  generateCommitMessage
+} from './gitService';
+export type { CommitResult, CommitInfo } from './gitService';
