@@ -4,6 +4,7 @@ import { formatContextForPrompt, truncateContent } from '../context/projectConte
 import { handleNewProject } from './newProject';
 import { handleCreateRoadmap } from './createRoadmap';
 import { handlePlanPhase } from './planPhase';
+import { handleExecutePlan } from './executePlan';
 
 /**
  * Command definitions with descriptions for help output
@@ -239,10 +240,11 @@ registry.set('status', statusHandler);
 registry.set('new-project', handleNewProject);
 registry.set('create-roadmap', handleCreateRoadmap);
 registry.set('plan-phase', handlePlanPhase);
+registry.set('execute-plan', handleExecutePlan);
 
 // Register placeholder handlers for all other commands
 for (const cmd of COMMAND_DEFINITIONS) {
-  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project' && cmd.name !== 'create-roadmap' && cmd.name !== 'plan-phase') {
+  if (cmd.name !== 'help' && cmd.name !== 'status' && cmd.name !== 'new-project' && cmd.name !== 'create-roadmap' && cmd.name !== 'plan-phase' && cmd.name !== 'execute-plan') {
     registry.set(cmd.name, createPlaceholderHandler(cmd.name, cmd.description));
   }
 }
