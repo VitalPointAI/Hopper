@@ -46,6 +46,14 @@
             "description": "Check project progress and current state"
           },
           {
+            "name": "pause-work",
+            "description": "Save work state for later resumption"
+          },
+          {
+            "name": "resume-work",
+            "description": "Resume work from previous session"
+          },
+          {
             "name": "status",
             "description": "Show current project status and phase"
           },

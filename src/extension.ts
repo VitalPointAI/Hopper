@@ -196,8 +196,11 @@ export function activate(context: vscode.ExtensionContext): void {
     { id: 'hopper.chat-participant.new-project', command: '/new-project' },
     { id: 'hopper.chat-participant.create-roadmap', command: '/create-roadmap' },
     { id: 'hopper.chat-participant.plan-phase', command: '/plan-phase' },
+    { id: 'hopper.chat-participant.execute-plan', command: '/execute-plan' },
     { id: 'hopper.chat-participant.status', command: '/status' },
     { id: 'hopper.chat-participant.progress', command: '/progress' },
+    { id: 'hopper.chat-participant.pause-work', command: '/pause-work' },
+    { id: 'hopper.chat-participant.resume-work', command: '/resume-work' },
     { id: 'hopper.chat-participant.help', command: '/help' }
   ];
 
