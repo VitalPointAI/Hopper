@@ -10,7 +10,10 @@ import {
   checkGitRepo,
   stageFiles,
   commit,
-  generateCommitMessage
+  generateCommitMessage,
+  saveSummary,
+  SummaryConfig,
+  TaskCommitInfo
 } from '../executor';
 
 /**
@@ -728,6 +731,9 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     stream.markdown('**Git integration:** Not available (not a git repository)\n\n');
   }
 
+  // Track execution start time for summary generation
+  const executionStartTime = new Date();
+
   // Check for existing execution state (resuming from checkpoint)
   const planPath = planUri.fsPath;
   let existingState = loadExecutionState(ctx.extensionContext, planPath);
@@ -1078,6 +1084,76 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       stream.markdown(`- [ ] ${criterion}\n`);
     }
     stream.markdown('\n');
+  }
+
+  // Generate SUMMARY.md if all tasks completed successfully
+  const allTasksSucceeded = failedCount === 0 && skippedCount === 0;
+
+  if (allTasksSucceeded) {
+    stream.progress('Generating summary...');
+
+    // Calculate execution end time and duration
+    const executionEndTime = new Date();
+    const durationMs = executionEndTime.getTime() - executionStartTime.getTime();
+
+    // Categorize files as created or modified (simplified - assume all are modified)
+    // In practice, you'd check if file existed before
+    const filesCreated: string[] = [];
+    const filesModified = Array.from(allFiles);
+
+    // Build task commits array from results
+    const commits: TaskCommitInfo[] = taskCommits;
+
+    // Extract phase directory from plan path
+    // e.g., "/path/.planning/phases/04-execution-commands/04-03-PLAN.md" -> "04-execution-commands"
+    const pathParts = planPath.split('/');
+    const phaseDir = pathParts[pathParts.length - 2] || plan.phase;
+
+    // Build summary config
+    const summaryConfig: SummaryConfig = {
+      phase: plan.phase,
+      planNumber: plan.planNumber,
+      durationMs,
+      startTime: executionStartTime,
+      endTime: executionEndTime,
+      tasks: plan.tasks,
+      commits,
+      filesCreated,
+      filesModified,
+      decisions: decisionsFromState,
+      objective: plan.objective
+    };
+
+    // Save summary
+    const summaryResult = await saveSummary(workspaceUri, phaseDir, plan.planNumber, summaryConfig);
+
+    if (summaryResult.success && summaryResult.filePath) {
+      stream.markdown('### Summary Generated\n\n');
+      stream.markdown(`Created: \`${summaryResult.filePath.fsPath.replace(workspaceUri.fsPath, '.')}\`\n\n`);
+      stream.reference(summaryResult.filePath);
+      stream.markdown('\n\n');
+
+      // Auto-commit the summary if git is available
+      if (isGitRepo && autoCommitEnabled) {
+        try {
+          const summaryRelPath = summaryResult.filePath.fsPath.replace(workspaceUri.fsPath + '/', '');
+          await stageFiles(workspaceUri, [summaryRelPath]);
+          const phaseNum = plan.phase.match(/^(\d+)/)?.[1] || '00';
+          const planNum = String(plan.planNumber).padStart(2, '0');
+          const docCommitMessage = `docs(${phaseNum}-${planNum}): complete plan summary`;
+          const docCommitResult = await commit(workspaceUri, docCommitMessage);
+
+          if (docCommitResult.success && docCommitResult.hash) {
+            stream.markdown(`**Summary committed:** \`${docCommitResult.hash}\` - ${docCommitMessage}\n\n`);
+          }
+        } catch (gitError) {
+          const gitErrorMsg = gitError instanceof Error ? gitError.message : String(gitError);
+          stream.markdown(`*Summary commit failed: ${gitErrorMsg}*\n\n`);
+        }
+      }
+    } else {
+      stream.markdown(`*Summary generation failed: ${summaryResult.error}*\n\n`);
+    }
   }
 
   stream.markdown('### Next Steps\n\n');

@@ -23,3 +23,7 @@ export {
   generateCommitMessage
 } from './gitService';
 export type { CommitResult, CommitInfo } from './gitService';
+
+// Summary generator exports
+export { createSummaryMd, saveSummary } from './summaryGenerator';
+export type { SummaryConfig, SummaryGeneratorResult, TaskCommitInfo } from './summaryGenerator';
