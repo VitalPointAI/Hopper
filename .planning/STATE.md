@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-12)
 
 **Core value:** Model-agnostic structured planning and execution accessible through VSCode's native agent chat interface — enabling any model (including NEAR AI) to reliably build complete projects through intelligent context engineering.
-**Current focus:** Phase 5 — Session Management (in progress)
+**Current focus:** Phase 5.1 — GSD Feature Parity (ready for planning)
 
 ## Current Position
 
 Phase: 5 of 10 (Session Management)
-Plan: 2 of 3 complete
-Status: In progress
-Last activity: 2026-01-17 — Completed 05-02-PLAN.md (session continuity)
+Plan: 3 of 3 complete
+Status: Phase complete
+Last activity: 2026-01-17 — Completed 05-03-PLAN.md (consider-issues command)
 
-Progress: █████████░░░░░░░░░░░ 52%
+Progress: ██████████░░░░░░░░░░ 55%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 39 (including FIX plans)
-- Average duration: 7.1 min
-- Total execution time: 277 min
+- Total plans completed: 40 (including FIX plans)
+- Average duration: 7.0 min
+- Total execution time: 280 min
 
 **By Phase:**
 
@@ -34,10 +34,10 @@ Progress: █████████░░░░░░░░░░░ 52%
 | 02-chat-participant | 3+FIX+FIX2+FIX3+FIX4 | 23 min | 2.9 min |
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 | 04-execution-commands | 3+FIX+FIX-FIX+FIX-FIX-FIX+FIX-FIX-FIX-FIX+FIX5+FIX6+FIX7+FIX8+04-03-FIX | 66 min | 5.1 min |
-| 05-session-management | 2 | 7 min | 3.5 min |
+| 05-session-management | 3 | 10 min | 3.3 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (4 min), 04-03 (5 min), 04-03-FIX (5 min), 05-01 (3 min), 05-02 (4 min)
+- Last 5 plans: 04-03-FIX (5 min), 05-01 (3 min), 05-02 (4 min), 05-03 (3 min)
 - Trend: Regular plans executing efficiently (~4 min avg)
 
 ## Accumulated Context
@@ -128,6 +128,9 @@ Recent decisions affecting current work:
 | 05-02 | Frontmatter + XML for handoff files | Matches GSD template structure |
 | 05-02 | First handoff takes priority | Single active session assumption |
 | 05-02 | Route 0 in progress for handoffs | Paused work checked before other routing |
+| 05-03 | LLM categorization for issues | resolved/urgent/natural-fit/can-wait categories |
+| 05-03 | GlobalState for issue analyses | Store between command and close button action |
+| 05-03 | Separate helper command for close | hopper.closeResolvedIssues for button action |
 
 ### Deferred Issues
 
@@ -146,6 +149,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 05-02-PLAN.md (session continuity)
+Stopped at: Completed 05-03-PLAN.md (consider-issues command)
 Resume file: None
-Next: Execute 05-03-PLAN.md (GSD parity commands)
+Next: Plan Phase 5.1 (GSD Feature Parity)
