@@ -328,21 +328,6 @@ export async function handleInsertPhase(ctx: CommandContext): Promise<IHopperRes
     return { metadata: { lastCommand: 'insert-phase' } };
   }
 
-  // Check if target phase is complete
-  if (!targetPhase.isComplete) {
-    stream.markdown('## Phase Not Complete\n\n');
-    stream.markdown(`Phase ${afterPhaseNum} (${targetPhase.name}) is not yet complete.\n\n`);
-    stream.markdown('You can only insert urgent phases after **completed** phases.\n\n');
-    stream.markdown('**Options:**\n');
-    stream.markdown(`- Complete Phase ${afterPhaseNum} first\n`);
-    stream.markdown(`- Use **/add-phase** to add at the end of roadmap\n\n`);
-    stream.button({
-      command: 'hopper.chat-participant.progress',
-      title: 'Check Progress'
-    });
-    return { metadata: { lastCommand: 'insert-phase' } };
-  }
-
   // Check if there's a next integer phase (otherwise use add-phase)
   const nextIntegerPhase = phases.find(p => Number.isInteger(p.number) && p.number === afterPhaseNum + 1);
   if (!nextIntegerPhase) {
