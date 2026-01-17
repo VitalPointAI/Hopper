@@ -6,18 +6,13 @@
 
 ## Open Issues
 
-### UAT-004: "Start Fresh" and "Continue from Here" appear identical
-
-**Discovered:** 2026-01-17
-**Phase/Plan:** 05-02
-**Severity:** Cosmetic
-**Feature:** /resume-work navigation options
-**Description:** Both buttons often route to `/progress`, making them seem identical. "Continue from Here" only differs when there's a specific plan path in the handoff.
-**Expected:** Clear distinction between resuming paused work vs starting fresh
-**Actual:** Both appear to do the same thing when no plan path in handoff
-**Note:** The behavior is correct but UX could be confusing. Consider different routing or clearer button labels.
+[None - all issues resolved]
 
 ## Resolved Issues
+
+### UAT-004: "Start Fresh" and "Continue from Here" appear identical
+**Resolved:** 2026-01-17 - Fixed during consider-issues review
+**Fix:** Clarified button labels: "Resume Plan" (when plan exists) vs "Check Progress" (when no plan). Removed redundant second button when both would do the same thing.
 
 ### UAT-001: pause-work and resume-work commands not visible in slash menu
 **Resolved:** 2026-01-17 - Fixed during UAT session

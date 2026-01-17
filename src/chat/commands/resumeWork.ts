@@ -271,29 +271,34 @@ export async function handleResumeWork(ctx: CommandContext): Promise<IHopperResu
     const planPathMatch = handoff.nextAction.match(/\/execute-plan\s+([^\s]+)/);
     const planPath = planPathMatch ? planPathMatch[1] : null;
 
-    // Offer options
+    // Offer options based on whether we have a specific plan to resume
     stream.markdown('**Choose how to proceed:**\n\n');
 
     if (planPath) {
+      // Have a specific plan - offer to resume it or check overall progress
       stream.button({
         command: 'hopper.chat-participant.execute-plan',
         arguments: [planPath],
-        title: 'Continue from Here'
+        title: 'Resume Plan'
       });
-    } else {
+
       stream.button({
         command: 'hopper.chat-participant.progress',
-        title: 'Continue from Here'
+        title: 'Check Progress Instead'
       });
+
+      stream.markdown('\n\n');
+      stream.markdown('*Tip: The handoff file will be deleted after the plan completes.*\n\n');
+    } else {
+      // No specific plan - just offer progress check
+      stream.button({
+        command: 'hopper.chat-participant.progress',
+        title: 'Check Progress'
+      });
+
+      stream.markdown('\n\n');
+      stream.markdown('*No specific plan was in progress. Use /progress to see what\'s next.*\n\n');
     }
-
-    stream.button({
-      command: 'hopper.chat-participant.progress',
-      title: 'Start Fresh'
-    });
-
-    stream.markdown('\n\n');
-    stream.markdown('*Tip: The handoff file will be deleted after the plan completes.*\n\n');
 
     // Update STATE.md resume file field
     await updateStateResumeFile(projectContext.planningUri, handoff.path);
