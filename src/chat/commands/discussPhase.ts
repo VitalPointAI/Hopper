@@ -54,6 +54,31 @@ Guidelines:
 Always return valid JSON.`;
 
 /**
+ * System prompt for merging new context with existing context
+ */
+const CONTEXT_MERGE_PROMPT = `You are helping merge new context into an existing context document.
+
+The user has provided additional thoughts about a phase. Merge them with the existing context, preserving what was there while incorporating the new information.
+
+Output your response as JSON:
+{
+  "vision": "Updated vision that incorporates both existing and new thoughts",
+  "essential": ["Merged list of essential items - keep existing, add new, remove duplicates"],
+  "outOfScope": ["Merged list of out-of-scope items"],
+  "specificIdeas": "Combined specific ideas from both sources",
+  "additionalNotes": "Combined additional notes"
+}
+
+Guidelines:
+- PRESERVE existing context - don't discard it
+- INTEGRATE new information naturally
+- If new info contradicts old, prefer the new (user changed their mind)
+- Remove duplicates but keep all unique items
+- The merged vision should feel cohesive, not like two separate things stapled together
+
+Always return valid JSON.`;
+
+/**
  * Parse phase information from ROADMAP.md content
  */
 interface ParsedPhaseInfo {
@@ -337,21 +362,35 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
     // File doesn't exist, which is expected
   }
 
+  // Load existing context if it exists (for merging)
+  let existingContextContent: string | undefined;
+  if (existingContext) {
+    try {
+      const existingBytes = await vscode.workspace.fs.readFile(contextUri);
+      existingContextContent = Buffer.from(existingBytes).toString('utf-8');
+    } catch {
+      // Could not read existing file
+    }
+  }
+
   if (existingContext && !userContext) {
     stream.markdown('## Context Already Exists\n\n');
     stream.markdown(`Phase ${phaseNum} (${targetPhase.name}) already has context.\n\n`);
     stream.markdown('**Existing context:**\n');
     stream.reference(contextUri);
     stream.markdown('\n\n');
-    stream.markdown('To update, delete the existing file and run `/discuss-phase` again.\n\n');
+    stream.markdown('To add more context, run the command with your additional thoughts:\n');
+    stream.markdown(`\`/discuss-phase ${phaseNum} [additional context to merge]\`\n\n`);
     stream.markdown('**Or proceed to next steps:**\n\n');
     stream.button({
       command: 'hopper.chat-participant.research-phase',
+      arguments: [phaseNum],
       title: `Research Phase ${phaseNum}`
     });
     stream.markdown(' ');
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [phaseNum],
       title: `Plan Phase ${phaseNum}`
     });
     return { metadata: { lastCommand: 'discuss-phase' } };
@@ -360,17 +399,32 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
   stream.progress('Preparing discussion...');
 
   try {
-    // If user provided context, synthesize it directly
+    // If user provided context, synthesize it (merging with existing if present)
     if (userContext) {
-      stream.markdown('## Capturing Context\n\n');
-      stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
-      stream.markdown(`**Goal:** ${targetPhase.goal}\n\n`);
-      stream.markdown('Processing your context...\n\n');
+      const isMerging = !!existingContextContent;
 
-      // Synthesize context
+      if (isMerging) {
+        stream.markdown('## Merging Additional Context\n\n');
+        stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
+        stream.markdown(`**Goal:** ${targetPhase.goal}\n\n`);
+        stream.markdown('Merging your new context with existing...\n\n');
+      } else {
+        stream.markdown('## Capturing Context\n\n');
+        stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
+        stream.markdown(`**Goal:** ${targetPhase.goal}\n\n`);
+        stream.markdown('Processing your context...\n\n');
+      }
+
+      // Choose prompt based on whether we're merging or creating new
+      const prompt = isMerging ? CONTEXT_MERGE_PROMPT : CONTEXT_SYNTHESIS_PROMPT;
+      const userInput = isMerging
+        ? `Phase: ${targetPhase.name}\nGoal: ${targetPhase.goal}\n\n--- EXISTING CONTEXT ---\n${existingContextContent}\n\n--- NEW INPUT TO MERGE ---\n${userContext}`
+        : `Phase: ${targetPhase.name}\nGoal: ${targetPhase.goal}\n\nUser's input:\n${userContext}`;
+
+      // Synthesize/merge context
       const synthesisMessages: vscode.LanguageModelChatMessage[] = [
-        vscode.LanguageModelChatMessage.User(CONTEXT_SYNTHESIS_PROMPT),
-        vscode.LanguageModelChatMessage.User(`Phase: ${targetPhase.name}\nGoal: ${targetPhase.goal}\n\nUser's input:\n${userContext}`)
+        vscode.LanguageModelChatMessage.User(prompt),
+        vscode.LanguageModelChatMessage.User(userInput)
       ];
 
       const synthesisResponse = await request.model.sendRequest(synthesisMessages, {}, token);
@@ -429,7 +483,7 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
       );
 
       // Success!
-      stream.markdown('## Context Captured\n\n');
+      stream.markdown(isMerging ? '## Context Updated\n\n' : '## Context Captured\n\n');
       stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
       stream.markdown('### Vision Summary\n\n');
       stream.markdown(`${context.vision}\n\n`);
@@ -442,7 +496,7 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
         stream.markdown('\n');
       }
 
-      stream.markdown('**Created:**\n');
+      stream.markdown(isMerging ? '**Updated:**\n' : '**Created:**\n');
       stream.reference(contextUri);
       stream.markdown('\n\n');
 
@@ -453,11 +507,13 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
       stream.markdown('### Next Steps\n\n');
       stream.button({
         command: 'hopper.chat-participant.research-phase',
+        arguments: [phaseNum],
         title: `Research Phase ${phaseNum}`
       });
       stream.markdown(' ');
       stream.button({
         command: 'hopper.chat-participant.plan-phase',
+        arguments: [phaseNum],
         title: `Plan Phase ${phaseNum}`
       });
 
@@ -535,6 +591,7 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
     stream.markdown('If you\'re ready to plan without detailed context:\n\n');
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [phaseNum],
       title: `Plan Phase ${phaseNum}`
     });
 

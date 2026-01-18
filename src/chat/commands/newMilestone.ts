@@ -496,11 +496,13 @@ export async function handleNewMilestone(ctx: CommandContext): Promise<IHopperRe
     stream.markdown('### Next Steps\n\n');
     stream.button({
       command: 'hopper.chat-participant.discuss-phase',
+      arguments: [startingPhaseNum],
       title: `Discuss Phase ${startingPhaseNum}`
     });
     stream.markdown(' ');
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [startingPhaseNum],
       title: `Plan Phase ${startingPhaseNum}`
     });
 

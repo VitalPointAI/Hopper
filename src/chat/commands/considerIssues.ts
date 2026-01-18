@@ -443,7 +443,7 @@ export async function handleConsiderIssues(ctx: CommandContext): Promise<IHopper
 
   if (urgent.length > 0) {
     stream.markdown(`**${urgent.length} urgent issue(s)** may need immediate attention.\n`);
-    stream.markdown('Consider using `/insert-phase` to address before continuing (coming in Phase 5.1).\n\n');
+    stream.markdown('Consider using `/insert-phase` to address before continuing.\n\n');
   }
 
   if (naturalFit.length > 0) {

@@ -8,6 +8,7 @@ import { trackActivation } from './telemetry/telemetryService';
 import { createHopperParticipant } from './chat/hopperParticipant';
 import { AuthType, AuthProvider } from './licensing/types';
 import { registerFileTools } from './tools/fileTools';
+import { registerTerminalTools } from './tools/terminalTools';
 
 // Export license validator for use by chat participant
 let licenseValidator: LicenseValidator | undefined;
@@ -37,6 +38,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register custom file tools (bypasses buggy copilot_createFile)
   registerFileTools(context);
+
+  // Register terminal tools (for long-running processes like dev servers)
+  registerTerminalTools(context);
 
   // Create and register the @hopper chat participant
   try {
@@ -204,7 +208,14 @@ export function activate(context: vscode.ExtensionContext): void {
     { id: 'hopper.chat-participant.consider-issues', command: '/consider-issues' },
     { id: 'hopper.chat-participant.help', command: '/help' },
     { id: 'hopper.chat-participant.plan-fix', command: '/plan-fix' },
-    { id: 'hopper.chat-participant.verify-work', command: '/verify-work' }
+    { id: 'hopper.chat-participant.verify-work', command: '/verify-work' },
+    { id: 'hopper.chat-participant.research-phase', command: '/research-phase' },
+    { id: 'hopper.chat-participant.discuss-phase', command: '/discuss-phase' },
+    { id: 'hopper.chat-participant.list-phase-assumptions', command: '/list-phase-assumptions' },
+    { id: 'hopper.chat-participant.complete-milestone', command: '/complete-milestone' },
+    { id: 'hopper.chat-participant.new-milestone', command: '/new-milestone' },
+    { id: 'hopper.chat-participant.discuss-milestone', command: '/discuss-milestone' },
+    { id: 'hopper.chat-participant.add-phase', command: '/add-phase' }
   ];
 
   for (const { id, command } of chatParticipantCommands) {

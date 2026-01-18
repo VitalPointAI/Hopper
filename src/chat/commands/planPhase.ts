@@ -255,20 +255,22 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     return { metadata: { lastCommand: 'plan-phase' } };
   }
 
-  // Parse phase number from prompt
+  // Parse phase number from prompt (may include keywords like "additional")
   const promptText = request.prompt.trim();
+  const promptParts = promptText.split(/\s+/);
+  const phaseArg = promptParts[0];
   let targetPhaseNum: number | undefined;
 
-  if (promptText) {
-    // Check for invalid input (non-numeric)
-    if (!/^[\d.]+$/.test(promptText)) {
+  if (phaseArg) {
+    // Check for invalid input (non-numeric first argument)
+    if (!/^[\d.]+$/.test(phaseArg)) {
       stream.markdown('## Invalid Argument\n\n');
-      stream.markdown(`"${promptText}" is not a valid phase number.\n\n`);
-      stream.markdown('**Usage:** `/plan-phase [phase-number]`\n\n');
+      stream.markdown(`"${phaseArg}" is not a valid phase number.\n\n`);
+      stream.markdown('**Usage:** `/plan-phase <phase-number> [additional]`\n\n');
       stream.markdown('**Examples:**\n');
       stream.markdown('- `/plan-phase 1` - Plan for Phase 1\n');
       stream.markdown('- `/plan-phase 2.1` - Plan for inserted Phase 2.1\n');
-      stream.markdown('- `/plan-phase` - Auto-detect next unplanned phase\n\n');
+      stream.markdown('- `/plan-phase 1 additional` - Create additional plan for Phase 1\n\n');
       stream.markdown('**Available phases:**\n');
       for (const p of phases) {
         stream.markdown(`- Phase ${p.number}: ${p.name}\n`);
@@ -278,7 +280,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     }
 
     // Try to parse as number (supports decimal like 1.5)
-    const parsed = parseFloat(promptText);
+    const parsed = parseFloat(phaseArg);
     if (!isNaN(parsed)) {
       targetPhaseNum = parsed;
     }
@@ -287,12 +289,13 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
   // If no phase specified, show usage help
   if (targetPhaseNum === undefined) {
     stream.markdown('## Usage\n\n');
-    stream.markdown('**`/plan-phase <phase-number>`**\n\n');
+    stream.markdown('**`/plan-phase <phase-number> [additional]`**\n\n');
     stream.markdown('Create a detailed execution plan for a specific phase.\n\n');
     stream.markdown('**Examples:**\n');
     stream.markdown('- `/plan-phase 1` - Plan for Phase 1\n');
     stream.markdown('- `/plan-phase 2` - Plan for Phase 2\n');
-    stream.markdown('- `/plan-phase 1.5` - Plan for inserted Phase 1.5\n\n');
+    stream.markdown('- `/plan-phase 1.5` - Plan for inserted Phase 1.5\n');
+    stream.markdown('- `/plan-phase 1 additional` - Create additional plan for Phase 1\n\n');
     stream.markdown('**Available phases:**\n');
     for (const p of phases) {
       stream.markdown(`- Phase ${p.number}: ${p.name}\n`);
@@ -370,7 +373,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
   stream.progress('Checking existing plans...');
   const planNumber = await getNextPlanNumber(workspaceUri, targetPhase.dirName, targetPhase.number);
 
-  // Check if plan already exists - offer options
+  // Check if plan already exists - show existing plan and explain behavior
   if (planNumber > 1) {
     const existingPlanUri = vscode.Uri.joinPath(
       workspaceUri,
@@ -380,13 +383,37 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
       `${targetPhase.number.toString().padStart(2, '0')}-${(planNumber - 1).toString().padStart(2, '0')}-PLAN.md`
     );
 
-    stream.markdown(`**Note:** Phase ${targetPhase.number} already has ${planNumber - 1} plan(s).\n\n`);
-    stream.markdown(`Creating **Plan ${planNumber}** for additional work in this phase.\n\n`);
-
-    // Show reference to existing plan
+    stream.markdown('## Plan Already Exists\n\n');
+    stream.markdown(`Phase ${targetPhase.number} (${targetPhase.name}) already has a plan.\n\n`);
     stream.markdown('**Existing plan:**\n');
     stream.reference(existingPlanUri);
     stream.markdown('\n\n');
+    stream.markdown('**Options:**\n');
+    stream.markdown(`- Edit the existing plan directly in the file\n`);
+    stream.markdown(`- Delete the existing plan and run \`/plan-phase ${targetPhaseNum}\` again to regenerate\n`);
+    stream.markdown(`- Run \`/plan-phase ${targetPhaseNum} additional\` to create Plan ${planNumber} for additional work\n\n`);
+
+    // Only create additional plan if user explicitly requested it
+    const promptLower = promptText.toLowerCase();
+    const wantsAdditional = promptLower.includes('additional') ||
+                           promptLower.includes('new') ||
+                           promptLower.includes('another');
+
+    if (!wantsAdditional) {
+      stream.button({
+        command: 'vscode.open',
+        arguments: [existingPlanUri],
+        title: 'Edit Existing Plan'
+      });
+      stream.markdown(' ');
+      stream.button({
+        command: 'hopper.chat-participant.execute-plan',
+        title: 'Execute Plan'
+      });
+      return { metadata: { lastCommand: 'plan-phase', phaseNumber: targetPhase.number } };
+    }
+
+    stream.markdown(`Creating **Plan ${planNumber}** for additional work in this phase.\n\n`);
   }
 
   stream.progress('Reading project context...');
@@ -480,6 +507,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
 
       stream.button({
         command: 'hopper.chat-participant.plan-phase',
+        arguments: [targetPhaseNum],
         title: 'Try Again'
       });
 
@@ -536,7 +564,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     }
 
     stream.markdown('\n### Next Steps\n\n');
-    stream.markdown('Review the plan and use **/execute-plan** (coming in Phase 4) to execute it.\n\n');
+    stream.markdown('Review the plan and use **/execute-plan** to execute it.\n\n');
 
     return {
       metadata: {

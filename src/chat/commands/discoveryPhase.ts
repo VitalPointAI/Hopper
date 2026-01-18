@@ -972,6 +972,7 @@ export async function handleDiscoveryPhase(ctx: CommandContext): Promise<IHopper
       stream.markdown('*No file created for verify depth. Use `/plan-phase` to proceed.*\n\n');
       stream.button({
         command: 'hopper.chat-participant.plan-phase',
+        arguments: [phaseNum],
         title: `Plan Phase ${phaseNum}`
       });
       return { metadata: { lastCommand: 'discovery-phase', phaseNumber: phaseNum } };
@@ -1015,6 +1016,7 @@ export async function handleDiscoveryPhase(ctx: CommandContext): Promise<IHopper
     stream.markdown('Discovery complete. The findings will be included when planning.\n\n');
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [phaseNum],
       title: `Plan Phase ${phaseNum}`
     });
 

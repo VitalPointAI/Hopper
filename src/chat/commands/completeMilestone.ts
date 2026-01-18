@@ -325,6 +325,7 @@ export async function handleCompleteMilestone(ctx: CommandContext): Promise<IHop
       const nextPhase = incompletePhases[0].number;
       stream.button({
         command: 'hopper.chat-participant.plan-phase',
+        arguments: [nextPhase],
         title: `Plan Phase ${nextPhase}`
       });
       stream.markdown(' ');
