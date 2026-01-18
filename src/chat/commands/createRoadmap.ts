@@ -7,48 +7,7 @@ import {
   saveRoadmap,
   roadmapExists
 } from '../generators';
-
-/**
- * System prompt for extracting phases from PROJECT.md
- */
-const PHASE_EXTRACTION_PROMPT = `You are helping create a project roadmap by analyzing PROJECT.md and suggesting phases.
-
-Analyze the project requirements and break them into logical phases. Each phase should:
-- Deliver something coherent and testable
-- Build on previous phases when needed
-- Be completable in reasonable scope (not too large)
-
-Output your response as JSON with this exact structure:
-{
-  "overview": "One paragraph describing the journey from start to finish",
-  "phases": [
-    {
-      "name": "kebab-case-name",
-      "goal": "What this phase delivers (1-2 sentences)",
-      "dependsOn": null,
-      "researchLikely": false,
-      "researchTopics": null
-    },
-    {
-      "name": "next-phase",
-      "goal": "What this phase delivers",
-      "dependsOn": 1,
-      "researchLikely": true,
-      "researchTopics": "External API integration, new libraries"
-    }
-  ]
-}
-
-Guidelines:
-- Target 3-8 phases based on project complexity
-- Use kebab-case names (e.g., "foundation", "core-features", "user-auth")
-- First phase dependsOn should be null
-- Subsequent phases typically depend on the previous phase
-- researchLikely = true for: external APIs, new libraries, architectural decisions
-- researchLikely = false for: internal patterns, CRUD operations, established conventions
-- Include researchTopics when researchLikely is true
-
-Always return valid JSON.`;
+import { ConfigManager, getPhaseExtractionPrompt } from '../../config';
 
 /**
  * Extract JSON from response, handling various markdown formats
@@ -272,12 +231,21 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<IHopperR
   const projectName = extractProjectName(projectMd);
   const coreValue = extractCoreValue(projectMd);
 
+  // Load config for planning depth (will return defaults if missing)
+  const configManager = new ConfigManager(workspaceUri);
+  const config = await configManager.loadConfig();
+  const planningDepth = config.planningDepth;
+
   stream.progress('Analyzing requirements and planning phases...');
 
+  // Show planning depth indicator
+  stream.markdown(`**Planning depth:** ${planningDepth}\n\n`);
+
   try {
-    // Build messages for LLM
+    // Build messages for LLM using depth-aware prompt
+    const phasePrompt = getPhaseExtractionPrompt(planningDepth);
     const messages: vscode.LanguageModelChatMessage[] = [
-      vscode.LanguageModelChatMessage.User(PHASE_EXTRACTION_PROMPT),
+      vscode.LanguageModelChatMessage.User(phasePrompt),
       vscode.LanguageModelChatMessage.User(`PROJECT.md content:\n\n${projectMd}`)
     ];
 
