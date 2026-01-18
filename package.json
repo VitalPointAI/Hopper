@@ -139,6 +139,10 @@
             "description": "Analyze codebase to produce planning documents"
           },
           {
+            "name": "security-check",
+            "description": "Scan codebase for security vulnerabilities"
+          },
+          {
             "name": "status",
             "description": "Show current project status and phase"
           },

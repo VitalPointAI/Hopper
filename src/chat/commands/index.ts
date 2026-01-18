@@ -23,6 +23,7 @@ import { handleCompleteMilestone } from './completeMilestone';
 import { handleDiscussMilestone } from './discussMilestone';
 import { handleDiscoveryPhase } from './discoveryPhase';
 import { handleMapCodebase } from './mapCodebase';
+import { handleSecurityCheck } from './securityCheck';
 
 /**
  * Command definitions with descriptions for help output
@@ -50,6 +51,7 @@ const COMMAND_DEFINITIONS = [
   { name: 'complete-milestone', description: 'Archive completed milestone' },
   { name: 'discuss-milestone', description: 'Gather context for next milestone' },
   { name: 'map-codebase', description: 'Analyze codebase to produce planning documents' },
+  { name: 'security-check', description: 'Scan codebase for security vulnerabilities' },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -294,6 +296,7 @@ registry.set('new-milestone', handleNewMilestone);
 registry.set('complete-milestone', handleCompleteMilestone);
 registry.set('discuss-milestone', handleDiscussMilestone);
 registry.set('map-codebase', handleMapCodebase);
+registry.set('security-check', handleSecurityCheck);
 
 /**
  * Get a command handler by name
