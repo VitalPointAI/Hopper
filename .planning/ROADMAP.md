@@ -147,7 +147,7 @@ Plans:
 - [x] 05.1-03: UAT workflow (/verify-work, /plan-fix, /resume-task)
 - [x] 05.1-04: Milestone management (/new-milestone, /complete-milestone, /discuss-milestone)
 - [x] 05.1-05: Live discovery (/discovery-phase with web search and doc fetching)
-- [ ] 05.1-06: Codebase mapping (/map-codebase) and parity verification
+- [x] 05.1-06: Codebase mapping (/map-codebase) and parity verification
 
 ### Phase 6: Security Review
 **Goal**: /security-check command that analyzes user projects for vulnerabilities, auto-fixes safe issues, and offers interactive fixing for others
@@ -157,7 +157,7 @@ Plans:
 **Plans**: 4
 
 Plans:
-- [ ] 06-01: Security types and GitHub Advisory client with caching
+- [x] 06-01: Security types and GitHub Advisory client with caching
 - [ ] 06-02: ESLint scanner with security plugins and OWASP mapping
 - [ ] 06-03: Auto-fix transforms using jscodeshift
 - [ ] 06-04: /security-check command with two-phase UX
@@ -178,5 +178,5 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 3. Planning Commands | 3/3 | Complete | 2026-01-15 |
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
-| 5.1 GSD Feature Parity | 5/6 | In progress | - |
-| 6. Security Review | 0/4 | Not started | - |
+| 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
+| 6. Security Review | 1/4 | In progress | - |
