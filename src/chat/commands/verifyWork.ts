@@ -842,6 +842,7 @@ export async function handleTestResultButton(
 /**
  * Handle severity button click from verify-work UI
  * Called when user clicks Blocker/Major/Minor/Cosmetic buttons after fail/partial
+ * Optionally prompts for custom description (non-blocking input box)
  */
 export async function handleSeverityButton(
   extensionContext: vscode.ExtensionContext,
@@ -855,12 +856,43 @@ export async function handleSeverityButton(
     return { completed: false, message: 'No pending test result. Run /verify-work to continue.' };
   }
 
-  // Record the result with severity and default description
+  // Prompt for optional description (non-blocking, with default)
+  const defaultDesc = getDefaultDescription(severity);
+  const inputBox = vscode.window.createInputBox();
+  inputBox.title = 'Issue Description (optional)';
+  inputBox.prompt = 'Describe the issue or press Enter to use default';
+  inputBox.placeholder = defaultDesc;
+  inputBox.ignoreFocusOut = true;
+
+  const description = await new Promise<string>((resolve) => {
+    let resolved = false;
+
+    inputBox.onDidAccept(() => {
+      if (!resolved) {
+        resolved = true;
+        const value = inputBox.value.trim() || defaultDesc;
+        inputBox.dispose();
+        resolve(value);
+      }
+    });
+
+    inputBox.onDidHide(() => {
+      if (!resolved) {
+        resolved = true;
+        inputBox.dispose();
+        resolve(defaultDesc); // Use default if dismissed
+      }
+    });
+
+    inputBox.show();
+  });
+
+  // Record the result with severity and description
   const testResult: TestResult = {
     feature: state.testItems[state.currentIndex],
     status: state.pendingStatus,
     severity,
-    description: getDefaultDescription(severity)
+    description
   };
   state.results.push(testResult);
   state.currentIndex = state.currentIndex + 1;
