@@ -1,5 +1,12 @@
 import * as vscode from 'vscode';
 import { CommandContext, IHopperResult } from './types';
+import {
+  fetchDocumentation,
+  getOfficialDocsUrl,
+  getPackageDocUrls,
+  summarizeDocContent,
+  DocResult
+} from '../../utils/webFetch';
 
 /**
  * Discovery depth levels
@@ -262,35 +269,78 @@ function getCurrentDate(): string {
 }
 
 /**
- * Perform web search using VSCode's built-in API if available
- * Falls back to constructing search URLs for manual lookup
+ * Fetch documentation for discovered libraries/topics
+ *
+ * Attempts to fetch from official docs, npm, and GitHub
  */
-async function performWebSearch(
-  query: string,
+async function fetchDiscoveryDocs(
+  topic: string,
   stream: vscode.ChatResponseStream,
-  token: vscode.CancellationToken
-): Promise<string[]> {
-  // Try to use VSCode's web search tool if available
-  try {
-    const tools = vscode.lm.tools;
-    const webSearchTool = tools.find(t => t.name === 'web_search' || t.name === 'webSearch');
+  _token: vscode.CancellationToken
+): Promise<{ searchQueries: string[]; fetchedDocs: DocResult[] }> {
+  const searchQueries: string[] = [
+    `Search query: "${topic}"`,
+    `Related: "${topic} 2026 best practices"`,
+    `Related: "${topic} vs alternatives"`
+  ];
 
-    if (webSearchTool) {
-      stream.progress(`Searching: ${query}...`);
-      // Note: Direct tool invocation would require proper tool calling context
-      // For now, we'll return suggested search queries
+  const fetchedDocs: DocResult[] = [];
+
+  // Extract potential library names from topic
+  const words = topic.toLowerCase().split(/\s+/);
+  const potentialLibs = words.filter(w =>
+    w.length > 2 &&
+    !['the', 'and', 'for', 'with', 'how', 'use', 'best', 'way'].includes(w)
+  );
+
+  // Try to fetch official docs for known libraries
+  for (const lib of potentialLibs.slice(0, 3)) {
+    const officialUrl = getOfficialDocsUrl(lib);
+    if (officialUrl) {
+      stream.progress(`Fetching ${lib} docs...`);
+      try {
+        const doc = await fetchDocumentation(officialUrl);
+        if (doc.success) {
+          fetchedDocs.push(doc);
+        }
+      } catch {
+        // Skip failed fetches
+      }
     }
-  } catch {
-    // Web search tool not available
+
+    // Try npm for packages
+    const { npm: npmUrl } = getPackageDocUrls(lib);
+    if (npmUrl && fetchedDocs.length < 3) {
+      stream.progress(`Checking npm for ${lib}...`);
+      try {
+        const doc = await fetchDocumentation(npmUrl);
+        if (doc.success && doc.content.length > 100) {
+          fetchedDocs.push(doc);
+        }
+      } catch {
+        // Skip failed fetches
+      }
+    }
   }
 
-  // Return search queries for LLM to process
-  // The model will use these in its context window
-  return [
-    `Search query: "${query}"`,
-    `Related: "${query} 2026 best practices"`,
-    `Related: "${query} vs alternatives"`
-  ];
+  return { searchQueries, fetchedDocs };
+}
+
+/**
+ * Build context string from fetched documentation
+ */
+function buildDocContext(fetchedDocs: DocResult[]): string {
+  if (fetchedDocs.length === 0) {
+    return '';
+  }
+
+  const parts = ['', '## Fetched Documentation', ''];
+  for (const doc of fetchedDocs) {
+    parts.push(summarizeDocContent(doc, 1500));
+    parts.push('');
+  }
+
+  return parts.join('\n');
 }
 
 /**
@@ -762,23 +812,37 @@ export async function handleDiscoveryPhase(ctx: CommandContext): Promise<IHopper
   stream.markdown(`**Depth:** ${depth}\n`);
   stream.markdown(`**Topic:** ${searchTopic}\n\n`);
 
-  // Perform web search
-  stream.progress('Searching web for current documentation...');
-  const searchQueries = await performWebSearch(searchTopic, stream, token);
+  // Fetch documentation from known sources
+  stream.progress('Fetching current documentation...');
+  const { searchQueries, fetchedDocs } = await fetchDiscoveryDocs(searchTopic, stream, token);
 
-  // Build context for LLM including search results
+  // Show what was fetched
+  if (fetchedDocs.length > 0) {
+    stream.markdown(`**Fetched ${fetchedDocs.length} documentation source(s):**\n`);
+    for (const doc of fetchedDocs) {
+      stream.markdown(`- ${doc.title} (${doc.source})\n`);
+    }
+    stream.markdown('\n');
+  }
+
+  // Build context for LLM including fetched docs
   const contextParts: string[] = [
     `Phase ${phaseNum}: ${targetPhase.name}`,
     `Goal: ${targetPhase.goal}`,
     '',
     'Search topic: ' + searchTopic,
     '',
-    'Web search queries performed:',
+    'Web search queries for reference:',
     ...searchQueries,
     '',
     'Project context:',
     projectContext.projectMd ? projectContext.projectMd.slice(0, 2000) : 'No project description'
   ];
+
+  // Add fetched documentation to context
+  if (fetchedDocs.length > 0) {
+    contextParts.push(buildDocContext(fetchedDocs));
+  }
 
   // Check for existing CONTEXT.md or RESEARCH.md
   const dirName = `${formatPhaseNumber(phaseNum)}-${toKebabCase(targetPhase.name)}`;
