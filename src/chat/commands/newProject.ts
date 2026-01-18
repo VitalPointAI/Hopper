@@ -8,30 +8,11 @@ import {
   selectPlanningDepth,
   selectExecutionMode,
   showConfigurationSummary,
-  createDefaultConfig
+  createDefaultConfig,
+  getProjectExtractionPrompt
 } from '../../config';
 
 const execAsync = promisify(exec);
-
-/**
- * System prompt for extracting project details from user input
- */
-const EXTRACTION_PROMPT = `You are helping extract project details from a user's description.
-Extract the following fields from their input. If a field is not mentioned, provide a reasonable default or leave empty.
-
-Output your response as JSON with these exact fields:
-{
-  "name": "project name",
-  "description": "2-3 sentence description of what this project does",
-  "coreValue": "the ONE most important thing this project must do",
-  "requirements": ["requirement 1", "requirement 2"],
-  "outOfScope": ["thing not building 1"],
-  "context": "background context",
-  "constraints": ["constraint 1"]
-}
-
-If the user provides minimal input, make reasonable assumptions and note them.
-Always return valid JSON.`;
 
 /**
  * Parse JSON from LLM response, handling markdown code blocks
@@ -140,8 +121,11 @@ export async function handleNewProject(ctx: CommandContext): Promise<IHopperResu
 
   try {
     // Build messages for LLM
+    // Use 'standard' depth for new projects since config doesn't exist yet
+    // User selects final depth after PROJECT.md creation
+    const extractionPrompt = getProjectExtractionPrompt('standard');
     const messages: vscode.LanguageModelChatMessage[] = [
-      vscode.LanguageModelChatMessage.User(EXTRACTION_PROMPT),
+      vscode.LanguageModelChatMessage.User(extractionPrompt),
       vscode.LanguageModelChatMessage.User(`User's project description:\n\n${userInput}`)
     ];
 
