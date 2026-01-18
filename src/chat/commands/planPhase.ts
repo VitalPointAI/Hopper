@@ -4,7 +4,6 @@ import {
   PlanConfig,
   TaskConfig,
   savePlan,
-  planExists,
   getNextPlanNumber
 } from '../generators';
 
@@ -13,7 +12,7 @@ import {
  */
 const TASK_GENERATION_PROMPT = `You are helping create an execution plan for a software project phase.
 
-Based on the project context and phase goal, generate 2-3 specific, actionable tasks.
+Based on the project context, phase goal, and the specific plan items provided, generate tasks that cover the work items listed.
 
 Output your response as JSON with this exact structure:
 {
@@ -43,7 +42,9 @@ Output your response as JSON with this exact structure:
 }
 
 Guidelines:
-- Target 2-3 tasks maximum (split into multiple plans if more needed)
+- Generate ONE task for EACH plan item provided
+- If 3 plan items are provided, generate exactly 3 tasks
+- If no specific plan items are listed, generate 3-5 tasks based on the phase goal
 - Use "auto" type for all tasks unless visual verification or decision is needed
 - Use "checkpoint:human-verify" sparingly - only for visual/interactive verification
 - Use "checkpoint:decision" only when user choice affects implementation
@@ -55,6 +56,11 @@ Guidelines:
 Always return valid JSON.`;
 
 /**
+ * Maximum tasks per plan - plans are split into batches of this size
+ */
+const MAX_TASKS_PER_PLAN = 3;
+
+/**
  * Parse phase information from ROADMAP.md
  */
 interface ParsedPhase {
@@ -63,6 +69,7 @@ interface ParsedPhase {
   goal: string;
   dirName: string;
   dependsOn?: number;
+  planItems: string[];  // The specific plan items listed under this phase
 }
 
 /**
@@ -85,16 +92,60 @@ function parseRoadmapPhases(roadmapMd: string): ParsedPhase[] {
     // Generate directory name
     const dirName = `${numStr.padStart(2, '0')}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
 
+    // Extract plan items from Phase Details section
+    const planItems = extractPlanItemsForPhase(roadmapMd, number);
+
     phases.push({
       number,
       name,
       goal,
       dirName,
-      dependsOn: phases.length > 0 ? phases[phases.length - 1].number : undefined
+      dependsOn: phases.length > 0 ? phases[phases.length - 1].number : undefined,
+      planItems
     });
   }
 
   return phases;
+}
+
+/**
+ * Extract plan items for a specific phase from the Phase Details section
+ */
+function extractPlanItemsForPhase(roadmapMd: string, phaseNumber: number): string[] {
+  const planItems: string[] = [];
+
+  // Find the Phase Details section for this phase
+  // Look for "### Phase X:" or "### Phase X.Y:" header
+  const phaseNumStr = phaseNumber.toString();
+  const phaseHeaderPattern = new RegExp(
+    `###\\s*Phase\\s+${phaseNumStr.replace('.', '\\.')}[:\\s]`,
+    'i'
+  );
+
+  const headerMatch = roadmapMd.match(phaseHeaderPattern);
+  if (!headerMatch || headerMatch.index === undefined) {
+    return planItems;
+  }
+
+  // Get content from this phase header to the next phase header or end
+  const startIndex = headerMatch.index;
+  const nextHeaderMatch = roadmapMd.slice(startIndex + 1).match(/###\s*Phase\s+\d/i);
+  const endIndex = nextHeaderMatch && nextHeaderMatch.index !== undefined
+    ? startIndex + 1 + nextHeaderMatch.index
+    : roadmapMd.length;
+
+  const phaseSection = roadmapMd.slice(startIndex, endIndex);
+
+  // Find the "Plans:" section and extract items
+  // Match lines like "- [x] 01-01: Extension scaffolding" or "- [ ] 01.5-01: License contract"
+  const planItemPattern = /-\s*\[[x\s]\]\s*[\d.]+[-–]\d+:\s*(.+)/gi;
+  let itemMatch;
+
+  while ((itemMatch = planItemPattern.exec(phaseSection)) !== null) {
+    planItems.push(itemMatch[1].trim());
+  }
+
+  return planItems;
 }
 
 /**
@@ -418,24 +469,24 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
 
   stream.progress('Reading project context...');
 
-  // Build context for LLM
-  const contextParts: string[] = [];
+  // Build base context for LLM (without plan items - those are added per batch)
+  const baseContextParts: string[] = [];
 
   if (projectContext.projectMd) {
-    contextParts.push('## PROJECT.md\n\n' + projectContext.projectMd);
+    baseContextParts.push('## PROJECT.md\n\n' + projectContext.projectMd);
   }
 
-  contextParts.push(`\n\n## Target Phase\n\n**Phase ${targetPhase.number}: ${targetPhase.name}**\n\nGoal: ${targetPhase.goal}`);
+  baseContextParts.push(`\n\n## Target Phase\n\n**Phase ${targetPhase.number}: ${targetPhase.name}**\n\nGoal: ${targetPhase.goal}`);
 
   if (targetPhase.dependsOn) {
     const depPhase = phases.find(p => p.number === targetPhase.dependsOn);
     if (depPhase) {
-      contextParts.push(`\n\nDepends on Phase ${depPhase.number}: ${depPhase.name}`);
+      baseContextParts.push(`\n\nDepends on Phase ${depPhase.number}: ${depPhase.name}`);
     }
   }
 
   if (projectContext.stateMd) {
-    contextParts.push('\n\n## Current State\n\n' + projectContext.stateMd);
+    baseContextParts.push('\n\n## Current State\n\n' + projectContext.stateMd);
   }
 
   // Check for DISCOVERY.md (from /discovery-phase) and include if available
@@ -447,12 +498,10 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     'DISCOVERY.md'
   );
 
-  let discoveryIncluded = false;
   try {
     const discoveryBytes = await vscode.workspace.fs.readFile(discoveryUri);
     const discoveryContent = Buffer.from(discoveryBytes).toString('utf-8');
-    contextParts.push('\n\n## Discovery Research\n\nThe following research was conducted for this phase:\n\n' + discoveryContent.slice(0, 3000));
-    discoveryIncluded = true;
+    baseContextParts.push('\n\n## Discovery Research\n\nThe following research was conducted for this phase:\n\n' + discoveryContent.slice(0, 3000));
     stream.markdown('*Using discovery research from DISCOVERY.md*\n\n');
   } catch {
     // No discovery file - suggest discovery for phases that might benefit
@@ -527,7 +576,7 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
           const docUri = vscode.Uri.joinPath(codebaseDir, docName);
           const docBytes = await vscode.workspace.fs.readFile(docUri);
           const docContent = Buffer.from(docBytes).toString('utf-8');
-          contextParts.push(`\n\n## Codebase: ${docName}\n\n${docContent.slice(0, 2000)}`);
+          baseContextParts.push(`\n\n## Codebase: ${docName}\n\n${docContent.slice(0, 2000)}`);
           codebaseContextAdded = true;
         } catch {
           // Doc doesn't exist
@@ -546,102 +595,152 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     }
   }
 
-  const fullContext = contextParts.join('');
+  const baseContext = baseContextParts.join('');
+
+  // Batch plan items into groups of MAX_TASKS_PER_PLAN
+  const planItems = targetPhase.planItems;
+  const batches: string[][] = [];
+
+  if (planItems.length === 0) {
+    // No specific items - create single batch with empty array (will use phase goal)
+    batches.push([]);
+  } else {
+    // Split into batches of MAX_TASKS_PER_PLAN
+    for (let i = 0; i < planItems.length; i += MAX_TASKS_PER_PLAN) {
+      batches.push(planItems.slice(i, i + MAX_TASKS_PER_PLAN));
+    }
+  }
+
+  const totalPlans = batches.length;
+  if (totalPlans > 1) {
+    stream.markdown(`**Creating ${totalPlans} plans** for Phase ${targetPhase.number} (${planItems.length} roadmap items)\n\n`);
+  }
 
   stream.progress('Analyzing phase requirements...');
 
+  const createdPlans: vscode.Uri[] = [];
+  let currentPlanNumber = planNumber;
+
   try {
-    // Build messages for LLM
-    const messages: vscode.LanguageModelChatMessage[] = [
-      vscode.LanguageModelChatMessage.User(TASK_GENERATION_PROMPT),
-      vscode.LanguageModelChatMessage.User(`Project context:\n\n${fullContext}`)
-    ];
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      const isMultiplePlans = batches.length > 1;
 
-    // Send to model
-    stream.progress('Generating execution plan...');
-    const response = await request.model.sendRequest(messages, {}, token);
+      if (isMultiplePlans) {
+        stream.progress(`Generating plan ${batchIndex + 1} of ${totalPlans}...`);
+      } else {
+        stream.progress('Generating execution plan...');
+      }
 
-    // Collect full response
-    let fullResponse = '';
-    for await (const fragment of response.text) {
-      if (token.isCancellationRequested) {
-        stream.markdown('**Cancelled**\n');
+      // Build context with this batch's items
+      let batchContext = baseContext;
+      if (batch.length > 0) {
+        batchContext += `\n\n### Plan Items for This Plan\n\nGenerate tasks for these ${batch.length} items:\n`;
+        batch.forEach((item, index) => {
+          batchContext += `${index + 1}. ${item}\n`;
+        });
+        batchContext += `\nIMPORTANT: Generate exactly ${batch.length} tasks, one for each item above.`;
+      }
+
+      // Build messages for LLM
+      const messages: vscode.LanguageModelChatMessage[] = [
+        vscode.LanguageModelChatMessage.User(TASK_GENERATION_PROMPT),
+        vscode.LanguageModelChatMessage.User(`Project context:\n\n${batchContext}`)
+      ];
+
+      // Send to model
+      const response = await request.model.sendRequest(messages, {}, token);
+
+      // Collect full response
+      let fullResponse = '';
+      for await (const fragment of response.text) {
+        if (token.isCancellationRequested) {
+          stream.markdown('**Cancelled**\n');
+          return { metadata: { lastCommand: 'plan-phase' } };
+        }
+        fullResponse += fragment;
+      }
+
+      // Parse the response
+      const parsed = parsePlanResponse(fullResponse);
+
+      if (!parsed) {
+        stream.markdown(`## Unable to Generate Plan ${batchIndex + 1}\n\n`);
+        stream.markdown('Could not parse task information from the model response.\n\n');
+        stream.markdown('**Model output (preview):**\n```\n' + fullResponse.slice(0, 500) + '\n```\n\n');
+        stream.markdown('**Suggestions:**\n');
+        stream.markdown('- Try running the command again\n');
+        stream.markdown('- Add more details to PROJECT.md\n\n');
+
+        stream.button({
+          command: 'hopper.chat-participant.plan-phase',
+          arguments: [targetPhaseNum],
+          title: 'Try Again'
+        });
+
         return { metadata: { lastCommand: 'plan-phase' } };
       }
-      fullResponse += fragment;
+
+      // Build plan config
+      const planConfig: PlanConfig = {
+        phase: targetPhase.dirName,
+        planNumber: currentPlanNumber,
+        phaseNumber: targetPhase.number,
+        phaseName: targetPhase.name,
+        objective: parsed.objective,
+        purpose: parsed.purpose,
+        output: parsed.output,
+        tasks: parsed.tasks,
+        verification: parsed.verification,
+        successCriteria: parsed.successCriteria
+      };
+
+      // Save the plan
+      stream.progress(`Creating plan file ${batchIndex + 1} of ${totalPlans}...`);
+      const result = await savePlan(workspaceUri, targetPhase.dirName, planConfig);
+
+      if (!result.success) {
+        stream.markdown(`**Error:** ${result.error}\n`);
+        return { metadata: { lastCommand: 'plan-phase' } };
+      }
+
+      if (result.filePath) {
+        createdPlans.push(result.filePath);
+      }
+
+      currentPlanNumber++;
     }
 
-    // Parse the response
-    const parsed = parsePlanResponse(fullResponse);
-
-    if (!parsed) {
-      stream.markdown('## Unable to Generate Plan\n\n');
-      stream.markdown('Could not parse task information from the model response.\n\n');
-      stream.markdown('**Model output (preview):**\n```\n' + fullResponse.slice(0, 500) + '\n```\n\n');
-      stream.markdown('**Suggestions:**\n');
-      stream.markdown('- Try running the command again\n');
-      stream.markdown('- Add more details to PROJECT.md\n\n');
-
-      stream.button({
-        command: 'hopper.chat-participant.plan-phase',
-        arguments: [targetPhaseNum],
-        title: 'Try Again'
-      });
-
-      return { metadata: { lastCommand: 'plan-phase' } };
-    }
-
-    // Build plan config
-    const planConfig: PlanConfig = {
-      phase: targetPhase.dirName,
-      planNumber,
-      phaseNumber: targetPhase.number,
-      phaseName: targetPhase.name,
-      objective: parsed.objective,
-      purpose: parsed.purpose,
-      output: parsed.output,
-      tasks: parsed.tasks,
-      verification: parsed.verification,
-      successCriteria: parsed.successCriteria
-    };
-
-    // Show generated plan preview
-    stream.markdown(`## Plan Preview\n\n`);
-    stream.markdown(`**Phase ${targetPhase.number}: ${targetPhase.name}** - Plan ${planNumber}\n\n`);
-    stream.markdown(`**Objective:** ${parsed.objective}\n\n`);
-    stream.markdown(`**Tasks:**\n`);
-    for (let i = 0; i < parsed.tasks.length; i++) {
-      const task = parsed.tasks[i];
-      stream.markdown(`${i + 1}. ${task.name}\n`);
-    }
-    stream.markdown('\n');
-
-    // Save the plan
-    stream.progress('Creating plan file...');
-    const result = await savePlan(workspaceUri, targetPhase.dirName, planConfig);
-
-    if (!result.success) {
-      stream.markdown(`**Error:** ${result.error}\n`);
-      return { metadata: { lastCommand: 'plan-phase' } };
-    }
-
-    // Success!
-    stream.markdown('## Plan Created\n\n');
-
-    if (result.filePath) {
+    // Success! Show summary
+    if (createdPlans.length === 1) {
+      stream.markdown('## Plan Created\n\n');
       stream.markdown('**Created:**\n');
-      stream.reference(result.filePath);
+      stream.reference(createdPlans[0]);
       stream.markdown('\n\n');
 
       stream.button({
         command: 'vscode.open',
-        arguments: [result.filePath],
+        arguments: [createdPlans[0]],
         title: 'Open PLAN.md'
+      });
+    } else {
+      stream.markdown(`## ${createdPlans.length} Plans Created\n\n`);
+      stream.markdown('**Created files:**\n');
+      for (const planUri of createdPlans) {
+        stream.reference(planUri);
+        stream.markdown('\n');
+      }
+      stream.markdown('\n');
+
+      stream.button({
+        command: 'vscode.open',
+        arguments: [createdPlans[0]],
+        title: 'Open First Plan'
       });
     }
 
     stream.markdown('\n### Next Steps\n\n');
-    stream.markdown('Review the plan and use **/execute-plan** to execute it.\n\n');
+    stream.markdown('Review the plan(s) and use **/execute-plan** to execute them in order.\n\n');
 
     return {
       metadata: {
