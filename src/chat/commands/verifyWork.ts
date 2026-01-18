@@ -41,13 +41,22 @@ interface UATIssue {
 
 /**
  * Get the storage key for verification state
+ * Uses a sanitized key to ensure it persists across restarts
  */
 function getVerificationStateKey(planPath: string): string {
-  return `hopper.verificationState.${planPath}`;
+  // Create clean key from plan path - extract phase-plan identifier
+  const match = planPath.match(/(\d+(?:\.\d+)?)-(\d+)-SUMMARY\.md$/);
+  if (match) {
+    return `hopper.verificationState.${match[1]}-${match[2]}`;
+  }
+  // Fallback: hash the path to create a short, valid key
+  const hash = planPath.split('').reduce((a, b) => ((a << 5) - a + b.charCodeAt(0)) | 0, 0);
+  return `hopper.verificationState.${Math.abs(hash)}`;
 }
 
 /**
  * Save verification state to extension globalState
+ * Marks keys for sync to ensure persistence across VSCode restarts
  */
 async function saveVerificationState(
   context: vscode.ExtensionContext,
@@ -55,6 +64,8 @@ async function saveVerificationState(
 ): Promise<void> {
   const key = getVerificationStateKey(state.planPath);
   await context.globalState.update(key, state);
+  // Mark key for sync to survive restarts
+  context.globalState.setKeysForSync([key]);
 }
 
 /**
