@@ -1,6 +1,5 @@
-# Build output
+# Build output (keep dist/ - it's needed!)
 out/
-dist/
 *.vsix
 
 # Dependencies
