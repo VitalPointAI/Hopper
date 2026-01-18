@@ -279,6 +279,7 @@
     "eslint": "^9.39.2",
     "eslint-plugin-no-unsanitized": "^4.1.4",
     "eslint-plugin-security": "^3.0.1",
+    "jiti": "^2.6.1",
     "jscodeshift": "^17.3.0",
     "openai": "^6.16.0",
     "semver": "^7.7.3"

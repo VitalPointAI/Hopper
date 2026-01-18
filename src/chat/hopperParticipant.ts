@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { LicenseValidator } from '../licensing/validator';
-import { getCommandHandler, isValidCommand, IHopperResult, CommandContext } from './commands';
+import { getCommandHandler, IHopperResult, CommandContext } from './commands';
 import { getProjectContext, formatContextForPrompt } from './context/projectContext';
+import { getContextTracker } from '../context/contextTracker';
 
 /**
  * Create and register the @hopper chat participant
@@ -31,11 +32,24 @@ export function createHopperParticipant(
     stream: vscode.ChatResponseStream,
     token: vscode.CancellationToken
   ): Promise<IHopperResult> => {
+    // Get context tracker and start/show session
+    const contextTracker = getContextTracker();
+    contextTracker.show();
+
+    // Track user input
+    contextTracker.addInput(request.prompt);
+
     // Show progress while loading context
     stream.progress('Loading project context...');
 
     // Fetch project context from .planning files
     const projectContext = await getProjectContext();
+
+    // Track project context if available
+    if (projectContext.hasPlanning) {
+      const formattedContext = formatContextForPrompt(projectContext);
+      contextTracker.addInput(formattedContext);
+    }
 
     // Route slash commands to handlers
     if (request.command) {
@@ -84,18 +98,26 @@ export function createHopperParticipant(
     messages.push(vscode.LanguageModelChatMessage.User(systemPrompt));
     messages.push(vscode.LanguageModelChatMessage.User(request.prompt));
 
+    // Track the system prompt as input
+    contextTracker.addInput(systemPrompt);
+
     try {
       // Forward request to the selected model
       const response = await request.model.sendRequest(messages, {}, token);
 
-      // Stream response fragments
+      // Stream response fragments and track output
+      let outputText = '';
       for await (const fragment of response.text) {
         // Check for cancellation before each write
         if (token.isCancellationRequested) {
           break;
         }
         stream.markdown(fragment);
+        outputText += fragment;
       }
+
+      // Track the complete output
+      contextTracker.addOutput(outputText);
 
       return {
         metadata: {

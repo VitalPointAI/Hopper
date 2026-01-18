@@ -8,16 +8,33 @@
 
 import * as vscode from 'vscode';
 import { CommandContext, IHopperResult } from './types';
+// Import types only - these don't trigger ESLint plugin initialization
+import type { SecurityIssue, DependencyIssue } from '../../security/types';
+// Advisory functions don't use ESLint, safe to import directly
 import {
-  SecurityIssue,
-  DependencyIssue,
   getLatestAdvisories,
   matchAdvisoriesToDependencies,
-  scanFiles,
   readPackageJson,
-  getFixForIssue,
-  applyTransform,
-} from '../../security';
+} from '../../security/advisories';
+
+// Lazy-load scanner and fix modules to defer ESLint/jscodeshift initialization
+// These are loaded on-demand when /security-check is invoked
+let scannerModule: typeof import('../../security/scanner') | null = null;
+let fixesModule: typeof import('../../security/fixes') | null = null;
+
+async function getScannerModule() {
+  if (!scannerModule) {
+    scannerModule = await import('../../security/scanner');
+  }
+  return scannerModule;
+}
+
+async function getFixesModule() {
+  if (!fixesModule) {
+    fixesModule = await import('../../security/fixes');
+  }
+  return fixesModule;
+}
 
 /**
  * Handle /security-check command
@@ -61,6 +78,7 @@ export async function handleSecurityCheck(ctx: CommandContext): Promise<IHopperR
   }
 
   // Phase 3: Scan code
+  // Dynamically import scanner to defer ESLint plugin initialization
   stream.progress('Scanning code for vulnerabilities...');
   const scanPatterns = [
     vscode.Uri.joinPath(workspaceUri, 'src/**/*.ts').fsPath,
@@ -72,7 +90,9 @@ export async function handleSecurityCheck(ctx: CommandContext): Promise<IHopperR
     vscode.Uri.joinPath(workspaceUri, 'app/**/*.tsx').fsPath,
   ];
 
-  const { issues: codeIssues, filesScanned, duration } = await scanFiles(scanPatterns, workspaceUri.fsPath);
+  // Lazy-load scanner to avoid ESLint plugin init at extension activation
+  const scanner = await getScannerModule();
+  const { issues: codeIssues, filesScanned, duration } = await scanner.scanFiles(scanPatterns, workspaceUri.fsPath);
 
   // Combine all issues
   const allIssues: SecurityIssue[] = [...codeIssues, ...dependencyIssues];
@@ -298,16 +318,19 @@ export async function autoFixSecurityIssues(
     return { fixed: 0, total: 0 };
   }
 
+  // Lazy-load fix functions to avoid jscodeshift init at extension activation
+  const fixes = await getFixesModule();
+
   const autoFixable = issues.filter(i => i.fixable && i.fixConfidence === 'high');
   let fixed = 0;
 
   for (const issue of autoFixable) {
     if (issue.file && issue.ruleId) {
       const fileUri = vscode.Uri.file(issue.file);
-      const fixInfo = getFixForIssue(issue);
+      const fixInfo = fixes.getFixForIssue(issue);
 
       if (fixInfo) {
-        const result = await applyTransform(fileUri, fixInfo.transform, fixInfo.description);
+        const result = await fixes.applyTransform(fileUri, fixInfo.transform, fixInfo.description);
         if (result.applied) {
           fixed++;
         }
@@ -329,6 +352,9 @@ export async function interactiveFixSecurityIssues(
   if (!issues) {
     return { fixed: 0, skipped: 0, stopped: false };
   }
+
+  // Lazy-load fix functions to avoid jscodeshift init at extension activation
+  const fixes = await getFixesModule();
 
   const needsReview = issues.filter(i => i.fixable && i.fixConfidence !== 'high');
   let fixed = 0;
@@ -364,10 +390,10 @@ export async function interactiveFixSecurityIssues(
     // Apply fix
     if (issue.file && issue.ruleId) {
       const fileUri = vscode.Uri.file(issue.file);
-      const fixInfo = getFixForIssue(issue);
+      const fixInfo = fixes.getFixForIssue(issue);
 
       if (fixInfo) {
-        const result = await applyTransform(fileUri, fixInfo.transform, fixInfo.description);
+        const result = await fixes.applyTransform(fileUri, fixInfo.transform, fixInfo.description);
         if (result.applied) {
           fixed++;
           vscode.window.showInformationMessage(`Fixed: ${fixInfo.description}`);
