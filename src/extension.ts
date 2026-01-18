@@ -458,6 +458,55 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(verifyWorkResultCommand);
 
+  // Register verifyWorkTestResult command for button-based test result flow
+  const verifyWorkTestResultCommand = vscode.commands.registerCommand(
+    'hopper.verifyWorkTestResult',
+    async (planPath: string, testIndex: number, result: 'pass' | 'fail' | 'partial' | 'skip') => {
+      const { handleTestResultButton } = await import('./chat/commands/verifyWork.js');
+      const response = await handleTestResultButton(context, planPath, testIndex, result);
+
+      // Show toast with result
+      vscode.window.showInformationMessage(response.message);
+
+      // Continue to next step via chat
+      if (response.needsSeverity) {
+        // Open chat with /verify-work to show severity buttons
+        await vscode.commands.executeCommand('workbench.action.chat.open', {
+          query: '@hopper /verify-work'
+        });
+      } else if (!response.completed) {
+        // Continue to next test
+        await vscode.commands.executeCommand('workbench.action.chat.open', {
+          query: '@hopper /verify-work'
+        });
+      } else {
+        // All tests complete, show summary
+        await vscode.commands.executeCommand('workbench.action.chat.open', {
+          query: '@hopper /verify-work'
+        });
+      }
+    }
+  );
+  context.subscriptions.push(verifyWorkTestResultCommand);
+
+  // Register verifyWorkSeverity command for severity button clicks
+  const verifyWorkSeverityCommand = vscode.commands.registerCommand(
+    'hopper.verifyWorkSeverity',
+    async (planPath: string, severity: 'blocker' | 'major' | 'minor' | 'cosmetic') => {
+      const { handleSeverityButton } = await import('./chat/commands/verifyWork.js');
+      const response = await handleSeverityButton(context, planPath, severity);
+
+      // Show toast with result
+      vscode.window.showInformationMessage(response.message);
+
+      // Continue via chat
+      await vscode.commands.executeCommand('workbench.action.chat.open', {
+        query: '@hopper /verify-work'
+      });
+    }
+  );
+  context.subscriptions.push(verifyWorkSeverityCommand);
+
   // Register URI handler for auth callbacks (both OAuth and wallet)
   const uriHandler = vscode.window.registerUriHandler({
     handleUri: async (uri: vscode.Uri) => {

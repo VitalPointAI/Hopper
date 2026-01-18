@@ -25,6 +25,12 @@ interface VerificationState {
   currentIndex: number;
   startedAt: string;
   pausedAt?: string;
+  /** True when buttons shown, awaiting click */
+  waitingForResult?: boolean;
+  /** True when awaiting severity for fail/partial */
+  pendingSeverity?: boolean;
+  /** Stores result status while awaiting severity */
+  pendingStatus?: 'fail' | 'partial';
 }
 
 /**
@@ -362,212 +368,222 @@ async function writeIssuesFile(
 }
 
 /**
- * Show a non-blocking QuickPick that persists when clicking away
- * Returns the selected value or null if cancelled/dismissed
+ * Display a single test with buttons for result selection
+ * Uses stream.button() which allows user to type in chat between button clicks
  */
-async function showNonBlockingQuickPick<T extends { label: string; value: unknown }>(
-  items: T[],
-  options: { title: string; placeHolder: string }
-): Promise<T | null> {
-  return new Promise((resolve) => {
-    const picker = vscode.window.createQuickPick<T>();
-    picker.items = items;
-    picker.title = options.title;
-    picker.placeholder = options.placeHolder;
-    picker.ignoreFocusOut = true; // Keep open when clicking elsewhere
-
-    let resolved = false;
-
-    picker.onDidAccept(() => {
-      if (picker.selectedItems.length > 0 && !resolved) {
-        resolved = true;
-        const selected = picker.selectedItems[0];
-        picker.dispose();
-        resolve(selected);
-      }
-    });
-
-    picker.onDidHide(() => {
-      if (!resolved) {
-        resolved = true;
-        picker.dispose();
-        resolve(null);
-      }
-    });
-
-    picker.show();
-  });
-}
-
-/**
- * Show a non-blocking input box that persists when clicking away
- * Returns the entered text or empty string if cancelled
- */
-async function showNonBlockingInputBox(
-  options: { title: string; prompt: string; placeHolder: string }
-): Promise<string> {
-  return new Promise((resolve) => {
-    const inputBox = vscode.window.createInputBox();
-    inputBox.title = options.title;
-    inputBox.prompt = options.prompt;
-    inputBox.placeholder = options.placeHolder;
-    inputBox.ignoreFocusOut = true; // Keep open when clicking elsewhere
-
-    let resolved = false;
-
-    inputBox.onDidAccept(() => {
-      if (!resolved) {
-        resolved = true;
-        const value = inputBox.value;
-        inputBox.dispose();
-        resolve(value);
-      }
-    });
-
-    inputBox.onDidHide(() => {
-      if (!resolved) {
-        resolved = true;
-        inputBox.dispose();
-        resolve(''); // Return empty string on dismiss
-      }
-    });
-
-    inputBox.show();
-  });
-}
-
-/**
- * Run interactive test flow using non-blocking VSCode dialogs
- * Guides user through tests one-by-one with per-test reporting
- * Saves state after each test for resume capability
- */
-async function runInteractiveTests(
-  testItems: string[],
-  planName: string,
+function displayTestWithButtons(
   stream: vscode.ChatResponseStream,
-  extensionContext: vscode.ExtensionContext,
-  state: VerificationState,
-  startIndex: number = 0
-): Promise<{ results: TestResult[]; paused: boolean }> {
-  // Start with any existing results from resumed state
-  const results: TestResult[] = [...state.results];
+  testItem: string,
+  testIndex: number,
+  totalTests: number,
+  planPath: string
+): void {
+  stream.markdown(`---\n\n`);
+  stream.markdown(`### Test ${testIndex + 1} of ${totalTests}\n\n`);
+  stream.markdown(`${testItem}\n\n`);
+  stream.markdown('**What is the result?**\n\n');
 
-  if (startIndex === 0) {
-    stream.markdown('### Interactive Testing\n\n');
-    stream.markdown('Follow the instructions below for each test, then select the result from the dialog.\n\n');
-    stream.markdown('**Note:** The dialog stays open when you click away. You can resume testing with **/verify-work** if you need to pause.\n\n');
-  } else {
-    stream.markdown(`### Resuming Testing (from test ${startIndex + 1})\n\n`);
-    stream.markdown(`**${startIndex} of ${testItems.length}** tests already completed.\n\n`);
-  }
+  // Show buttons for each result option
+  stream.button({
+    command: 'hopper.verifyWorkTestResult',
+    arguments: [planPath, testIndex, 'pass'],
+    title: '✓ Pass'
+  });
+  stream.markdown(' ');
+  stream.button({
+    command: 'hopper.verifyWorkTestResult',
+    arguments: [planPath, testIndex, 'fail'],
+    title: '✗ Fail'
+  });
+  stream.markdown(' ');
+  stream.button({
+    command: 'hopper.verifyWorkTestResult',
+    arguments: [planPath, testIndex, 'partial'],
+    title: '⚠ Partial'
+  });
+  stream.markdown(' ');
+  stream.button({
+    command: 'hopper.verifyWorkTestResult',
+    arguments: [planPath, testIndex, 'skip'],
+    title: '⏭ Skip'
+  });
+  stream.markdown('\n\n');
+  stream.markdown('*You can type questions in the chat before clicking a button.*\n\n');
+}
 
-  for (let i = startIndex; i < testItems.length; i++) {
-    const testItem = testItems[i];
+/**
+ * Display severity selection buttons for fail/partial results
+ */
+function displaySeverityButtons(
+  stream: vscode.ChatResponseStream,
+  planPath: string
+): void {
+  stream.markdown('**How severe is this issue?**\n\n');
 
-    // Display test with clear formatting
-    stream.markdown(`---\n\n`);
-    stream.markdown(`### Test ${i + 1} of ${testItems.length}\n\n`);
-    stream.markdown(`${testItem}\n\n`);
+  stream.button({
+    command: 'hopper.verifyWorkSeverity',
+    arguments: [planPath, 'blocker'],
+    title: 'Blocker'
+  });
+  stream.markdown(' ');
+  stream.button({
+    command: 'hopper.verifyWorkSeverity',
+    arguments: [planPath, 'major'],
+    title: 'Major'
+  });
+  stream.markdown(' ');
+  stream.button({
+    command: 'hopper.verifyWorkSeverity',
+    arguments: [planPath, 'minor'],
+    title: 'Minor'
+  });
+  stream.markdown(' ');
+  stream.button({
+    command: 'hopper.verifyWorkSeverity',
+    arguments: [planPath, 'cosmetic'],
+    title: 'Cosmetic'
+  });
+  stream.markdown('\n\n');
+}
 
-    // Show non-blocking QuickPick for test result
-    const statusResult = await showNonBlockingQuickPick(
-      [
-        { label: '$(pass) Pass', description: 'Feature works as described', value: 'pass' as const },
-        { label: '$(error) Fail', description: 'Feature does not work', value: 'fail' as const },
-        { label: '$(warning) Partial', description: 'Works but has issues', value: 'partial' as const },
-        { label: '$(debug-step-over) Skip', description: 'Cannot test right now', value: 'skip' as const }
-      ],
-      {
-        title: `Test ${i + 1}/${testItems.length}: What is the result?`,
-        placeHolder: 'Read the test instructions in the chat panel, then select result'
-      }
+/**
+ * Get default description based on severity level
+ */
+function getDefaultDescription(severity: 'blocker' | 'major' | 'minor' | 'cosmetic'): string {
+  const descriptions: Record<typeof severity, string> = {
+    blocker: 'Feature completely unusable',
+    major: 'Feature works but significant problem',
+    minor: 'Small issue, feature still usable',
+    cosmetic: 'Visual issue only'
+  };
+  return descriptions[severity];
+}
+
+/**
+ * Display test results summary and handle completion
+ */
+async function displayTestSummary(
+  stream: vscode.ChatResponseStream,
+  results: TestResult[],
+  planningUri: vscode.Uri,
+  phaseDir: string,
+  target: { phase: string; plan: string; uri: vscode.Uri }
+): Promise<void> {
+  // Calculate summary
+  const passed = results.filter(r => r.status === 'pass').length;
+  const failed = results.filter(r => r.status === 'fail').length;
+  const partial = results.filter(r => r.status === 'partial').length;
+  const skipped = results.filter(r => r.status === 'skip').length;
+
+  // Display summary
+  stream.markdown('---\n\n');
+  stream.markdown('## Test Results Summary\n\n');
+  stream.markdown(`| Status | Count |\n`);
+  stream.markdown(`|--------|-------|\n`);
+  stream.markdown(`| ✓ Passed | ${passed} |\n`);
+  stream.markdown(`| ✗ Failed | ${failed} |\n`);
+  stream.markdown(`| ⚠ Partial | ${partial} |\n`);
+  stream.markdown(`| ⏭ Skipped | ${skipped} |\n\n`);
+
+  // Collect issues (failed and partial)
+  const issueResults = results.filter(r => r.status === 'fail' || r.status === 'partial');
+
+  if (issueResults.length > 0) {
+    // Convert to UATIssue format
+    const issues: UATIssue[] = issueResults.map((r, idx) => ({
+      id: `UAT-${String(idx + 1).padStart(3, '0')}`,
+      feature: r.feature,
+      severity: (r.severity ? r.severity.charAt(0).toUpperCase() + r.severity.slice(1) : 'Major') as UATIssue['severity'],
+      description: r.description || `Test ${r.status}: ${r.feature}`
+    }));
+
+    // Write issues file
+    const issuesUri = await writeIssuesFile(
+      planningUri,
+      phaseDir,
+      target.phase,
+      target.plan,
+      issues
     );
 
-    if (!statusResult) {
-      // User dismissed the picker (pressed Escape or clicked close)
-      stream.markdown(`  - *Testing paused*\n\n`);
-      stream.markdown('---\n\n');
-      stream.markdown('**Testing paused.** You dismissed the dialog.\n\n');
-      stream.markdown(`Progress: **${results.length}/${testItems.length}** tests completed.\n\n`);
+    if (issuesUri) {
+      stream.markdown(`### Issues Logged\n\n`);
+      stream.markdown(`**${issues.length} issue(s)** saved to: \`${target.phase}-${target.plan.padStart(2, '0')}-ISSUES.md\`\n\n`);
 
-      // Save state for resume
-      state.currentIndex = i;
-      state.results = results;
-      state.pausedAt = new Date().toISOString();
-      await saveVerificationState(extensionContext, state);
-
-      stream.markdown('Run **/verify-work** to resume from where you left off.\n\n');
-      return { results, paused: true };
-    }
-
-    const result: TestResult = {
-      feature: testItem,
-      status: statusResult.value
-    };
-
-    // If fail or partial, get more details
-    if (statusResult.value === 'fail' || statusResult.value === 'partial') {
-      // Get severity (with non-blocking picker)
-      const severityResult = await showNonBlockingQuickPick(
-        [
-          { label: 'Blocker', description: 'Cannot use feature at all', value: 'blocker' as const },
-          { label: 'Major', description: 'Feature works but significant problem', value: 'major' as const },
-          { label: 'Minor', description: 'Small issue, feature still usable', value: 'minor' as const },
-          { label: 'Cosmetic', description: 'Visual only, no functional impact', value: 'cosmetic' as const }
-        ],
-        {
-          title: 'Issue Severity',
-          placeHolder: 'How severe is this issue?'
-        }
-      );
-
-      // Default to Major if cancelled
-      result.severity = severityResult?.value || 'major';
-
-      // Get description (with non-blocking input box)
-      const description = await showNonBlockingInputBox({
-        title: 'Issue Description',
-        prompt: 'What went wrong?',
-        placeHolder: 'Describe what happened vs what you expected'
-      });
-
-      if (description) {
-        result.description = description;
+      for (const issue of issues) {
+        stream.markdown(`- **${issue.id}** (${issue.severity}): ${issue.feature}\n`);
       }
+      stream.markdown('\n');
+
+      stream.reference(issuesUri);
     }
 
-    results.push(result);
+    // Determine verdict
+    const blockers = issues.filter(i => i.severity === 'Blocker').length;
+    const majors = issues.filter(i => i.severity === 'Major').length;
 
-    // Save state after each test result for resume capability
-    state.currentIndex = i + 1;
-    state.results = results;
-    await saveVerificationState(extensionContext, state);
-
-    // Show result in chat
-    const statusEmoji = {
-      pass: '✓',
-      fail: '✗',
-      partial: '⚠',
-      skip: '⏭'
-    }[result.status];
-
-    stream.markdown(`  - ${statusEmoji} **${statusResult.label}**`);
-    if (result.severity) {
-      stream.markdown(` (${result.severity})`);
+    stream.markdown('### Verdict\n\n');
+    if (blockers > 0) {
+      stream.markdown(`**BLOCKERS FOUND** — ${blockers} blocking issue(s) must be fixed before continuing.\n\n`);
+    } else if (majors > 0) {
+      stream.markdown(`**MAJOR ISSUES** — ${majors} significant issue(s) found. Review before proceeding.\n\n`);
+    } else {
+      stream.markdown(`**MINOR ISSUES** — Feature works with minor issues logged.\n\n`);
     }
-    if (result.description) {
-      stream.markdown(`: ${result.description}`);
-    }
-    stream.markdown('\n\n');
+
+    // Offer next steps
+    stream.markdown('### Next Steps\n\n');
+    stream.markdown('Use **/plan-fix** to create a fix plan for logged issues:\n\n');
+    stream.button({
+      command: 'hopper.chat-participant.plan-fix',
+      arguments: [`${target.phase}-${target.plan.padStart(2, '0')}`],
+      title: `Plan Fixes for ${target.phase}-${target.plan}`
+    });
+  } else if (passed === results.length) {
+    stream.markdown('### Verdict\n\n');
+    stream.markdown('**ALL TESTS PASSED** — Feature validated!\n\n');
+
+    stream.markdown('### Next Steps\n\n');
+    stream.markdown('Ready to continue to the next phase:\n\n');
+    stream.button({
+      command: 'hopper.chat-participant.progress',
+      title: 'Check Progress'
+    });
+  } else {
+    stream.markdown('### Verdict\n\n');
+    stream.markdown(`**TESTING INCOMPLETE** — ${skipped} test(s) were skipped.\n\n`);
+
+    stream.button({
+      command: 'hopper.chat-participant.progress',
+      title: 'Check Progress'
+    });
   }
 
-  return { results, paused: false };
+  stream.markdown('\n');
+  stream.reference(target.uri);
+
+  // Update STATE.md with verification results
+  try {
+    const planRef = `${target.phase}-${target.plan.padStart(2, '0')}`;
+    await updateStateAfterVerification(
+      planningUri,
+      planRef,
+      passed,
+      failed,
+      partial,
+      skipped
+    );
+  } catch (stateErr) {
+    console.error('[Hopper] Failed to update STATE.md after verification:', stateErr);
+    // Don't fail the verification, just log the error
+  }
 }
 
 /**
  * Handle /verify-work command
  *
  * Guides manual user acceptance testing of recently built features.
+ * Uses button-based flow that allows typing in chat between tests.
  * Extracts deliverables from SUMMARY.md, generates test checklist,
  * guides user through each test interactively, logs issues to phase-scoped file.
  */
@@ -635,233 +651,110 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
 
   // Check for existing verification state (for resume capability)
   const savedState = loadVerificationState(extensionContext, planPath);
-  let startIndex = 0;
   let testItems: string[];
   let verificationState: VerificationState;
 
-  if (savedState && savedState.currentIndex < savedState.testItems.length) {
-    // Offer to resume
-    const resumeChoice = await vscode.window.showQuickPick(
-      [
-        { label: '$(debug-continue) Resume', description: `Continue from test ${savedState.currentIndex + 1}`, value: 'resume' as const },
-        { label: '$(refresh) Start Over', description: 'Clear progress and start fresh', value: 'restart' as const }
-      ],
-      {
-        title: `Resume Verification? (${savedState.results.length}/${savedState.testItems.length} tests completed)`,
-        placeHolder: 'Choose how to proceed'
+  // If we have saved state that is waiting for a severity selection, display severity buttons
+  if (savedState && savedState.pendingSeverity && savedState.pendingStatus) {
+    stream.markdown(`## Select Severity\n\n`);
+    stream.markdown(`**Plan:** Phase ${target.phase} Plan ${target.plan}\n`);
+    stream.markdown(`**Test ${savedState.currentIndex + 1}:** marked as **${savedState.pendingStatus}**\n\n`);
+    displaySeverityButtons(stream, planPath);
+    return { metadata: { lastCommand: 'verify-work', waitingForSeverity: true } };
+  }
+
+  // If we have saved state and all tests are complete, show summary
+  if (savedState && savedState.currentIndex >= savedState.testItems.length && !savedState.waitingForResult) {
+    await clearVerificationState(extensionContext, planPath);
+    await displayTestSummary(stream, savedState.results, projectContext.planningUri, phaseDir, target);
+    return {
+      metadata: {
+        lastCommand: 'verify-work',
+        phase: `${target.phase}-${target.plan}`,
+        testResults: {
+          passed: savedState.results.filter(r => r.status === 'pass').length,
+          failed: savedState.results.filter(r => r.status === 'fail').length,
+          partial: savedState.results.filter(r => r.status === 'partial').length,
+          skipped: savedState.results.filter(r => r.status === 'skip').length
+        }
       }
-    );
+    };
+  }
 
-    if (resumeChoice?.value === 'resume') {
-      // Resume from saved state
-      testItems = savedState.testItems;
-      startIndex = savedState.currentIndex;
-      verificationState = savedState;
+  // Check if we have existing state with completed tests
+  if (savedState && savedState.currentIndex > 0 && savedState.currentIndex < savedState.testItems.length) {
+    // Show progress and continue from where we left off
+    testItems = savedState.testItems;
+    verificationState = savedState;
 
-      stream.markdown(`## Resuming Verification\n\n`);
-      stream.markdown(`**Plan:** Phase ${target.phase} Plan ${target.plan}\n`);
-      stream.markdown(`**Progress:** ${savedState.results.length} of ${savedState.testItems.length} tests completed\n\n`);
-    } else {
-      // Start fresh - clear state and regenerate
-      await clearVerificationState(extensionContext, planPath);
+    stream.markdown(`## Continuing Verification\n\n`);
+    stream.markdown(`**Plan:** Phase ${target.phase} Plan ${target.plan}\n`);
+    stream.markdown(`**Progress:** ${savedState.results.length} of ${savedState.testItems.length} tests completed\n\n`);
 
-      stream.progress('Generating test checklist...');
-      const planName = `Phase ${target.phase} Plan ${target.plan}`;
-      testItems = await generateTestChecklist(ctx, deliverables, planName);
-
-      verificationState = {
-        planPath,
-        phase: target.phase,
-        plan: target.plan,
-        testItems,
-        results: [],
-        currentIndex: 0,
-        startedAt: new Date().toISOString()
-      };
-      await saveVerificationState(extensionContext, verificationState);
-
-      // Present the UAT overview
-      stream.markdown(`## User Acceptance Testing\n\n`);
-      stream.markdown(`**Plan:** ${planName}\n`);
-      stream.markdown(`**Summary:** ${target.uri.fsPath.replace(projectContext.planningUri.fsPath, '.')}\n\n`);
-
-      stream.markdown('### Deliverables to Test\n\n');
-      for (const accomplishment of deliverables.accomplishments) {
-        stream.markdown(`- ${accomplishment}\n`);
+    // Show completed results
+    if (savedState.results.length > 0) {
+      stream.markdown('### Completed Tests\n\n');
+      for (let i = 0; i < savedState.results.length; i++) {
+        const r = savedState.results[i];
+        const emoji = { pass: '✓', fail: '✗', partial: '⚠', skip: '⏭' }[r.status];
+        stream.markdown(`${emoji} Test ${i + 1}: **${r.status}**${r.severity ? ` (${r.severity})` : ''}\n`);
       }
       stream.markdown('\n');
-
-      stream.markdown(`**${testItems.length} tests generated.** Starting interactive testing...\n\n`);
     }
-  } else {
-    // No saved state - start fresh
-    stream.progress('Generating test checklist...');
-    const planName = `Phase ${target.phase} Plan ${target.plan}`;
-    testItems = await generateTestChecklist(ctx, deliverables, planName);
 
-    verificationState = {
-      planPath,
-      phase: target.phase,
-      plan: target.plan,
-      testItems,
-      results: [],
-      currentIndex: 0,
-      startedAt: new Date().toISOString()
-    };
+    // Display current test with buttons
+    displayTestWithButtons(
+      stream,
+      testItems[savedState.currentIndex],
+      savedState.currentIndex,
+      testItems.length,
+      planPath
+    );
+
+    // Mark as waiting for result
+    verificationState.waitingForResult = true;
     await saveVerificationState(extensionContext, verificationState);
 
-    // Present the UAT overview
-    stream.markdown(`## User Acceptance Testing\n\n`);
-    stream.markdown(`**Plan:** ${planName}\n`);
-    stream.markdown(`**Summary:** ${target.uri.fsPath.replace(projectContext.planningUri.fsPath, '.')}\n\n`);
-
-    stream.markdown('### Deliverables to Test\n\n');
-    for (const accomplishment of deliverables.accomplishments) {
-      stream.markdown(`- ${accomplishment}\n`);
-    }
-    stream.markdown('\n');
-
-    stream.markdown(`**${testItems.length} tests generated.** Starting interactive testing...\n\n`);
+    return { metadata: { lastCommand: 'verify-work', waitingForResult: true } };
   }
 
+  // Start fresh - generate test checklist
+  stream.progress('Generating test checklist...');
   const planName = `Phase ${target.phase} Plan ${target.plan}`;
+  testItems = await generateTestChecklist(ctx, deliverables, planName);
 
-  // Run interactive test flow with state persistence
-  const { results, paused } = await runInteractiveTests(
+  verificationState = {
+    planPath,
+    phase: target.phase,
+    plan: target.plan,
     testItems,
-    planName,
-    stream,
-    extensionContext,
-    verificationState,
-    startIndex
-  );
-
-  // If paused, return early (state already saved)
-  if (paused) {
-    return { metadata: { lastCommand: 'verify-work', paused: true } };
-  }
-
-  // Clear verification state since all tests completed
-  await clearVerificationState(extensionContext, planPath);
-
-  // Calculate summary
-  const passed = results.filter(r => r.status === 'pass').length;
-  const failed = results.filter(r => r.status === 'fail').length;
-  const partial = results.filter(r => r.status === 'partial').length;
-  const skipped = results.filter(r => r.status === 'skip').length;
-
-  // Display summary
-  stream.markdown('---\n\n');
-  stream.markdown('## Test Results Summary\n\n');
-  stream.markdown(`| Status | Count |\n`);
-  stream.markdown(`|--------|-------|\n`);
-  stream.markdown(`| ✓ Passed | ${passed} |\n`);
-  stream.markdown(`| ✗ Failed | ${failed} |\n`);
-  stream.markdown(`| ⚠ Partial | ${partial} |\n`);
-  stream.markdown(`| ⏭ Skipped | ${skipped} |\n\n`);
-
-  // Collect issues (failed and partial)
-  const issueResults = results.filter(r => r.status === 'fail' || r.status === 'partial');
-
-  if (issueResults.length > 0) {
-    // Convert to UATIssue format
-    const issues: UATIssue[] = issueResults.map((r, idx) => ({
-      id: `UAT-${String(idx + 1).padStart(3, '0')}`,
-      feature: r.feature,
-      severity: (r.severity ? r.severity.charAt(0).toUpperCase() + r.severity.slice(1) : 'Major') as UATIssue['severity'],
-      description: r.description || `Test ${r.status}: ${r.feature}`
-    }));
-
-    // Write issues file
-    const issuesUri = await writeIssuesFile(
-      projectContext.planningUri,
-      phaseDir,
-      target.phase,
-      target.plan,
-      issues
-    );
-
-    if (issuesUri) {
-      stream.markdown(`### Issues Logged\n\n`);
-      stream.markdown(`**${issues.length} issue(s)** saved to: \`${target.phase}-${target.plan.padStart(2, '0')}-ISSUES.md\`\n\n`);
-
-      for (const issue of issues) {
-        stream.markdown(`- **${issue.id}** (${issue.severity}): ${issue.feature}\n`);
-      }
-      stream.markdown('\n');
-
-      stream.reference(issuesUri);
-    }
-
-    // Determine verdict
-    const blockers = issues.filter(i => i.severity === 'Blocker').length;
-    const majors = issues.filter(i => i.severity === 'Major').length;
-
-    stream.markdown('### Verdict\n\n');
-    if (blockers > 0) {
-      stream.markdown(`**BLOCKERS FOUND** — ${blockers} blocking issue(s) must be fixed before continuing.\n\n`);
-    } else if (majors > 0) {
-      stream.markdown(`**MAJOR ISSUES** — ${majors} significant issue(s) found. Review before proceeding.\n\n`);
-    } else {
-      stream.markdown(`**MINOR ISSUES** — Feature works with minor issues logged.\n\n`);
-    }
-
-    // Offer next steps
-    stream.markdown('### Next Steps\n\n');
-    stream.markdown('Use **/plan-fix** to create a fix plan for logged issues:\n\n');
-    stream.button({
-      command: 'hopper.chat-participant.plan-fix',
-      arguments: [`${target.phase}-${target.plan.padStart(2, '0')}`],
-      title: `Plan Fixes for ${target.phase}-${target.plan}`
-    });
-  } else if (passed === results.length) {
-    stream.markdown('### Verdict\n\n');
-    stream.markdown('**ALL TESTS PASSED** — Feature validated!\n\n');
-
-    stream.markdown('### Next Steps\n\n');
-    stream.markdown('Ready to continue to the next phase:\n\n');
-    stream.button({
-      command: 'hopper.chat-participant.progress',
-      title: 'Check Progress'
-    });
-  } else {
-    stream.markdown('### Verdict\n\n');
-    stream.markdown(`**TESTING INCOMPLETE** — ${skipped} test(s) were skipped.\n\n`);
-
-    stream.button({
-      command: 'hopper.chat-participant.progress',
-      title: 'Check Progress'
-    });
-  }
-
-  stream.markdown('\n');
-  stream.reference(target.uri);
-
-  // Update STATE.md with verification results
-  if (projectContext.planningUri) {
-    try {
-      const planRef = `${target.phase}-${target.plan.padStart(2, '0')}`;
-      await updateStateAfterVerification(
-        projectContext.planningUri,
-        planRef,
-        passed,
-        failed,
-        partial,
-        skipped
-      );
-    } catch (stateErr) {
-      console.error('[Hopper] Failed to update STATE.md after verification:', stateErr);
-      // Don't fail the verification, just log the error
-    }
-  }
-
-  return {
-    metadata: {
-      lastCommand: 'verify-work',
-      phase: `${target.phase}-${target.plan}`,
-      testResults: { passed, failed, partial, skipped }
-    }
+    results: [],
+    currentIndex: 0,
+    startedAt: new Date().toISOString(),
+    waitingForResult: true
   };
+  await saveVerificationState(extensionContext, verificationState);
+
+  // Present the UAT overview
+  stream.markdown(`## User Acceptance Testing\n\n`);
+  stream.markdown(`**Plan:** ${planName}\n`);
+  stream.markdown(`**Summary:** ${target.uri.fsPath.replace(projectContext.planningUri.fsPath, '.')}\n\n`);
+
+  stream.markdown('### Deliverables to Test\n\n');
+  for (const accomplishment of deliverables.accomplishments) {
+    stream.markdown(`- ${accomplishment}\n`);
+  }
+  stream.markdown('\n');
+
+  stream.markdown(`**${testItems.length} tests generated.**\n\n`);
+  stream.markdown('### Interactive Testing\n\n');
+  stream.markdown('Click the buttons below to record your test results.\n');
+  stream.markdown('**You can type questions in the chat anytime** - the buttons will still work.\n\n');
+
+  // Display first test with buttons
+  displayTestWithButtons(stream, testItems[0], 0, testItems.length, planPath);
+
+  return { metadata: { lastCommand: 'verify-work', waitingForResult: true } };
 }
 
 /**
@@ -901,4 +794,83 @@ export async function handleVerifyWorkResult(
     success: false,
     message: 'Failed to record test results'
   };
+}
+
+/**
+ * Handle test result button click from verify-work UI
+ * Called when user clicks Pass/Fail/Partial/Skip buttons
+ */
+export async function handleTestResultButton(
+  extensionContext: vscode.ExtensionContext,
+  planPath: string,
+  testIndex: number,
+  result: 'pass' | 'fail' | 'partial' | 'skip'
+): Promise<{ needsSeverity: boolean; completed: boolean; message: string }> {
+  // Load current state
+  const state = loadVerificationState(extensionContext, planPath);
+
+  if (!state) {
+    return { needsSeverity: false, completed: false, message: 'No verification state found. Run /verify-work to start.' };
+  }
+
+  // For pass or skip, record result immediately
+  if (result === 'pass' || result === 'skip') {
+    const testResult: TestResult = {
+      feature: state.testItems[testIndex],
+      status: result
+    };
+    state.results.push(testResult);
+    state.currentIndex = testIndex + 1;
+    state.waitingForResult = false;
+    await saveVerificationState(extensionContext, state);
+
+    if (state.currentIndex >= state.testItems.length) {
+      return { needsSeverity: false, completed: true, message: `Test ${testIndex + 1} marked as ${result}. All tests complete!` };
+    }
+    return { needsSeverity: false, completed: false, message: `Test ${testIndex + 1} marked as ${result}. Continue with next test.` };
+  }
+
+  // For fail or partial, need to get severity first
+  state.pendingStatus = result;
+  state.pendingSeverity = true;
+  state.waitingForResult = false;
+  await saveVerificationState(extensionContext, state);
+
+  return { needsSeverity: true, completed: false, message: `Test ${testIndex + 1} marked as ${result}. Select severity.` };
+}
+
+/**
+ * Handle severity button click from verify-work UI
+ * Called when user clicks Blocker/Major/Minor/Cosmetic buttons after fail/partial
+ */
+export async function handleSeverityButton(
+  extensionContext: vscode.ExtensionContext,
+  planPath: string,
+  severity: 'blocker' | 'major' | 'minor' | 'cosmetic'
+): Promise<{ completed: boolean; message: string }> {
+  // Load current state
+  const state = loadVerificationState(extensionContext, planPath);
+
+  if (!state || !state.pendingStatus) {
+    return { completed: false, message: 'No pending test result. Run /verify-work to continue.' };
+  }
+
+  // Record the result with severity and default description
+  const testResult: TestResult = {
+    feature: state.testItems[state.currentIndex],
+    status: state.pendingStatus,
+    severity,
+    description: getDefaultDescription(severity)
+  };
+  state.results.push(testResult);
+  state.currentIndex = state.currentIndex + 1;
+  state.pendingStatus = undefined;
+  state.pendingSeverity = false;
+  state.waitingForResult = false;
+  await saveVerificationState(extensionContext, state);
+
+  if (state.currentIndex >= state.testItems.length) {
+    return { completed: true, message: `Issue recorded as ${severity}. All tests complete!` };
+  }
+  return { completed: false, message: `Issue recorded as ${severity}. Continue with next test.` };
 }
