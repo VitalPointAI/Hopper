@@ -469,6 +469,83 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     }
   }
 
+  // Check for codebase mapping and load relevant documents
+  const codebaseDir = vscode.Uri.joinPath(workspaceUri, '.planning', 'codebase');
+  try {
+    const codebaseEntries = await vscode.workspace.fs.readDirectory(codebaseDir);
+    if (codebaseEntries.length > 0) {
+      // Determine which docs to load based on phase goal keywords
+      const goalLower = targetPhase.goal.toLowerCase();
+      const docsToLoad: string[] = [];
+
+      // Always include CONVENTIONS.md for coding context
+      docsToLoad.push('CONVENTIONS.md');
+
+      // UI phases
+      if (goalLower.includes('ui') || goalLower.includes('frontend') ||
+          goalLower.includes('component') || goalLower.includes('interface')) {
+        docsToLoad.push('STRUCTURE.md');
+      }
+
+      // API phases
+      if (goalLower.includes('api') || goalLower.includes('endpoint') ||
+          goalLower.includes('route') || goalLower.includes('backend')) {
+        docsToLoad.push('ARCHITECTURE.md');
+      }
+
+      // Database phases
+      if (goalLower.includes('database') || goalLower.includes('schema') ||
+          goalLower.includes('migration') || goalLower.includes('model')) {
+        docsToLoad.push('ARCHITECTURE.md', 'STACK.md');
+      }
+
+      // Testing phases
+      if (goalLower.includes('test') || goalLower.includes('spec') ||
+          goalLower.includes('coverage') || goalLower.includes('quality')) {
+        docsToLoad.push('TESTING.md');
+      }
+
+      // Integration phases
+      if (goalLower.includes('integration') || goalLower.includes('external') ||
+          goalLower.includes('service') || goalLower.includes('third-party')) {
+        docsToLoad.push('INTEGRATIONS.md');
+      }
+
+      // Refactoring phases
+      if (goalLower.includes('refactor') || goalLower.includes('debt') ||
+          goalLower.includes('cleanup') || goalLower.includes('improve')) {
+        docsToLoad.push('CONCERNS.md');
+      }
+
+      // Remove duplicates
+      const uniqueDocs = [...new Set(docsToLoad)];
+
+      // Load each codebase document
+      let codebaseContextAdded = false;
+      for (const docName of uniqueDocs) {
+        try {
+          const docUri = vscode.Uri.joinPath(codebaseDir, docName);
+          const docBytes = await vscode.workspace.fs.readFile(docUri);
+          const docContent = Buffer.from(docBytes).toString('utf-8');
+          contextParts.push(`\n\n## Codebase: ${docName}\n\n${docContent.slice(0, 2000)}`);
+          codebaseContextAdded = true;
+        } catch {
+          // Doc doesn't exist
+        }
+      }
+
+      if (codebaseContextAdded) {
+        stream.markdown('*Using codebase mapping context*\n\n');
+      }
+    }
+  } catch {
+    // No codebase directory - suggest mapping for complex projects
+    const isComplexProject = projectContext.projectMd && projectContext.projectMd.length > 1000;
+    if (isComplexProject) {
+      stream.markdown('*Tip: Run `/map-codebase` to generate codebase documentation for better planning.*\n\n');
+    }
+  }
+
   const fullContext = contextParts.join('');
 
   stream.progress('Analyzing phase requirements...');

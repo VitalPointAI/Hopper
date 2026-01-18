@@ -135,6 +135,10 @@
             "description": "Research current documentation before planning"
           },
           {
+            "name": "map-codebase",
+            "description": "Analyze codebase to produce planning documents"
+          },
+          {
             "name": "status",
             "description": "Show current project status and phase"
           },
