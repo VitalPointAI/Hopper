@@ -3,6 +3,13 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { CommandContext, IHopperResult } from './types';
 import { ProjectConfig, saveProject, planningExists } from '../generators';
+import {
+  ConfigManager,
+  selectPlanningDepth,
+  selectExecutionMode,
+  showConfigurationSummary,
+  createDefaultConfig
+} from '../../config';
 
 const execAsync = promisify(exec);
 
@@ -243,6 +250,27 @@ export async function handleNewProject(ctx: CommandContext): Promise<IHopperResu
         stream.markdown('*Git commit integration will be unavailable. Install git and run `git init` manually.*\n\n');
       }
     }
+
+    // Configure project settings
+    stream.progress('Configuring project settings...');
+
+    // Prompt for planning depth - use default if cancelled
+    const selectedDepth = await selectPlanningDepth();
+    const depth = selectedDepth ?? 'standard';
+
+    // Prompt for execution mode - use default if cancelled
+    const selectedMode = await selectExecutionMode();
+    const mode = selectedMode ?? 'guided';
+
+    // Save configuration
+    const configManager = new ConfigManager(workspaceUri);
+    const hopperConfig = createDefaultConfig();
+    hopperConfig.planningDepth = depth;
+    hopperConfig.executionMode = mode;
+    await configManager.saveConfig(hopperConfig);
+
+    // Show configuration summary
+    showConfigurationSummary(hopperConfig, stream);
 
     // Next steps
     stream.markdown('\n### Next Steps\n\n');
