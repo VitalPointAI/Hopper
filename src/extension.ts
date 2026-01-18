@@ -9,6 +9,7 @@ import { createHopperParticipant } from './chat/hopperParticipant';
 import { AuthType, AuthProvider } from './licensing/types';
 import { registerFileTools } from './tools/fileTools';
 import { registerTerminalTools } from './tools/terminalTools';
+import { registerContextTracker } from './context/contextTracker';
 
 // Export license validator for use by chat participant
 let licenseValidator: LicenseValidator | undefined;
@@ -41,6 +42,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register terminal tools (for long-running processes like dev servers)
   registerTerminalTools(context);
+
+  // Register context tracker for token usage display
+  registerContextTracker(context);
 
   // Create and register the @hopper chat participant
   try {
@@ -238,6 +242,39 @@ export function activate(context: vscode.ExtensionContext): void {
     });
     context.subscriptions.push(disposable);
   }
+
+  // Register security fix commands
+  const securityAutoFixCommand = vscode.commands.registerCommand(
+    'hopper.securityAutoFix',
+    async () => {
+      const { autoFixSecurityIssues } = await import('./chat/commands/securityCheck.js');
+      const result = await autoFixSecurityIssues(context);
+
+      if (result.fixed > 0) {
+        vscode.window.showInformationMessage(`Fixed ${result.fixed} of ${result.total} auto-fixable issues`);
+      } else if (result.total === 0) {
+        vscode.window.showWarningMessage('Run /security-check first');
+      } else {
+        vscode.window.showWarningMessage('No issues could be fixed');
+      }
+    }
+  );
+  context.subscriptions.push(securityAutoFixCommand);
+
+  const securityInteractiveFixCommand = vscode.commands.registerCommand(
+    'hopper.securityInteractiveFix',
+    async () => {
+      const { interactiveFixSecurityIssues } = await import('./chat/commands/securityCheck.js');
+      const result = await interactiveFixSecurityIssues(context);
+
+      if (result.stopped) {
+        vscode.window.showInformationMessage(`Review stopped. Fixed ${result.fixed}, skipped ${result.skipped}`);
+      } else {
+        vscode.window.showInformationMessage(`Review complete. Fixed ${result.fixed}, skipped ${result.skipped}`);
+      }
+    }
+  );
+  context.subscriptions.push(securityInteractiveFixCommand);
 
   // Register closeResolvedIssues command for consider-issues triage action
   const closeIssuesCommand = vscode.commands.registerCommand(
