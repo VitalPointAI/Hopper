@@ -11,9 +11,11 @@ Researched the ecosystem for building a `/security-check` command that scans use
 
 The standard approach uses **ESLint security plugins** for fast pattern detection (14-89 rules covering XSS, injection, eval, path traversal) combined with **jscodeshift** for safe AST-based code transformations. For comprehensive coverage, Semgrep provides 600+ high-confidence rules with OWASP/CWE references and cross-file taint analysis.
 
+**Critical insight: Self-updating threat intelligence.** Security tools that only know patterns from their build date miss emerging threats. The `/security-check` command should **fetch the latest advisories at runtime** from GitHub Advisory Database (GHSA) and NVD before scanning. This augments static ESLint rules with real-time CVE/CWE data for the npm ecosystem.
+
 Key finding: Don't hand-roll vulnerability detection patterns. ESLint plugins like `eslint-plugin-security` and `eslint-plugin-no-unsanitized` cover known patterns that would take months to rediscover. Use DOMPurify for XSS sanitization fixes - it's OWASP-recommended and handles edge cases custom code would miss.
 
-**Primary recommendation:** Use ESLint security plugins for detection (fast, integrates with VSCode), jscodeshift for safe auto-fixes, and the OWASP Top 10:2025 categorization for organizing findings. Implement a confidence threshold where only HIGH confidence issues get auto-fixed.
+**Primary recommendation:** Start each scan by fetching recent advisories from GitHub Advisory Database API (free, no auth required for public data). Use ESLint security plugins for code pattern detection, augment with GHSA data for emerging threats, and apply jscodeshift for safe auto-fixes. Implement confidence thresholds where only HIGH confidence issues get auto-fixed.
 </research_summary>
 
 <standard_stack>
@@ -33,6 +35,13 @@ Key finding: Don't hand-roll vulnerability detection patterns. ESLint plugins li
 | eslint-plugin-xss | 0.1.x | XSS-specific rules | React/DOM-heavy codebases |
 | eslint-plugin-secure-coding | 2.x | Extended ruleset | 89 rules, CWE/OWASP references, CVSS scores |
 | semgrep | 1.x | Advanced SAST | Cross-file taint analysis, framework-aware rules |
+
+### Threat Intelligence (Self-Updating)
+| Source | Endpoint | Purpose | Why Use |
+|--------|----------|---------|---------|
+| GitHub Advisory Database | `api.github.com/advisories` | Real-time CVE/GHSA data | Free, no auth, npm ecosystem filter, CVSS scores |
+| NVD (NIST) | `services.nvd.nist.gov/rest/json/cves/2.0` | Comprehensive CVE database | CWE mappings, 120-day range queries |
+| CISA KEV | `cisa.gov/known-exploited-vulnerabilities-catalog` | Actively exploited vulns | Prioritize vulns being used in the wild |
 
 ### Safe Code Transformation
 | Library | Version | Purpose | When to Use |
@@ -63,7 +72,12 @@ npm install jscodeshift dompurify
 src/
 ├── security/
 │   ├── types.ts              # SecurityIssue, Severity, OWASPCategory types
-│   ├── scanner.ts            # Coordinates ESLint + custom detection
+│   ├── advisories/           # Threat intelligence fetching
+│   │   ├── ghsa.ts           # GitHub Advisory Database client
+│   │   ├── nvd.ts            # NVD API client (optional)
+│   │   ├── cache.ts          # Local cache for advisories (24hr TTL)
+│   │   └── index.ts
+│   ├── scanner.ts            # Coordinates ESLint + advisory matching
 │   ├── rules/                # Custom ESLint rules if needed
 │   ├── fixes/                # jscodeshift transforms by issue type
 │   │   ├── xss-fix.ts
@@ -75,12 +89,57 @@ src/
 │   └── securityCheck.ts      # Command handler
 ```
 
+### Pattern 0: Self-Updating Threat Intelligence (CRITICAL)
+**What:** Fetch latest security advisories before every scan
+**When to use:** ALWAYS - first step of every /security-check invocation
+**Example:**
+```typescript
+// Step 0: Update threat intelligence (before any scanning)
+async function updateThreatIntelligence(): Promise<Advisory[]> {
+  const cache = await loadAdvisoryCache();
+
+  // Check if cache is fresh (< 24 hours old)
+  if (cache && Date.now() - cache.timestamp < 24 * 60 * 60 * 1000) {
+    return cache.advisories;
+  }
+
+  // Fetch latest from GitHub Advisory Database (no auth required)
+  const response = await fetch(
+    'https://api.github.com/advisories?' + new URLSearchParams({
+      ecosystem: 'npm',
+      severity: 'critical,high,medium',
+      per_page: '100',
+      sort: 'updated',
+      direction: 'desc'
+    }),
+    {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    }
+  );
+
+  const advisories = await response.json();
+  await saveAdvisoryCache({ timestamp: Date.now(), advisories });
+
+  return advisories;
+}
+
+// Use in scan: merge static rules + dynamic advisories
+const advisories = await updateThreatIntelligence();
+const eslintFindings = await runESLintScan(files);
+const advisoryFindings = matchAdvisoriesToCode(advisories, packageJson);
+const allFindings = [...eslintFindings, ...advisoryFindings];
+```
+
 ### Pattern 1: Two-Phase Detection + Fix
 **What:** Separate detection from remediation completely
 **When to use:** Always - keeps concerns separate, enables dry-run
 **Example:**
 ```typescript
-// Phase 1: Detect (never modifies files)
+// Phase 1: Update threat intelligence + Detect (never modifies files)
+await updateThreatIntelligence();
 const findings = await scanForVulnerabilities(workspaceUri);
 
 // Phase 2: Categorize by fix confidence
@@ -179,6 +238,7 @@ const autoFixRules: Record<string, FixConfidence> = {
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
+| CVE/vulnerability database | Hardcoded vulnerability list | GitHub Advisory Database API | Updates daily, 328K+ CVEs, npm ecosystem filter, free |
 | XSS detection patterns | Regex for innerHTML/eval | eslint-plugin-no-unsanitized | Mozilla reduced 1000s of grep results to 34 findings with this plugin |
 | SQL injection detection | String matching for queries | eslint-plugin-security detect-non-literal-regexp | Edge cases like template literals, concatenation |
 | HTML sanitization | Custom tag stripping | DOMPurify | OWASP-recommended, handles mutation XSS, SVG attacks |
@@ -238,6 +298,16 @@ const autoFixRules: Record<string, FixConfidence> = {
 - Add one-line explanation: "Allows attackers to steal user sessions"
 - Link to OWASP page for detailed explanation
 **Warning signs:** Users ask "is this actually important?"
+
+### Pitfall 6: Stale Threat Intelligence
+**What goes wrong:** Scanner misses newly disclosed vulnerabilities
+**Why it happens:** Static rules baked in at build time, no runtime updates
+**How to avoid:**
+- Fetch latest advisories from GHSA at scan start
+- Cache with reasonable TTL (24 hours)
+- Show "last updated" timestamp to user
+- Handle offline gracefully (use cached data)
+**Warning signs:** npm audit finds issues /security-check missed
 </common_pitfalls>
 
 <code_examples>
@@ -424,6 +494,156 @@ function getSeverity(ruleId: string): Severity {
   return severityMap[ruleId] || 'medium';
 }
 ```
+
+### GitHub Advisory Database API Client
+```typescript
+// Source: GitHub REST API docs - Global Security Advisories
+interface GitHubAdvisory {
+  ghsa_id: string;
+  cve_id: string | null;
+  summary: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  cvss: { score: number; vector_string: string } | null;
+  cwes: Array<{ cwe_id: string; name: string }>;
+  vulnerabilities: Array<{
+    package: { ecosystem: string; name: string };
+    vulnerable_version_range: string;
+    patched_versions: string | null;
+  }>;
+  published_at: string;
+  updated_at: string;
+}
+
+async function fetchNpmAdvisories(options: {
+  severity?: ('low' | 'medium' | 'high' | 'critical')[];
+  updatedSince?: Date;
+}): Promise<GitHubAdvisory[]> {
+  const params = new URLSearchParams({
+    ecosystem: 'npm',
+    per_page: '100',
+    sort: 'updated',
+    direction: 'desc',
+  });
+
+  if (options.severity) {
+    params.set('severity', options.severity.join(','));
+  }
+  if (options.updatedSince) {
+    params.set('updated', `>=${options.updatedSince.toISOString().split('T')[0]}`);
+  }
+
+  const response = await fetch(
+    `https://api.github.com/advisories?${params}`,
+    {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        // No auth required for public advisories!
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// Match advisories to project dependencies
+function matchAdvisoriesToDependencies(
+  advisories: GitHubAdvisory[],
+  dependencies: Record<string, string>
+): SecurityIssue[] {
+  const issues: SecurityIssue[] = [];
+
+  for (const advisory of advisories) {
+    for (const vuln of advisory.vulnerabilities) {
+      if (vuln.package.ecosystem !== 'npm') continue;
+
+      const installedVersion = dependencies[vuln.package.name];
+      if (!installedVersion) continue;
+
+      // Check if installed version is in vulnerable range
+      if (isVulnerableVersion(installedVersion, vuln.vulnerable_version_range)) {
+        issues.push({
+          type: 'dependency',
+          ghsaId: advisory.ghsa_id,
+          cveId: advisory.cve_id,
+          package: vuln.package.name,
+          installedVersion,
+          vulnerableRange: vuln.vulnerable_version_range,
+          patchedVersions: vuln.patched_versions,
+          severity: advisory.severity,
+          cvssScore: advisory.cvss?.score,
+          summary: advisory.summary,
+          cwes: advisory.cwes.map(c => c.cwe_id),
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+```
+
+### Advisory Cache Implementation
+```typescript
+// Cache advisories locally to avoid hitting API every scan
+import * as vscode from 'vscode';
+
+interface AdvisoryCache {
+  timestamp: number;
+  advisories: GitHubAdvisory[];
+}
+
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_KEY = 'hopper.security.advisoryCache';
+
+async function getCachedAdvisories(
+  context: vscode.ExtensionContext
+): Promise<GitHubAdvisory[] | null> {
+  const cached = context.globalState.get<AdvisoryCache>(CACHE_KEY);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.advisories;
+  }
+
+  return null; // Cache miss or expired
+}
+
+async function updateAdvisoryCache(
+  context: vscode.ExtensionContext,
+  advisories: GitHubAdvisory[]
+): Promise<void> {
+  await context.globalState.update(CACHE_KEY, {
+    timestamp: Date.now(),
+    advisories,
+  });
+}
+
+// Main entry point for threat intelligence
+async function getLatestAdvisories(
+  context: vscode.ExtensionContext
+): Promise<GitHubAdvisory[]> {
+  // Try cache first
+  const cached = await getCachedAdvisories(context);
+  if (cached) {
+    return cached;
+  }
+
+  // Fetch fresh data
+  const advisories = await fetchNpmAdvisories({
+    severity: ['critical', 'high', 'medium'],
+  });
+
+  // Update cache
+  await updateAdvisoryCache(context, advisories);
+
+  return advisories;
+}
+```
 </code_examples>
 
 <sota_updates>
@@ -471,6 +691,8 @@ function getSeverity(ruleId: string): Severity {
 ## Sources
 
 ### Primary (HIGH confidence)
+- [GitHub Advisory Database API](https://docs.github.com/en/rest/security-advisories/global-advisories) - Official REST API docs, query params verified
+- [NVD Vulnerability API](https://nvd.nist.gov/developers/vulnerabilities) - CVE API docs, CWE filtering, date ranges
 - [OWASP Top 10:2025](https://owasp.org/Top10/2025/) - Official categories verified
 - [eslint-plugin-security GitHub](https://github.com/eslint-community/eslint-plugin-security) - All 14 rules documented
 - [jscodeshift GitHub](https://github.com/facebook/jscodeshift) - API and transform patterns
@@ -491,9 +713,10 @@ function getSeverity(ruleId: string): Severity {
 
 **Research scope:**
 - Core technology: ESLint + security plugins for static analysis
+- Threat intelligence: GitHub Advisory Database API, NVD, CISA KEV
 - Ecosystem: jscodeshift for transforms, DOMPurify for sanitization
-- Patterns: Two-phase detect/fix, confidence-based auto-fix, OWASP categorization
-- Pitfalls: False positives, breaking fixes, outdated OWASP
+- Patterns: Self-updating advisories, two-phase detect/fix, confidence-based auto-fix
+- Pitfalls: False positives, breaking fixes, outdated OWASP, stale threat data
 
 **Confidence breakdown:**
 - Standard stack: HIGH - verified with npm/GitHub docs
