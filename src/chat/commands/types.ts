@@ -21,6 +21,13 @@ export interface IHopperResult extends vscode.ChatResult {
     phase?: string;
     /** Issue reference */
     issue?: string;
+    /** Test results from verify-work */
+    testResults?: {
+      passed: number;
+      failed: number;
+      partial: number;
+      skipped: number;
+    };
   };
 }
 

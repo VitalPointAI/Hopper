@@ -507,7 +507,7 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
     const issues: UATIssue[] = issueResults.map((r, idx) => ({
       id: `UAT-${String(idx + 1).padStart(3, '0')}`,
       feature: r.feature,
-      severity: (r.severity?.charAt(0).toUpperCase() + r.severity?.slice(1)) as UATIssue['severity'] || 'Major',
+      severity: (r.severity ? r.severity.charAt(0).toUpperCase() + r.severity.slice(1) : 'Major') as UATIssue['severity'],
       description: r.description || `Test ${r.status}: ${r.feature}`
     }));
 

@@ -262,7 +262,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const planningUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.planning');
 
       // Import and call closeResolvedIssues from considerIssues module
-      const { closeResolvedIssues } = await import('./chat/commands/considerIssues');
+      const { closeResolvedIssues } = await import('./chat/commands/considerIssues.js');
       const issueIds = resolvedAnalyses.map(a => a.issue.id);
 
       const result = await closeResolvedIssues(planningUri, issueIds, analyses as Parameters<typeof closeResolvedIssues>[2]);
@@ -356,7 +356,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       if (issues.length > 0) {
         // Import and call handleVerifyWorkResult
-        const { handleVerifyWorkResult } = await import('./chat/commands/verifyWork');
+        const { handleVerifyWorkResult } = await import('./chat/commands/verifyWork.js');
         const workspaceFolders = vscode.workspace.workspaceFolders;
 
         if (workspaceFolders && workspaceFolders.length > 0) {
