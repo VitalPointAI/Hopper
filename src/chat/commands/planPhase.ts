@@ -411,6 +411,37 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     contextParts.push('\n\n## Current State\n\n' + projectContext.stateMd);
   }
 
+  // Check for DISCOVERY.md (from /discovery-phase) and include if available
+  const discoveryUri = vscode.Uri.joinPath(
+    workspaceUri,
+    '.planning',
+    'phases',
+    targetPhase.dirName,
+    'DISCOVERY.md'
+  );
+
+  let discoveryIncluded = false;
+  try {
+    const discoveryBytes = await vscode.workspace.fs.readFile(discoveryUri);
+    const discoveryContent = Buffer.from(discoveryBytes).toString('utf-8');
+    contextParts.push('\n\n## Discovery Research\n\nThe following research was conducted for this phase:\n\n' + discoveryContent.slice(0, 3000));
+    discoveryIncluded = true;
+    stream.markdown('*Using discovery research from DISCOVERY.md*\n\n');
+  } catch {
+    // No discovery file - suggest discovery for phases that might benefit
+    const goalLower = targetPhase.goal.toLowerCase();
+    const needsDiscovery =
+      goalLower.includes('api') ||
+      goalLower.includes('integration') ||
+      goalLower.includes('library') ||
+      goalLower.includes('framework') ||
+      goalLower.includes('external');
+
+    if (needsDiscovery) {
+      stream.markdown(`*Tip: Run \`/discovery-phase ${targetPhase.number}\` for current documentation before planning.*\n\n`);
+    }
+  }
+
   const fullContext = contextParts.join('');
 
   stream.progress('Analyzing phase requirements...');

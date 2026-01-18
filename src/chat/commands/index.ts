@@ -21,6 +21,7 @@ import { handleResumeTask } from './resumeTask';
 import { handleNewMilestone } from './newMilestone';
 import { handleCompleteMilestone } from './completeMilestone';
 import { handleDiscussMilestone } from './discussMilestone';
+import { handleDiscoveryPhase } from './discoveryPhase';
 
 /**
  * Command definitions with descriptions for help output
@@ -38,6 +39,7 @@ const COMMAND_DEFINITIONS = [
   { name: 'insert-phase', description: 'Insert urgent phase between existing phases' },
   { name: 'remove-phase', description: 'Remove a phase from roadmap' },
   { name: 'research-phase', description: 'Research how to implement a phase before planning' },
+  { name: 'discovery-phase', description: 'Research current documentation before planning' },
   { name: 'discuss-phase', description: 'Gather phase context through adaptive questioning' },
   { name: 'list-phase-assumptions', description: "Surface Hopper's assumptions about a phase approach" },
   { name: 'verify-work', description: 'Guide manual user acceptance testing' },
@@ -280,6 +282,7 @@ registry.set('add-phase', handleAddPhase);
 registry.set('insert-phase', handleInsertPhase);
 registry.set('remove-phase', handleRemovePhase);
 registry.set('research-phase', handleResearchPhase);
+registry.set('discovery-phase', handleDiscoveryPhase);
 registry.set('discuss-phase', handleDiscussPhase);
 registry.set('list-phase-assumptions', handleListPhaseAssumptions);
 registry.set('verify-work', handleVerifyWork);
