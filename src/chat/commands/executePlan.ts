@@ -13,7 +13,10 @@ import {
   generateCommitMessage,
   saveSummary,
   SummaryConfig,
-  TaskCommitInfo
+  TaskCommitInfo,
+  isScaffoldingTask,
+  extractScaffoldingCommand,
+  executeScaffoldingWithProtection
 } from '../executor';
 import { clearHandoffAfterCompletion } from './resumeWork';
 import {
@@ -1090,6 +1093,32 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       if (task.files && task.files.length > 0) {
         stream.markdown(`**Files:** ${task.files.join(', ')}\n\n`);
+      }
+
+      // Check if this is a scaffolding task that needs special handling
+      if (isScaffoldingTask(task.action)) {
+        const scaffoldCommand = extractScaffoldingCommand(task.action);
+        if (scaffoldCommand) {
+          stream.markdown('**Scaffolding detected** - protecting .planning/ directory\n\n');
+
+          const scaffoldResult = await executeScaffoldingWithProtection(
+            workspaceUri,
+            scaffoldCommand,
+            stream
+          );
+
+          if (scaffoldResult.success) {
+            stream.markdown(`**Status:** Task ${task.id}/${plan.tasks.length} completed (scaffolding)\n\n`);
+            stream.markdown('---\n\n');
+            results.push({ taskId: task.id, success: true, name: task.name });
+            continue;
+          } else {
+            stream.markdown(`**Error:** ${scaffoldResult.error}\n\n`);
+            stream.markdown('---\n\n');
+            results.push({ taskId: task.id, success: false, name: task.name });
+            continue;
+          }
+        }
       }
 
       try {

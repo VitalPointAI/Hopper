@@ -27,3 +27,11 @@ export type { CommitResult, CommitInfo } from './gitService';
 // Summary generator exports
 export { createSummaryMd, saveSummary } from './summaryGenerator';
 export type { SummaryConfig, SummaryGeneratorResult, TaskCommitInfo } from './summaryGenerator';
+
+// Scaffolding helper exports
+export {
+  isScaffoldingTask,
+  extractScaffoldingCommand,
+  executeScaffoldingWithProtection
+} from './scaffolding';
+export type { ScaffoldingResult } from './scaffolding';
