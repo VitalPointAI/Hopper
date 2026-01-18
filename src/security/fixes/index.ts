@@ -168,3 +168,12 @@ export function getFixForIssue(
 export function registerTransform(ruleId: string, entry: TransformEntry): void {
   TRANSFORM_REGISTRY[ruleId] = entry;
 }
+
+// Import transform modules to trigger auto-registration
+// These modules call registerTransform() when imported
+import './xss';
+import './crypto';
+
+// Re-export transform modules for direct access
+export * from './xss';
+export * from './crypto';
