@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { CommandContext, IHopperResult } from './types';
@@ -225,8 +226,67 @@ export async function handleNewProject(ctx: CommandContext): Promise<IHopperResu
       // No git repo exists - initialize one
       stream.progress('Initializing git repository...');
       try {
+        // Create a sensible default .gitignore if one doesn't exist
+        const gitignorePath = path.join(workspacePath, '.gitignore');
+        const gitignoreUri = vscode.Uri.file(gitignorePath);
+        let hasGitignore = false;
+        try {
+          await vscode.workspace.fs.stat(gitignoreUri);
+          hasGitignore = true;
+        } catch {
+          // .gitignore doesn't exist
+        }
+
+        if (!hasGitignore) {
+          const defaultGitignore = `# Dependencies
+node_modules/
+vendor/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+target/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs and caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cache/
+.parcel-cache/
+.turbo/
+
+# Testing
+coverage/
+.nyc_output/
+
+# OS files
+Thumbs.db
+`;
+          await vscode.workspace.fs.writeFile(gitignoreUri, Buffer.from(defaultGitignore, 'utf8'));
+        }
+
         await execAsync('git init', { cwd: workspacePath });
-        await execAsync('git add .planning/', { cwd: workspacePath });
+        await execAsync('git add .planning/ .gitignore', { cwd: workspacePath });
         await execAsync('git commit -m "chore: initialize project with Hopper"', { cwd: workspacePath });
         stream.markdown('\n✓ Git repository initialized with initial commit\n\n');
       } catch (gitError) {
