@@ -681,25 +681,39 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
     };
   }
 
-  // Check if we have existing state with completed tests
-  if (savedState && savedState.currentIndex > 0 && savedState.currentIndex < savedState.testItems.length) {
+  // Check if we have existing state (resume capability)
+  if (savedState && savedState.currentIndex < savedState.testItems.length && savedState.testItems.length > 0) {
     // Show progress and continue from where we left off
     testItems = savedState.testItems;
     verificationState = savedState;
 
-    stream.markdown(`## Continuing Verification\n\n`);
-    stream.markdown(`**Plan:** Phase ${target.phase} Plan ${target.plan}\n`);
-    stream.markdown(`**Progress:** ${savedState.results.length} of ${savedState.testItems.length} tests completed\n\n`);
+    const planName = `Phase ${target.phase} Plan ${target.plan}`;
 
-    // Show completed results
-    if (savedState.results.length > 0) {
-      stream.markdown('### Completed Tests\n\n');
-      for (let i = 0; i < savedState.results.length; i++) {
-        const r = savedState.results[i];
-        const emoji = { pass: '✓', fail: '✗', partial: '⚠', skip: '⏭' }[r.status];
-        stream.markdown(`${emoji} Test ${i + 1}: **${r.status}**${r.severity ? ` (${r.severity})` : ''}\n`);
+    if (savedState.currentIndex === 0 && savedState.results.length === 0) {
+      // First test - show full intro
+      stream.markdown(`## User Acceptance Testing\n\n`);
+      stream.markdown(`**Plan:** ${planName}\n`);
+      stream.markdown(`**Summary:** ${target.uri.fsPath.replace(projectContext.planningUri.fsPath, '.')}\n\n`);
+      stream.markdown(`**${testItems.length} tests to run.**\n\n`);
+      stream.markdown('### Interactive Testing\n\n');
+      stream.markdown('Click the buttons below to record your test results.\n');
+      stream.markdown('**You can type questions in the chat anytime** - the buttons will still work.\n\n');
+    } else {
+      // Resuming - show progress
+      stream.markdown(`## Continuing Verification\n\n`);
+      stream.markdown(`**Plan:** ${planName}\n`);
+      stream.markdown(`**Progress:** ${savedState.results.length} of ${savedState.testItems.length} tests completed\n\n`);
+
+      // Show completed results
+      if (savedState.results.length > 0) {
+        stream.markdown('### Completed Tests\n\n');
+        for (let i = 0; i < savedState.results.length; i++) {
+          const r = savedState.results[i];
+          const emoji = { pass: '✓', fail: '✗', partial: '⚠', skip: '⏭' }[r.status];
+          stream.markdown(`${emoji} Test ${i + 1}: **${r.status}**${r.severity ? ` (${r.severity})` : ''}\n`);
+        }
+        stream.markdown('\n');
       }
-      stream.markdown('\n');
     }
 
     // Display current test with buttons
