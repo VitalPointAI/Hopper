@@ -5,6 +5,28 @@
   "version": "0.0.1",
   "publisher": "vitalpointai",
   "license": "MIT",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vitalpointai/hopper"
+  },
+  "bugs": {
+    "url": "https://github.com/vitalpointai/hopper/issues"
+  },
+  "homepage": "https://github.com/vitalpointai/hopper#readme",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "ai",
+    "chat",
+    "planning",
+    "near",
+    "agent",
+    "roadmap",
+    "project-management"
+  ],
   "engines": {
     "vscode": "^1.104.0"
   },
