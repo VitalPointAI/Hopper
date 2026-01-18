@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-01-18
+
+### Changed
+- Updated licensing model: Extension code is now MIT licensed (open source)
+- Backend infrastructure (API, licensing system, NEAR contracts) remains proprietary
+- Added clear licensing documentation to README and separate LICENSE files for backend components
+
+## [0.0.3] - 2026-01-18
+
+### Changed
+- Updated README with correct publisher name (VitalPoint) and extension ID (hopper-velocity)
+- Fixed marketplace links and installation commands
+
+## [0.0.2] - 2026-01-18
+
+### Changed
+- Updated description to clarify freemium model
+
 ## [0.0.1] - 2026-01-17
 
 ### Added
