@@ -152,12 +152,15 @@ Plans:
 ### Phase 6: Security Review
 **Goal**: /security-check command that analyzes user projects for vulnerabilities, auto-fixes safe issues, and offers interactive fixing for others
 **Depends on**: Phase 5.1 (feature complete before security review)
-**Research**: Likely (OWASP Top 10 detection patterns, safe auto-fix strategies)
+**Research**: Complete (06-RESEARCH.md)
 **Research topics**: Static analysis patterns for common vulnerabilities (XSS, injection, auth issues), safe code transformation techniques, severity classification
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 6 to break down)
+- [ ] 06-01: Security types and GitHub Advisory client with caching
+- [ ] 06-02: ESLint scanner with security plugins and OWASP mapping
+- [ ] 06-03: Auto-fix transforms using jscodeshift
+- [ ] 06-04: /security-check command with two-phase UX
 
 ## Progress
 
@@ -176,4 +179,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
 | 5.1 GSD Feature Parity | 5/6 | In progress | - |
-| 6. Security Review | 0/0 | Not started | - |
+| 6. Security Review | 0/4 | Not started | - |
