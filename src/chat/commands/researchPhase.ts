@@ -101,6 +101,39 @@ Guidelines:
 Always return valid JSON.`;
 
 /**
+ * System prompt for merging new research with existing research
+ */
+const RESEARCH_MERGE_PROMPT = `You are a senior software architect updating existing research with new findings.
+
+The user wants to add to or refine existing research. Merge the new information with the existing research, preserving valuable existing content while incorporating new insights.
+
+Output your response as JSON with the same structure as the original research:
+{
+  "summary": "Updated executive summary incorporating new findings",
+  "primaryRecommendation": "Updated actionable guidance",
+  "confidence": "HIGH|MEDIUM|LOW",
+  "standardStack": { ... merged stack recommendations ... },
+  "architecturePatterns": { ... merged patterns ... },
+  "dontHandRoll": [ ... merged list ... ],
+  "commonPitfalls": [ ... merged list ... ],
+  "codeExamples": [ ... merged examples ... ],
+  "stateOfTheArt": { ... merged state ... },
+  "openQuestions": [ ... updated questions, remove resolved ones ... ],
+  "sources": { ... merged sources ... }
+}
+
+Guidelines:
+- PRESERVE existing research - don't discard valuable findings
+- INTEGRATE new information naturally
+- If new research contradicts old, prefer the new (more recent info)
+- Remove duplicates but keep all unique items
+- Update confidence levels based on combined evidence
+- Remove open questions that are now answered
+- The merged research should be cohesive, not disjointed
+
+Always return valid JSON.`;
+
+/**
  * Parse phase information from ROADMAP.md content
  */
 interface ParsedPhaseInfo {
@@ -489,15 +522,20 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
     return { metadata: { lastCommand: 'research-phase' } };
   }
 
-  // Parse phase number from prompt
+  // Parse phase number from prompt (may include keywords like "additional" or a focus topic)
   const promptText = request.prompt.trim();
-  if (!promptText) {
+  const promptParts = promptText.split(/\s+/);
+  const phaseArg = promptParts[0];
+  const additionalArgs = promptParts.slice(1).join(' ');
+
+  if (!phaseArg) {
     stream.markdown('## Usage\n\n');
-    stream.markdown('**`/research-phase <phase-number>`**\n\n');
+    stream.markdown('**`/research-phase <phase-number> [topic]`**\n\n');
     stream.markdown('Research how to implement a phase before planning.\n\n');
     stream.markdown('**Examples:**\n');
     stream.markdown('- `/research-phase 3` - Research Phase 3\n');
-    stream.markdown('- `/research-phase 2.1` - Research inserted Phase 2.1\n\n');
+    stream.markdown('- `/research-phase 2.1` - Research inserted Phase 2.1\n');
+    stream.markdown('- `/research-phase 3 authentication patterns` - Add research on specific topic\n\n');
     stream.markdown('**When to use:**\n');
     stream.markdown('- 3D graphics, game development, audio/music\n');
     stream.markdown('- ML/AI integration, real-time systems\n');
@@ -510,14 +548,14 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
   }
 
   // Validate phase number
-  if (!/^[\d.]+$/.test(promptText)) {
+  if (!/^[\d.]+$/.test(phaseArg)) {
     stream.markdown('## Invalid Argument\n\n');
-    stream.markdown(`"${promptText}" is not a valid phase number.\n\n`);
-    stream.markdown('**Usage:** `/research-phase <phase-number>`\n\n');
+    stream.markdown(`"${phaseArg}" is not a valid phase number.\n\n`);
+    stream.markdown('**Usage:** `/research-phase <phase-number> [topic]`\n\n');
     return { metadata: { lastCommand: 'research-phase' } };
   }
 
-  const phaseNum = parseFloat(promptText);
+  const phaseNum = parseFloat(phaseArg);
   if (isNaN(phaseNum) || phaseNum < 1) {
     stream.markdown('## Invalid Phase Number\n\n');
     stream.markdown(`"${promptText}" is not a valid phase number.\n\n`);
@@ -558,24 +596,30 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
   const researchFileName = `${formatPhaseNumber(phaseNum)}-RESEARCH.md`;
   const researchUri = vscode.Uri.joinPath(workspaceUri, '.planning', 'phases', dirName, researchFileName);
 
-  let existingResearch = false;
+  let existingResearchContent: string | undefined;
   try {
-    await vscode.workspace.fs.stat(researchUri);
-    existingResearch = true;
+    const existingBytes = await vscode.workspace.fs.readFile(researchUri);
+    existingResearchContent = Buffer.from(existingBytes).toString('utf-8');
   } catch {
     // File doesn't exist, which is expected
   }
 
-  if (existingResearch) {
+  // Check if user wants to add to existing research
+  const wantsToAdd = additionalArgs.length > 0;
+
+  if (existingResearchContent && !wantsToAdd) {
     stream.markdown('## Research Already Exists\n\n');
     stream.markdown(`Phase ${phaseNum} (${targetPhase.name}) already has research.\n\n`);
     stream.markdown('**Existing research:**\n');
     stream.reference(researchUri);
     stream.markdown('\n\n');
-    stream.markdown('To update research, delete the existing file and run `/research-phase` again.\n\n');
+    stream.markdown('**Options:**\n');
+    stream.markdown(`- Add to research: \`/research-phase ${phaseNum} [topic to research]\`\n`);
+    stream.markdown(`- Delete the file and run \`/research-phase ${phaseNum}\` to regenerate from scratch\n\n`);
     stream.markdown('**Or proceed to planning:**\n\n');
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [phaseNum],
       title: `Plan Phase ${phaseNum}`
     });
     return { metadata: { lastCommand: 'research-phase' } };
@@ -592,39 +636,20 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
     // No context file, that's fine
   }
 
-  stream.progress('Analyzing phase for research domains...');
+  // Determine if we're merging with existing research
+  const isMerging = !!existingResearchContent && wantsToAdd;
+
+  if (isMerging) {
+    stream.markdown('## Adding to Existing Research\n\n');
+    stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
+    stream.markdown(`**Additional topic:** ${additionalArgs}\n\n`);
+    stream.progress('Researching additional topic...');
+  } else {
+    stream.progress('Analyzing phase for research domains...');
+  }
 
   try {
-    // Step 1: Identify research domains
-    const domainContextParts = [
-      `Phase ${phaseNum}: ${targetPhase.name}`,
-      `Goal: ${targetPhase.goal}`,
-      '',
-      'Project context:',
-      projectContext.projectMd ? projectContext.projectMd.slice(0, 2000) : 'No project description available'
-    ];
-
-    if (contextContent) {
-      domainContextParts.push('', 'Additional context from discussion:', contextContent.slice(0, 1000));
-    }
-
-    const domainMessages: vscode.LanguageModelChatMessage[] = [
-      vscode.LanguageModelChatMessage.User(RESEARCH_DOMAIN_PROMPT),
-      vscode.LanguageModelChatMessage.User(domainContextParts.join('\n'))
-    ];
-
-    const domainResponse = await request.model.sendRequest(domainMessages, {}, token);
-
-    let domainResponseText = '';
-    for await (const fragment of domainResponse.text) {
-      if (token.isCancellationRequested) {
-        stream.markdown('**Cancelled**\n');
-        return { metadata: { lastCommand: 'research-phase' } };
-      }
-      domainResponseText += fragment;
-    }
-
-    // Parse domain analysis
+    // Step 1: Identify research domains (or use provided topic for merging)
     let domainAnalysis: {
       needsResearch: boolean;
       reason: string;
@@ -633,32 +658,73 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
       skipReason: string | null;
     };
 
-    try {
-      const jsonStr = extractJsonFromResponse(domainResponseText);
-      domainAnalysis = JSON.parse(jsonStr);
-    } catch {
-      // Default to needing research
+    if (isMerging) {
+      // When merging, use the user-provided topic as the domain
       domainAnalysis = {
         needsResearch: true,
-        reason: 'Unable to analyze, proceeding with research',
-        domains: [{ name: targetPhase.name, category: 'core-technology', questions: ['What is the best approach?'] }],
+        reason: `User requested additional research on: ${additionalArgs}`,
+        domains: [{ name: additionalArgs, category: 'core-technology', questions: [`What are the best practices for ${additionalArgs}?`] }],
         suggestSkip: false,
         skipReason: null
       };
-    }
+    } else {
+      // Normal flow: identify domains from phase description
+      const domainContextParts = [
+        `Phase ${phaseNum}: ${targetPhase.name}`,
+        `Goal: ${targetPhase.goal}`,
+        '',
+        'Project context:',
+        projectContext.projectMd ? projectContext.projectMd.slice(0, 2000) : 'No project description available'
+      ];
 
-    // If research not needed, suggest skipping
-    if (domainAnalysis.suggestSkip || !domainAnalysis.needsResearch) {
-      stream.markdown('## Research May Not Be Needed\n\n');
-      stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
-      stream.markdown(`${domainAnalysis.reason || domainAnalysis.skipReason || 'This appears to be commodity work that Claude handles well.'}\n\n`);
-      stream.markdown('**Recommendation:** Skip research and proceed directly to planning.\n\n');
-      stream.button({
-        command: 'hopper.chat-participant.plan-phase',
-        title: `Plan Phase ${phaseNum}`
-      });
-      stream.markdown('\n\nIf you still want to research, re-run with `/research-phase ${phaseNum}` and specify what to research in a follow-up message.\n');
-      return { metadata: { lastCommand: 'research-phase', phaseNumber: phaseNum } };
+      if (contextContent) {
+        domainContextParts.push('', 'Additional context from discussion:', contextContent.slice(0, 1000));
+      }
+
+      const domainMessages: vscode.LanguageModelChatMessage[] = [
+        vscode.LanguageModelChatMessage.User(RESEARCH_DOMAIN_PROMPT),
+        vscode.LanguageModelChatMessage.User(domainContextParts.join('\n'))
+      ];
+
+      const domainResponse = await request.model.sendRequest(domainMessages, {}, token);
+
+      let domainResponseText = '';
+      for await (const fragment of domainResponse.text) {
+        if (token.isCancellationRequested) {
+          stream.markdown('**Cancelled**\n');
+          return { metadata: { lastCommand: 'research-phase' } };
+        }
+        domainResponseText += fragment;
+      }
+
+      try {
+        const jsonStr = extractJsonFromResponse(domainResponseText);
+        domainAnalysis = JSON.parse(jsonStr);
+      } catch {
+        // Default to needing research
+        domainAnalysis = {
+          needsResearch: true,
+          reason: 'Unable to analyze, proceeding with research',
+          domains: [{ name: targetPhase.name, category: 'core-technology', questions: ['What is the best approach?'] }],
+          suggestSkip: false,
+          skipReason: null
+        };
+      }
+
+      // If research not needed, suggest skipping (only for new research, not merging)
+      if (domainAnalysis.suggestSkip || !domainAnalysis.needsResearch) {
+        stream.markdown('## Research May Not Be Needed\n\n');
+        stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
+        stream.markdown(`${domainAnalysis.reason || domainAnalysis.skipReason || 'This appears to be commodity work that Claude handles well.'}\n\n`);
+        stream.markdown('**Recommendation:** Skip research and proceed directly to planning.\n\n');
+        stream.button({
+          command: 'hopper.chat-participant.plan-phase',
+          arguments: [phaseNum],
+          title: `Plan Phase ${phaseNum}`
+        });
+        stream.markdown('\n\nIf you still want to research, re-run with `/research-phase ${phaseNum}` and specify what to research in a follow-up message.\n');
+        return { metadata: { lastCommand: 'research-phase', phaseNumber: phaseNum } };
+      }
     }
 
     // Show what we're researching
@@ -674,8 +740,8 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
     }
     stream.markdown('\n');
 
-    // Step 2: Conduct comprehensive research
-    stream.progress('Conducting comprehensive research...');
+    // Step 2: Conduct comprehensive research (or merge with existing)
+    stream.progress(isMerging ? 'Researching and merging...' : 'Conducting comprehensive research...');
 
     const researchContextParts = [
       `Phase ${phaseNum}: ${targetPhase.name}`,
@@ -692,9 +758,29 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
       researchContextParts.push('', 'User vision/context:', contextContent.slice(0, 1500));
     }
 
+    // Choose prompt based on whether we're merging
+    let researchPrompt: string;
+    let researchInput: string;
+
+    if (isMerging && existingResearchContent) {
+      researchPrompt = RESEARCH_MERGE_PROMPT;
+      researchInput = [
+        ...researchContextParts,
+        '',
+        '--- EXISTING RESEARCH ---',
+        existingResearchContent.slice(0, 4000),
+        '',
+        '--- NEW TOPIC TO RESEARCH AND MERGE ---',
+        additionalArgs
+      ].join('\n');
+    } else {
+      researchPrompt = RESEARCH_GENERATION_PROMPT;
+      researchInput = researchContextParts.join('\n');
+    }
+
     const researchMessages: vscode.LanguageModelChatMessage[] = [
-      vscode.LanguageModelChatMessage.User(RESEARCH_GENERATION_PROMPT),
-      vscode.LanguageModelChatMessage.User(researchContextParts.join('\n'))
+      vscode.LanguageModelChatMessage.User(researchPrompt),
+      vscode.LanguageModelChatMessage.User(researchInput)
     ];
 
     const researchResponse = await request.model.sendRequest(researchMessages, {}, token);
@@ -735,13 +821,14 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
       stream.markdown('- Use `/discuss-phase` to provide more context first\n\n');
       stream.button({
         command: 'hopper.chat-participant.research-phase',
+        arguments: [phaseNum],
         title: 'Try Again'
       });
       return { metadata: { lastCommand: 'research-phase' } };
     }
 
     // Generate RESEARCH.md content
-    stream.progress('Creating research document...');
+    stream.progress(isMerging ? 'Updating research document...' : 'Creating research document...');
     const primaryDomain = domainAnalysis.domains[0]?.name || targetPhase.name;
     const researchContent = generateResearchMarkdown(phaseNum, targetPhase.name, primaryDomain, research);
 
@@ -760,7 +847,7 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
     );
 
     // Success!
-    stream.markdown('## Research Complete\n\n');
+    stream.markdown(isMerging ? '## Research Updated\n\n' : '## Research Complete\n\n');
     stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
     stream.markdown(`**Confidence:** ${research.confidence}\n\n`);
     stream.markdown(`**Primary recommendation:** ${research.primaryRecommendation}\n\n`);
@@ -791,14 +878,20 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
       stream.markdown('\n');
     }
 
-    stream.markdown('**Created:**\n');
+    stream.markdown(isMerging ? '**Updated:**\n' : '**Created:**\n');
     stream.reference(researchUri);
     stream.markdown('\n\n');
 
+    if (isMerging) {
+      stream.markdown('### Want to Add More?\n\n');
+      stream.markdown(`Run \`/research-phase ${phaseNum} [another topic]\` to add more research.\n\n`);
+    }
+
     stream.markdown('### Next Steps\n\n');
-    stream.markdown(`Research complete. Use **/plan-phase ${phaseNum}** to create the execution plan.\n\n`);
+    stream.markdown(`Research ${isMerging ? 'updated' : 'complete'}. Use **/plan-phase ${phaseNum}** to create the execution plan.\n\n`);
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [phaseNum],
       title: `Plan Phase ${phaseNum}`
     });
 

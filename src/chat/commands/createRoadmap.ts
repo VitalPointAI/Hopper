@@ -258,6 +258,7 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<IHopperR
 
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [1],
       title: 'Plan Phase 1'
     });
 
@@ -399,6 +400,7 @@ export async function handleCreateRoadmap(ctx: CommandContext): Promise<IHopperR
 
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [1],
       title: 'Plan Phase 1'
     });
 

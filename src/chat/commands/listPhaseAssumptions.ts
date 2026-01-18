@@ -287,6 +287,7 @@ export async function handleListPhaseAssumptions(ctx: CommandContext): Promise<I
       stream.markdown('- Add more details to PROJECT.md\n\n');
       stream.button({
         command: 'hopper.chat-participant.list-phase-assumptions',
+        arguments: [phaseNum],
         title: 'Try Again'
       });
       return { metadata: { lastCommand: 'list-phase-assumptions' } };
@@ -387,18 +388,21 @@ export async function handleListPhaseAssumptions(ctx: CommandContext): Promise<I
     stream.markdown('**1. Clarify your vision** with `/discuss-phase`\n');
     stream.button({
       command: 'hopper.chat-participant.discuss-phase',
+      arguments: [phaseNum],
       title: `Discuss Phase ${phaseNum}`
     });
 
     stream.markdown('\n\n**2. Research the domain** with `/research-phase`\n');
     stream.button({
       command: 'hopper.chat-participant.research-phase',
+      arguments: [phaseNum],
       title: `Research Phase ${phaseNum}`
     });
 
     stream.markdown('\n\n**3. Proceed to planning** if assumptions look good\n');
     stream.button({
       command: 'hopper.chat-participant.plan-phase',
+      arguments: [phaseNum],
       title: `Plan Phase ${phaseNum}`
     });
 

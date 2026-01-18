@@ -18,6 +18,131 @@ import {
 import { clearHandoffAfterCompletion } from './resumeWork';
 
 /**
+ * Format a tool invocation message with contextual information.
+ * Provides user-friendly descriptions for file and directory operations.
+ */
+function formatToolMessage(toolName: string, input: Record<string, unknown>, workspaceRoot?: string): { start: string; complete: string } {
+  // Helper to make paths relative and readable
+  const formatPath = (fullPath: string): string => {
+    if (workspaceRoot && fullPath.startsWith(workspaceRoot)) {
+      return fullPath.slice(workspaceRoot.length + 1); // +1 for trailing slash
+    }
+    return fullPath;
+  };
+
+  // Helper to get file extension description
+  const getFileType = (filePath: string): string => {
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    const types: Record<string, string> = {
+      'ts': 'TypeScript',
+      'tsx': 'TypeScript React',
+      'js': 'JavaScript',
+      'jsx': 'JavaScript React',
+      'json': 'JSON',
+      'md': 'Markdown',
+      'css': 'CSS',
+      'scss': 'SCSS',
+      'html': 'HTML',
+      'yaml': 'YAML',
+      'yml': 'YAML',
+      'py': 'Python',
+      'go': 'Go',
+      'rs': 'Rust',
+      'java': 'Java',
+      'sql': 'SQL',
+      'sh': 'Shell script',
+      'bash': 'Bash script'
+    };
+    return types[ext || ''] || 'file';
+  };
+
+  // Helper to estimate content size
+  const getContentSize = (content: string): string => {
+    const lines = content.split('\n').length;
+    if (lines === 1) {
+      return '1 line';
+    }
+    return `${lines} lines`;
+  };
+
+  switch (toolName) {
+    case 'hopper_createFile': {
+      const filePath = input.filePath as string || 'unknown';
+      const content = input.content as string || '';
+      const relativePath = formatPath(filePath);
+      const fileType = getFileType(filePath);
+      const size = getContentSize(content);
+      return {
+        start: `**Creating ${fileType}:** \`${relativePath}\` (${size})`,
+        complete: `Created \`${relativePath}\``
+      };
+    }
+
+    case 'hopper_createDirectory': {
+      const dirPath = input.dirPath as string || 'unknown';
+      const relativePath = formatPath(dirPath);
+      return {
+        start: `**Creating directory:** \`${relativePath}/\``,
+        complete: `Created directory \`${relativePath}/\``
+      };
+    }
+
+    case 'copilot_editFile':
+    case 'vscode_editFile': {
+      const filePath = input.filePath as string || input.path as string || 'unknown';
+      const relativePath = formatPath(filePath);
+      return {
+        start: `**Editing:** \`${relativePath}\``,
+        complete: `Edited \`${relativePath}\``
+      };
+    }
+
+    case 'copilot_readFile':
+    case 'vscode_readFile': {
+      const filePath = input.filePath as string || input.path as string || 'unknown';
+      const relativePath = formatPath(filePath);
+      return {
+        start: `*Reading \`${relativePath}\`...*`,
+        complete: `*Read \`${relativePath}\`*`
+      };
+    }
+
+    case 'hopper_runInTerminal': {
+      const command = input.command as string || 'unknown';
+      const name = input.name as string;
+      const displayName = name || command.split(' ')[0];
+      return {
+        start: `**Starting terminal:** \`${displayName}\`\n   Command: \`${command}\``,
+        complete: `Terminal \`${displayName}\` started (running in background)`
+      };
+    }
+
+    case 'hopper_waitForPort': {
+      const port = input.port as number || 0;
+      const host = input.host as string || 'localhost';
+      return {
+        start: `**Waiting for port:** ${host}:${port}`,
+        complete: `Port ${host}:${port} is ready`
+      };
+    }
+
+    case 'hopper_httpHealthCheck': {
+      const url = input.url as string || 'unknown';
+      return {
+        start: `**Health check:** ${url}`,
+        complete: `Health check passed: ${url}`
+      };
+    }
+
+    default:
+      return {
+        start: `*Executing tool: ${toolName}...*`,
+        complete: `*Tool ${toolName} completed.*`
+      };
+  }
+}
+
+/**
  * Execute a chat request with tool calling loop.
  * Handles invoking tools when the model requests them.
  *
@@ -27,6 +152,7 @@ import { clearHandoffAfterCompletion } from './resumeWork';
  * @param stream The chat response stream to write to
  * @param token Cancellation token
  * @param toolInvocationToken Token from chat request for proper UI integration (required for file operations)
+ * @param workspaceRoot Optional workspace root for relative path formatting
  */
 async function executeWithTools(
   model: vscode.LanguageModelChat,
@@ -34,7 +160,8 @@ async function executeWithTools(
   tools: vscode.LanguageModelChatTool[],
   stream: vscode.ChatResponseStream,
   token: vscode.CancellationToken,
-  toolInvocationToken?: vscode.ChatParticipantToolToken
+  toolInvocationToken?: vscode.ChatParticipantToolToken,
+  workspaceRoot?: string
 ): Promise<void> {
   const MAX_ITERATIONS = 10;
   let iteration = 0;
@@ -59,8 +186,12 @@ async function executeWithTools(
         hasToolCalls = true;
         toolCallParts.push(part);
 
-        // Show tool invocation in stream
-        stream.markdown(`\n\n*Executing tool: ${part.name}...*\n\n`);
+        // Format contextual tool message
+        const toolInput = part.input as Record<string, unknown>;
+        const toolMsg = formatToolMessage(part.name, toolInput, workspaceRoot);
+
+        // Show tool invocation in stream with context
+        stream.markdown(`\n\n${toolMsg.start}\n\n`);
 
         try {
           // Log tool input for debugging
@@ -89,11 +220,11 @@ async function executeWithTools(
             new vscode.LanguageModelToolResultPart(part.callId, result.content)
           );
 
-          stream.markdown(`*Tool ${part.name} completed.*\n\n`);
+          stream.markdown(`${toolMsg.complete}\n\n`);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           console.error(`[Hopper] Tool ${part.name} error:`, err);
-          stream.markdown(`*Tool ${part.name} failed: ${errorMsg}*\n\n`);
+          stream.markdown(`**Failed:** ${part.name} - ${errorMsg}\n\n`);
 
           toolResults.push(
             new vscode.LanguageModelToolResultPart(
@@ -300,6 +431,20 @@ For file operations, you MUST use the hopper_* tools (NOT copilot_* tools):
 - Use hopper_createFile to create new files (with filePath and content)
 - Use hopper_createDirectory to create directories (with dirPath)
 These tools are reliable and work correctly with absolute paths.
+
+**Long-Running Processes (dev servers, watch tasks, etc.)**
+For commands that run continuously and don't exit (like dev servers), use these tools:
+- Use hopper_runInTerminal to start the process in a separate terminal (returns immediately)
+  - Parameters: command (required), name (optional terminal name), cwd (optional working directory)
+- Use hopper_waitForPort to wait for a port to become available
+  - Parameters: port (required), host (default: localhost), timeoutMs (default: 30000)
+- Use hopper_httpHealthCheck to verify a URL is responding
+  - Parameters: url (required), expectedStatus (default: 200), timeoutMs (default: 30000)
+
+Example workflow for starting a dev server:
+1. hopper_runInTerminal with command "npm run dev" and name "Dev Server"
+2. hopper_waitForPort with port 3000 (or appropriate port)
+3. Continue with remaining tasks once the server is ready
 
 **Task:** ${task.name}
 
@@ -925,7 +1070,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         // Execute with manual tool orchestration
         stream.markdown('**Agent executing...**\n\n');
 
-        await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken);
+        await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken, workspaceUri.fsPath);
 
         stream.markdown('\n\n');
 
