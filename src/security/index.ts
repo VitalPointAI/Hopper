@@ -42,3 +42,14 @@ export {
   getRuleOwasp,
   ScanResult,
 } from './scanner';
+
+// Export auto-fix transforms
+export {
+  applyTransform,
+  applyFixes,
+  getFixForIssue,
+  registerTransform,
+  FixResult,
+  TransformEntry,
+  TRANSFORM_REGISTRY,
+} from './fixes';

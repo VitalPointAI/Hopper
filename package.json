@@ -263,6 +263,7 @@
     "package": "vsce package"
   },
   "devDependencies": {
+    "@types/jscodeshift": "^17.3.0",
     "@types/node": "^25.0.9",
     "@types/semver": "^7.7.1",
     "@types/vscode": "^1.104.0",
@@ -274,6 +275,7 @@
     "eslint": "^9.39.2",
     "eslint-plugin-no-unsanitized": "^4.1.4",
     "eslint-plugin-security": "^3.0.1",
+    "jscodeshift": "^17.3.0",
     "openai": "^6.16.0",
     "semver": "^7.7.3"
   }
