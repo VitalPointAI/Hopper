@@ -1,8 +1,8 @@
-# Hopper
+# Hopper Velocity
 
-**Model-agnostic structured planning for VS Code agent chat with NEAR AI integration**
+**Ship projects faster with AI-powered planning and execution. First phase free, upgrade to continue your project.**
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/vitalpointai.hopper?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=vitalpointai.hopper)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/VitalPoint.hopper-velocity?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=VitalPoint.hopper-velocity)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -42,7 +42,7 @@ Hopper brings structured project planning directly into VS Code's chat interface
 
 Or install from the command line:
 ```bash
-code --install-extension vitalpointai.hopper
+code --install-extension VitalPoint.hopper-velocity
 ```
 
 ---
