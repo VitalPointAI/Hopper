@@ -16,6 +16,13 @@ import {
   TaskCommitInfo
 } from '../executor';
 import { clearHandoffAfterCompletion } from './resumeWork';
+import {
+  ConfigManager,
+  shouldPauseAtCheckpoint,
+  shouldConfirmTask,
+  confirmTaskExecution,
+  getModeDescription
+} from '../../config';
 
 /**
  * Format a tool invocation message with contextual information.
@@ -838,12 +845,18 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     }
   }
 
+  // Load execution mode from config
+  const configManager = new ConfigManager(workspaceUri);
+  const hopperConfig = await configManager.loadConfig();
+  const executionMode = hopperConfig.executionMode;
+
   // Show plan overview
   stream.markdown(`## Executing Plan\n\n`);
   stream.markdown(`**Phase:** ${plan.phase}\n`);
   stream.markdown(`**Plan:** ${plan.planNumber}\n`);
   stream.markdown(`**Objective:** ${plan.objective}\n\n`);
-  stream.markdown(`**Tasks:** ${plan.tasks.length}\n\n`);
+  stream.markdown(`**Tasks:** ${plan.tasks.length}\n`);
+  stream.markdown(`**Execution mode:** ${getModeDescription(executionMode)}\n\n`);
 
   stream.reference(planUri);
   stream.markdown('\n\n---\n\n');
@@ -995,45 +1008,84 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
     // Handle checkpoint tasks
     if (isCheckpointVerify(task)) {
-      // Save state and pause at human-verify checkpoint
-      const state: ExecutionState = {
-        planPath,
-        currentTaskIndex: i,
-        completedTasks: results.filter(r => r.success).map(r => r.taskId),
-        decisions: existingState?.decisions || {},
-        pausedAtCheckpoint: true,
-        checkpointType: 'human-verify',
-        savedAt: Date.now()
-      };
-      await saveExecutionState(ctx.extensionContext, state);
+      // Check if we should pause based on execution mode
+      if (shouldPauseAtCheckpoint(executionMode, 'human-verify')) {
+        // Save state and pause at human-verify checkpoint
+        const state: ExecutionState = {
+          planPath,
+          currentTaskIndex: i,
+          completedTasks: results.filter(r => r.success).map(r => r.taskId),
+          decisions: existingState?.decisions || {},
+          pausedAtCheckpoint: true,
+          checkpointType: 'human-verify',
+          savedAt: Date.now()
+        };
+        await saveExecutionState(ctx.extensionContext, state);
 
-      // Render checkpoint UI
-      renderCheckpointVerify(task, i, plan.tasks.length, stream, planPath);
+        // Render checkpoint UI
+        renderCheckpointVerify(task, i, plan.tasks.length, stream, planPath);
 
-      return { metadata: { lastCommand: 'execute-plan' } };
+        return { metadata: { lastCommand: 'execute-plan' } };
+      } else {
+        // Yolo mode: auto-approve checkpoint
+        stream.markdown(`### Task ${i + 1}/${plan.tasks.length}: Checkpoint (auto-approved)\n\n`);
+        stream.markdown(`**What was built:** ${task.whatBuilt}\n\n`);
+        stream.markdown('*Auto-approved in yolo mode.*\n\n---\n\n');
+        results.push({ taskId: task.id, success: true, name: task.whatBuilt });
+        continue;
+      }
     }
 
     if (isCheckpointDecision(task)) {
-      // Save state and pause at decision checkpoint
-      const state: ExecutionState = {
-        planPath,
-        currentTaskIndex: i,
-        completedTasks: results.filter(r => r.success).map(r => r.taskId),
-        decisions: existingState?.decisions || {},
-        pausedAtCheckpoint: true,
-        checkpointType: 'decision',
-        savedAt: Date.now()
-      };
-      await saveExecutionState(ctx.extensionContext, state);
+      // Check if we should pause based on execution mode
+      if (shouldPauseAtCheckpoint(executionMode, 'decision')) {
+        // Save state and pause at decision checkpoint
+        const state: ExecutionState = {
+          planPath,
+          currentTaskIndex: i,
+          completedTasks: results.filter(r => r.success).map(r => r.taskId),
+          decisions: existingState?.decisions || {},
+          pausedAtCheckpoint: true,
+          checkpointType: 'decision',
+          savedAt: Date.now()
+        };
+        await saveExecutionState(ctx.extensionContext, state);
 
-      // Render decision UI
-      renderCheckpointDecision(task, i, plan.tasks.length, stream, planPath);
+        // Render decision UI
+        renderCheckpointDecision(task, i, plan.tasks.length, stream, planPath);
 
-      return { metadata: { lastCommand: 'execute-plan' } };
+        return { metadata: { lastCommand: 'execute-plan' } };
+      } else {
+        // Yolo mode: auto-select first option
+        const firstOption = task.options[0];
+        stream.markdown(`### Task ${i + 1}/${plan.tasks.length}: Decision (auto-selected)\n\n`);
+        stream.markdown(`**Decision:** ${task.decision}\n`);
+        stream.markdown(`**Selected:** ${firstOption?.name || 'first option'} (auto-selected in yolo mode)\n\n---\n\n`);
+        if (firstOption) {
+          existingState = existingState || { planPath, currentTaskIndex: 0, completedTasks: [], decisions: {}, pausedAtCheckpoint: false, savedAt: Date.now() };
+          existingState.decisions[`task-${task.id}`] = firstOption.id;
+        }
+        results.push({ taskId: task.id, success: true, name: task.decision });
+        continue;
+      }
     }
 
     // Handle auto tasks
     if (isAutoTask(task)) {
+      // Check if manual mode requires confirmation before auto tasks
+      if (shouldConfirmTask(executionMode, 'auto')) {
+        const confirmed = await confirmTaskExecution(
+          { name: task.name, files: task.files, action: task.action },
+          stream
+        );
+        if (!confirmed) {
+          // User skipped this task
+          results.push({ taskId: task.id, success: false, name: task.name });
+          stream.markdown('---\n\n');
+          continue;
+        }
+      }
+
       stream.markdown(`### Task ${task.id}/${plan.tasks.length}: ${task.name}\n\n`);
 
       if (task.files && task.files.length > 0) {
@@ -1158,7 +1210,8 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
   stream.markdown('## Execution Complete\n\n');
   stream.markdown(`**Plan:** ${plan.phase} - Plan ${plan.planNumber}\n`);
-  stream.markdown(`**Mode:** ${usedAgentMode ? 'Agent (file modifications)' : 'Suggestions (manual apply)'}\n`);
+  stream.markdown(`**Agent mode:** ${usedAgentMode ? 'File modifications' : 'Suggestions only'}\n`);
+  stream.markdown(`**Execution mode:** ${getModeDescription(executionMode)}\n`);
   stream.markdown(`**Tasks:** ${successCount}/${plan.tasks.length} completed`);
   if (failedCount > 0) {
     stream.markdown(`, ${failedCount} failed`);
