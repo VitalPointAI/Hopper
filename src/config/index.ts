@@ -15,3 +15,9 @@ export {
   getPhaseExtractionPrompt,
   getPlanGenerationPrompt
 } from './prompts';
+export {
+  shouldPauseAtCheckpoint,
+  shouldConfirmTask,
+  confirmTaskExecution,
+  getModeDescription
+} from './executionGates';
