@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 
 ## Current Position
 
-Phase: 6 of 11 (Security Review)
+Phase: 6 of 12 (Security Review)
 Plan: 4 of 4 complete
 Status: Phase complete
 Last activity: 2026-01-18 — Completed 06-04-PLAN.md (/security-check command)
 
-Progress: ████████████████████ 100%
+Progress: ██████████████████░░ 92%
 
 ## Performance Metrics
 
@@ -175,10 +175,11 @@ Recent decisions affecting current work:
 - Phase 1.5.1 inserted after Phase 1.5: Infrastructure Deploy (URGENT) — Discovered during 03-03 UAT that licensing was built but never deployed
 - Phase 1.5.3 inserted after Phase 1.5.2: Rebrand SpecFlow to Hopper (URGENT) — User-facing name change from @specflow to @hopper
 - Phase 6 added: Security Review — Security audit and hardening of extension and backend
+- Phase 7 added: Planning Depth — User-selectable planning depth and execution control modes
 
 ## Session Continuity
 
 Last session: 2026-01-18
 Stopped at: Completed 06-04-PLAN.md (/security-check command)
 Resume file: None
-Next: Phase 6 complete - milestone complete
+Next: Plan Phase 7 (Planning Depth)

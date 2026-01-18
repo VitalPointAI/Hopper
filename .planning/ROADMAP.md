@@ -27,6 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Session Management** - Progress tracking, resumption, issue logging
 - [x] **Phase 5.1: GSD Feature Parity** - INSERTED - Complete all GSD framework commands
 - [x] **Phase 6: Security Review** - Security audit and hardening
+- [ ] **Phase 7: Planning Depth** - User-selectable planning depth and execution control modes
 
 ## Phase Details
 
@@ -162,10 +163,22 @@ Plans:
 - [x] 06-03: Auto-fix transforms using jscodeshift
 - [x] 06-04: /security-check command with two-phase UX
 
+### Phase 7: Planning Depth
+**Goal**: User-selectable planning depth (quick/standard/comprehensive) and execution control modes (yolo/guided/manual) for /new-project and other planning commands
+**Depends on**: Phase 6 (security complete before UX enhancements)
+**Research**: Unlikely (internal configuration patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: Configuration types and manager (HopperConfig, load/save from .planning/config.json)
+- [ ] 07-02: Interactive selection UI (depth and mode picker during /new-project)
+- [ ] 07-03: Depth-aware prompts (vary PROJECT.md and ROADMAP.md detail based on depth)
+- [ ] 07-04: Gate implementation (confirmation flow based on execution mode)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5 → 5.1 → 6
+Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5 → 5.1 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -180,3 +193,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
 | 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
 | 6. Security Review | 4/4 | Complete | 2026-01-18 |
+| 7. Planning Depth | 0/4 | Not started | - |
