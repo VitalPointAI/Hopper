@@ -26,6 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Execution Commands** - PLAN.md execution, verification, git integration
 - [x] **Phase 5: Session Management** - Progress tracking, resumption, issue logging
 - [ ] **Phase 5.1: GSD Feature Parity** - INSERTED - Complete all GSD framework commands (In progress)
+- [ ] **Phase 6: Security Review** - Security audit and hardening
 
 ## Phase Details
 
@@ -148,10 +149,20 @@ Plans:
 - [x] 05.1-05: Live discovery (/discovery-phase with web search and doc fetching)
 - [ ] 05.1-06: Codebase mapping (/map-codebase) and parity verification
 
+### Phase 6: Security Review
+**Goal**: /security-check command that analyzes user projects for vulnerabilities, auto-fixes safe issues, and offers interactive fixing for others
+**Depends on**: Phase 5.1 (feature complete before security review)
+**Research**: Likely (OWASP Top 10 detection patterns, safe auto-fix strategies)
+**Research topics**: Static analysis patterns for common vulnerabilities (XSS, injection, auth issues), safe code transformation techniques, severity classification
+**Plans**: TBD
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 6 to break down)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5 → 5.1
+Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5 → 5.1 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -165,3 +176,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
 | 5.1 GSD Feature Parity | 5/6 | In progress | - |
+| 6. Security Review | 0/0 | Not started | - |
