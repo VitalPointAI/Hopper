@@ -3,17 +3,20 @@
   "displayName": "Hopper",
   "description": "Model-agnostic structured planning for VSCode agent chat with NEAR AI integration",
   "version": "0.0.1",
-  "publisher": "vitalpointai",
+  "publisher": "VitalPoint",
   "license": "MIT",
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vitalpointai/hopper"
+    "url": "https://github.com/VitalPointAI/Hopper"
   },
   "bugs": {
-    "url": "https://github.com/vitalpointai/hopper/issues"
+    "url": "https://github.com/VitalPointAI/Hopper/issues"
   },
-  "homepage": "https://github.com/vitalpointai/hopper#readme",
+  "homepage": "https://github.com/VitalPointAI/Hopper.git#readme",
+  "sponsor": {
+    "url": "https://github.com/sponsors/VitalPointAI"
+  },
   "galleryBanner": {
     "color": "#1e1e1e",
     "theme": "dark"
@@ -153,7 +156,6 @@
       {
         "name": "hopper_createFile",
         "displayName": "Hopper Create File",
-        "description": "Creates a file at the specified absolute path with the given content. Use this for creating new files in the workspace.",
         "tags": [
           "workspace",
           "file"
@@ -180,7 +182,6 @@
       {
         "name": "hopper_createDirectory",
         "displayName": "Hopper Create Directory",
-        "description": "Creates a directory at the specified absolute path. Creates parent directories if they don't exist.",
         "tags": [
           "workspace",
           "file"

@@ -147,9 +147,9 @@ Hopper integrates with NEAR AI to provide model-agnostic language model support.
 
 ## Support
 
-- [Report Issues](https://github.com/vitalpointai/hopper/issues)
-- [Documentation](https://github.com/vitalpointai/hopper#readme)
+- [Report Issues](https://github.com/VitalPointAI/Hopper/issues)
+- [Documentation](https://github.com/VitalPointAI/Hopper#readme)
 
 ---
 
-**Made with ❤️ by [VitalPointAI](https://github.com/vitalpointai)**
+**Made with ❤️ by [VitalPointAI](https://github.com/VitalPointAI/Hopper)**
