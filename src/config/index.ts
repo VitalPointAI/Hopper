@@ -5,3 +5,8 @@ export type {
   HopperConfig
 } from './types';
 export { DEFAULT_CONFIG, createDefaultConfig } from './types';
+export {
+  selectPlanningDepth,
+  selectExecutionMode,
+  showConfigurationSummary
+} from './selectionUI';
