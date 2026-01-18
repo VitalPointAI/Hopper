@@ -14,6 +14,20 @@ interface TestResult {
 }
 
 /**
+ * Verification state for persistence and resume capability
+ */
+interface VerificationState {
+  planPath: string;
+  phase: string;
+  plan: string;
+  testItems: string[];
+  results: TestResult[];
+  currentIndex: number;
+  startedAt: string;
+  pausedAt?: string;
+}
+
+/**
  * UAT Issue logged from testing
  */
 interface UATIssue {
@@ -23,6 +37,46 @@ interface UATIssue {
   description: string;
   expected?: string;
   actual?: string;
+}
+
+/**
+ * Get the storage key for verification state
+ */
+function getVerificationStateKey(planPath: string): string {
+  return `hopper.verificationState.${planPath}`;
+}
+
+/**
+ * Save verification state to extension globalState
+ */
+async function saveVerificationState(
+  context: vscode.ExtensionContext,
+  state: VerificationState
+): Promise<void> {
+  const key = getVerificationStateKey(state.planPath);
+  await context.globalState.update(key, state);
+}
+
+/**
+ * Load verification state from extension globalState
+ */
+function loadVerificationState(
+  context: vscode.ExtensionContext,
+  planPath: string
+): VerificationState | undefined {
+  const key = getVerificationStateKey(planPath);
+  return context.globalState.get<VerificationState>(key);
+}
+
+/**
+ * Clear verification state from extension globalState
+ */
+async function clearVerificationState(
+  context: vscode.ExtensionContext,
+  planPath: string
+): Promise<void> {
+  const key = getVerificationStateKey(planPath);
+  await context.globalState.update(key, undefined);
 }
 
 /**
@@ -297,21 +351,106 @@ async function writeIssuesFile(
 }
 
 /**
- * Run interactive test flow using VSCode dialogs
+ * Show a non-blocking QuickPick that persists when clicking away
+ * Returns the selected value or null if cancelled/dismissed
+ */
+async function showNonBlockingQuickPick<T extends { label: string; value: unknown }>(
+  items: T[],
+  options: { title: string; placeHolder: string }
+): Promise<T | null> {
+  return new Promise((resolve) => {
+    const picker = vscode.window.createQuickPick<T>();
+    picker.items = items;
+    picker.title = options.title;
+    picker.placeholder = options.placeHolder;
+    picker.ignoreFocusOut = true; // Keep open when clicking elsewhere
+
+    let resolved = false;
+
+    picker.onDidAccept(() => {
+      if (picker.selectedItems.length > 0 && !resolved) {
+        resolved = true;
+        const selected = picker.selectedItems[0];
+        picker.dispose();
+        resolve(selected);
+      }
+    });
+
+    picker.onDidHide(() => {
+      if (!resolved) {
+        resolved = true;
+        picker.dispose();
+        resolve(null);
+      }
+    });
+
+    picker.show();
+  });
+}
+
+/**
+ * Show a non-blocking input box that persists when clicking away
+ * Returns the entered text or empty string if cancelled
+ */
+async function showNonBlockingInputBox(
+  options: { title: string; prompt: string; placeHolder: string }
+): Promise<string> {
+  return new Promise((resolve) => {
+    const inputBox = vscode.window.createInputBox();
+    inputBox.title = options.title;
+    inputBox.prompt = options.prompt;
+    inputBox.placeholder = options.placeHolder;
+    inputBox.ignoreFocusOut = true; // Keep open when clicking elsewhere
+
+    let resolved = false;
+
+    inputBox.onDidAccept(() => {
+      if (!resolved) {
+        resolved = true;
+        const value = inputBox.value;
+        inputBox.dispose();
+        resolve(value);
+      }
+    });
+
+    inputBox.onDidHide(() => {
+      if (!resolved) {
+        resolved = true;
+        inputBox.dispose();
+        resolve(''); // Return empty string on dismiss
+      }
+    });
+
+    inputBox.show();
+  });
+}
+
+/**
+ * Run interactive test flow using non-blocking VSCode dialogs
  * Guides user through tests one-by-one with per-test reporting
+ * Saves state after each test for resume capability
  */
 async function runInteractiveTests(
   testItems: string[],
   planName: string,
-  stream: vscode.ChatResponseStream
-): Promise<TestResult[]> {
-  const results: TestResult[] = [];
+  stream: vscode.ChatResponseStream,
+  extensionContext: vscode.ExtensionContext,
+  state: VerificationState,
+  startIndex: number = 0
+): Promise<{ results: TestResult[]; paused: boolean }> {
+  // Start with any existing results from resumed state
+  const results: TestResult[] = [...state.results];
 
-  stream.markdown('### Interactive Testing\n\n');
-  stream.markdown('Follow the instructions below for each test, then select the result from the dialog.\n\n');
-  stream.markdown('**Important:** Keep your eyes on this chat panel for test instructions - a small dialog will appear asking for results.\n\n');
+  if (startIndex === 0) {
+    stream.markdown('### Interactive Testing\n\n');
+    stream.markdown('Follow the instructions below for each test, then select the result from the dialog.\n\n');
+    stream.markdown('**Note:** The dialog stays open when you click away. You can resume testing with **/verify-work** if you need to pause.\n\n');
+  } else {
+    stream.markdown(`### Resuming Testing (from test ${startIndex + 1})\n\n`);
+    stream.markdown(`**${startIndex} of ${testItems.length}** tests already completed.\n\n`);
+  }
 
-  for (let i = 0; i < testItems.length; i++) {
+  for (let i = startIndex; i < testItems.length; i++) {
     const testItem = testItems[i];
 
     // Display test with clear formatting
@@ -319,8 +458,8 @@ async function runInteractiveTests(
     stream.markdown(`### Test ${i + 1} of ${testItems.length}\n\n`);
     stream.markdown(`${testItem}\n\n`);
 
-    // Show QuickPick for test result - use shorter title since full instructions are in chat
-    const statusResult = await vscode.window.showQuickPick(
+    // Show non-blocking QuickPick for test result
+    const statusResult = await showNonBlockingQuickPick(
       [
         { label: '$(pass) Pass', description: 'Feature works as described', value: 'pass' as const },
         { label: '$(error) Fail', description: 'Feature does not work', value: 'fail' as const },
@@ -334,22 +473,20 @@ async function runInteractiveTests(
     );
 
     if (!statusResult) {
-      // User cancelled (clicked elsewhere, pressed Escape, etc.)
+      // User dismissed the picker (pressed Escape or clicked close)
       stream.markdown(`  - *Testing paused*\n\n`);
       stream.markdown('---\n\n');
-      stream.markdown('**Testing paused.** You clicked away or pressed Escape.\n\n');
-      stream.markdown(`Progress: **${i}/${testItems.length}** tests completed.\n\n`);
+      stream.markdown('**Testing paused.** You dismissed the dialog.\n\n');
+      stream.markdown(`Progress: **${results.length}/${testItems.length}** tests completed.\n\n`);
 
-      // Mark remaining as skipped
-      for (let j = i; j < testItems.length; j++) {
-        results.push({
-          feature: testItems[j],
-          status: 'skip'
-        });
-      }
+      // Save state for resume
+      state.currentIndex = i;
+      state.results = results;
+      state.pausedAt = new Date().toISOString();
+      await saveVerificationState(extensionContext, state);
 
-      stream.markdown('To continue testing, run **/verify-work** again.\n\n');
-      break;
+      stream.markdown('Run **/verify-work** to resume from where you left off.\n\n');
+      return { results, paused: true };
     }
 
     const result: TestResult = {
@@ -359,8 +496,8 @@ async function runInteractiveTests(
 
     // If fail or partial, get more details
     if (statusResult.value === 'fail' || statusResult.value === 'partial') {
-      // Get severity
-      const severityResult = await vscode.window.showQuickPick(
+      // Get severity (with non-blocking picker)
+      const severityResult = await showNonBlockingQuickPick(
         [
           { label: 'Blocker', description: 'Cannot use feature at all', value: 'blocker' as const },
           { label: 'Major', description: 'Feature works but significant problem', value: 'major' as const },
@@ -373,12 +510,11 @@ async function runInteractiveTests(
         }
       );
 
-      if (severityResult) {
-        result.severity = severityResult.value;
-      }
+      // Default to Major if cancelled
+      result.severity = severityResult?.value || 'major';
 
-      // Get description
-      const description = await vscode.window.showInputBox({
+      // Get description (with non-blocking input box)
+      const description = await showNonBlockingInputBox({
         title: 'Issue Description',
         prompt: 'What went wrong?',
         placeHolder: 'Describe what happened vs what you expected'
@@ -390,6 +526,11 @@ async function runInteractiveTests(
     }
 
     results.push(result);
+
+    // Save state after each test result for resume capability
+    state.currentIndex = i + 1;
+    state.results = results;
+    await saveVerificationState(extensionContext, state);
 
     // Show result in chat
     const statusEmoji = {
@@ -409,7 +550,7 @@ async function runInteractiveTests(
     stream.markdown('\n\n');
   }
 
-  return results;
+  return { results, paused: false };
 }
 
 /**
@@ -420,7 +561,7 @@ async function runInteractiveTests(
  * guides user through each test interactively, logs issues to phase-scoped file.
  */
 export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResult> {
-  const { request, stream, projectContext } = ctx;
+  const { request, stream, projectContext, extensionContext } = ctx;
 
   // Check if project exists
   if (!projectContext.hasPlanning || !projectContext.planningUri) {
@@ -479,27 +620,118 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
   // Get phase directory name
   const pathParts = target.uri.fsPath.split('/');
   const phaseDir = pathParts[pathParts.length - 2];
+  const planPath = target.uri.fsPath;
 
-  // Generate test checklist
-  stream.progress('Generating test checklist...');
-  const planName = `Phase ${target.phase} Plan ${target.plan}`;
-  const testItems = await generateTestChecklist(ctx, deliverables, planName);
+  // Check for existing verification state (for resume capability)
+  const savedState = loadVerificationState(extensionContext, planPath);
+  let startIndex = 0;
+  let testItems: string[];
+  let verificationState: VerificationState;
 
-  // Present the UAT overview
-  stream.markdown(`## User Acceptance Testing\n\n`);
-  stream.markdown(`**Plan:** ${planName}\n`);
-  stream.markdown(`**Summary:** ${target.uri.fsPath.replace(projectContext.planningUri.fsPath, '.')}\n\n`);
+  if (savedState && savedState.currentIndex < savedState.testItems.length) {
+    // Offer to resume
+    const resumeChoice = await vscode.window.showQuickPick(
+      [
+        { label: '$(debug-continue) Resume', description: `Continue from test ${savedState.currentIndex + 1}`, value: 'resume' as const },
+        { label: '$(refresh) Start Over', description: 'Clear progress and start fresh', value: 'restart' as const }
+      ],
+      {
+        title: `Resume Verification? (${savedState.results.length}/${savedState.testItems.length} tests completed)`,
+        placeHolder: 'Choose how to proceed'
+      }
+    );
 
-  stream.markdown('### Deliverables to Test\n\n');
-  for (const accomplishment of deliverables.accomplishments) {
-    stream.markdown(`- ${accomplishment}\n`);
+    if (resumeChoice?.value === 'resume') {
+      // Resume from saved state
+      testItems = savedState.testItems;
+      startIndex = savedState.currentIndex;
+      verificationState = savedState;
+
+      stream.markdown(`## Resuming Verification\n\n`);
+      stream.markdown(`**Plan:** Phase ${target.phase} Plan ${target.plan}\n`);
+      stream.markdown(`**Progress:** ${savedState.results.length} of ${savedState.testItems.length} tests completed\n\n`);
+    } else {
+      // Start fresh - clear state and regenerate
+      await clearVerificationState(extensionContext, planPath);
+
+      stream.progress('Generating test checklist...');
+      const planName = `Phase ${target.phase} Plan ${target.plan}`;
+      testItems = await generateTestChecklist(ctx, deliverables, planName);
+
+      verificationState = {
+        planPath,
+        phase: target.phase,
+        plan: target.plan,
+        testItems,
+        results: [],
+        currentIndex: 0,
+        startedAt: new Date().toISOString()
+      };
+      await saveVerificationState(extensionContext, verificationState);
+
+      // Present the UAT overview
+      stream.markdown(`## User Acceptance Testing\n\n`);
+      stream.markdown(`**Plan:** ${planName}\n`);
+      stream.markdown(`**Summary:** ${target.uri.fsPath.replace(projectContext.planningUri.fsPath, '.')}\n\n`);
+
+      stream.markdown('### Deliverables to Test\n\n');
+      for (const accomplishment of deliverables.accomplishments) {
+        stream.markdown(`- ${accomplishment}\n`);
+      }
+      stream.markdown('\n');
+
+      stream.markdown(`**${testItems.length} tests generated.** Starting interactive testing...\n\n`);
+    }
+  } else {
+    // No saved state - start fresh
+    stream.progress('Generating test checklist...');
+    const planName = `Phase ${target.phase} Plan ${target.plan}`;
+    testItems = await generateTestChecklist(ctx, deliverables, planName);
+
+    verificationState = {
+      planPath,
+      phase: target.phase,
+      plan: target.plan,
+      testItems,
+      results: [],
+      currentIndex: 0,
+      startedAt: new Date().toISOString()
+    };
+    await saveVerificationState(extensionContext, verificationState);
+
+    // Present the UAT overview
+    stream.markdown(`## User Acceptance Testing\n\n`);
+    stream.markdown(`**Plan:** ${planName}\n`);
+    stream.markdown(`**Summary:** ${target.uri.fsPath.replace(projectContext.planningUri.fsPath, '.')}\n\n`);
+
+    stream.markdown('### Deliverables to Test\n\n');
+    for (const accomplishment of deliverables.accomplishments) {
+      stream.markdown(`- ${accomplishment}\n`);
+    }
+    stream.markdown('\n');
+
+    stream.markdown(`**${testItems.length} tests generated.** Starting interactive testing...\n\n`);
   }
-  stream.markdown('\n');
 
-  stream.markdown(`**${testItems.length} tests generated.** Starting interactive testing...\n\n`);
+  const planName = `Phase ${target.phase} Plan ${target.plan}`;
 
-  // Run interactive test flow
-  const results = await runInteractiveTests(testItems, planName, stream);
+  // Run interactive test flow with state persistence
+  const { results, paused } = await runInteractiveTests(
+    testItems,
+    planName,
+    stream,
+    extensionContext,
+    verificationState,
+    startIndex
+  );
+
+  // If paused, return early (state already saved)
+  if (paused) {
+    return { metadata: { lastCommand: 'verify-work', paused: true } };
+  }
+
+  // Clear verification state since all tests completed
+  await clearVerificationState(extensionContext, planPath);
 
   // Calculate summary
   const passed = results.filter(r => r.status === 'pass').length;
