@@ -167,7 +167,7 @@ Plans:
 **Goal**: User-selectable planning depth (quick/standard/comprehensive) and execution control modes (yolo/guided/manual) for /new-project and other planning commands
 **Depends on**: Phase 6 (security complete before UX enhancements)
 **Research**: Unlikely (internal configuration patterns)
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
 - [ ] 07-01: Configuration types and manager (HopperConfig, load/save from .planning/config.json)
