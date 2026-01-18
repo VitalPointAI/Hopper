@@ -141,7 +141,11 @@ Hopper integrates with NEAR AI to provide model-agnostic language model support.
 
 ## License
 
-[MIT](LICENSE)
+**VS Code Extension:** [MIT License](LICENSE) - Free and open source
+
+**Backend Infrastructure:** Proprietary - The API, licensing system, and NEAR smart contracts are proprietary and not open source.
+
+The extension code is open source under MIT, but requires connection to VitalPointAI's proprietary backend services for full functionality beyond the free tier.
 
 ---
 
@@ -152,4 +156,5 @@ Hopper integrates with NEAR AI to provide model-agnostic language model support.
 
 ---
 
-**Made with ❤️ by [VitalPointAI](https://github.com/VitalPointAI/Hopper)**
+**Made with ❤️ by [VitalPointAI](https://github.com/VitalPointAI)**
+
