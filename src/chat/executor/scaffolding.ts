@@ -65,19 +65,30 @@ export function extractScaffoldingCommand(action: string): string | null {
   // npm init -y
   // cargo init
 
-  // Match lines that start with common command runners
+  // Match commands anywhere in text (not just at line start)
+  // Capture the command and its arguments until end of line or backtick
   const commandPatterns = [
-    /^(npx\s+[^\n]+)/m,
-    /^(npm\s+(?:init|create)[^\n]+)/m,
-    /^(yarn\s+create[^\n]+)/m,
-    /^(pnpm\s+create[^\n]+)/m,
-    /^(bun\s+create[^\n]+)/m,
-    /^(cargo\s+(?:init|new)[^\n]+)/m,
-    /^(go\s+mod\s+init[^\n]+)/m,
-    /^(dotnet\s+new[^\n]+)/m,
-    /^(rails\s+new[^\n]+)/m,
-    /^(composer\s+create-project[^\n]+)/m,
-    /^(flutter\s+create[^\n]+)/m,
+    // npx commands - match until newline, backtick, or end
+    /(npx\s+create-[\w-]+(?:@[\w.]+)?\s+[^\n`]+)/i,
+    /(npx\s+[\w@/-]+\s+init[^\n`]*)/i,
+    // npm/yarn/pnpm/bun create/init
+    /(npm\s+(?:init|create)\s+[^\n`]+)/i,
+    /(yarn\s+create\s+[^\n`]+)/i,
+    /(pnpm\s+create\s+[^\n`]+)/i,
+    /(bun\s+create\s+[^\n`]+)/i,
+    // Rust
+    /(cargo\s+(?:init|new)[^\n`]*)/i,
+    // Go
+    /(go\s+mod\s+init[^\n`]*)/i,
+    // .NET
+    /(dotnet\s+new[^\n`]+)/i,
+    // Ruby
+    /(rails\s+new[^\n`]+)/i,
+    // PHP
+    /(composer\s+create-project[^\n`]+)/i,
+    // Mobile
+    /(flutter\s+create[^\n`]+)/i,
+    /(expo\s+init[^\n`]*)/i,
   ];
 
   for (const pattern of commandPatterns) {
