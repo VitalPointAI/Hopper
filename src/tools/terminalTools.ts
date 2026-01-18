@@ -131,7 +131,6 @@ export class HopperWaitForPortTool implements vscode.LanguageModelTool<WaitForPo
       console.log(`[Hopper] Waiting for port ${port} on ${host}...`);
 
       const startTime = Date.now();
-      let lastError: Error | null = null;
 
       while (Date.now() - startTime < timeoutMs) {
         if (token.isCancellationRequested) {
@@ -154,8 +153,7 @@ export class HopperWaitForPortTool implements vscode.LanguageModelTool<WaitForPo
       }
 
       throw new Error(
-        `Timeout waiting for port ${port} on ${host} after ${timeoutMs}ms` +
-        (lastError ? `: ${lastError.message}` : '')
+        `Timeout waiting for port ${port} on ${host} after ${timeoutMs}ms`
       );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
