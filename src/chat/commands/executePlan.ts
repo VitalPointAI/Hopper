@@ -1096,8 +1096,13 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       }
 
       // Check if this is a scaffolding task that needs special handling
-      if (isScaffoldingTask(task.action)) {
+      const isScaffolding = isScaffoldingTask(task.action);
+      console.log(`[Hopper] Task action: ${task.action.slice(0, 100)}...`);
+      console.log(`[Hopper] Is scaffolding task: ${isScaffolding}`);
+
+      if (isScaffolding) {
         const scaffoldCommand = extractScaffoldingCommand(task.action);
+        console.log(`[Hopper] Extracted scaffold command: ${scaffoldCommand}`);
         if (scaffoldCommand) {
           stream.markdown('**Scaffolding detected** - protecting .planning/ directory\n\n');
 

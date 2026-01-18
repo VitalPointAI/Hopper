@@ -65,30 +65,45 @@ export function extractScaffoldingCommand(action: string): string | null {
   // npm init -y
   // cargo init
 
-  // Match commands anywhere in text (not just at line start)
-  // Capture the command and its arguments until end of line or backtick
+  // First, try to extract commands wrapped in single quotes (common in plan text)
+  // This handles: Run 'npx create-next-app@latest ...' to initialize
+  const singleQuotedPattern = /'((?:npx|npm|yarn|pnpm|bun|cargo|go|dotnet|rails|composer|flutter|expo)\s+[^']+)'/i;
+  const quotedMatch = action.match(singleQuotedPattern);
+  if (quotedMatch) {
+    return quotedMatch[1].trim();
+  }
+
+  // Also try backtick-wrapped commands: `npx create-next-app@latest ...`
+  const backtickPattern = /`((?:npx|npm|yarn|pnpm|bun|cargo|go|dotnet|rails|composer|flutter|expo)\s+[^`]+)`/i;
+  const backtickMatch = action.match(backtickPattern);
+  if (backtickMatch) {
+    return backtickMatch[1].trim();
+  }
+
+  // Fallback: Match unquoted commands anywhere in text
+  // Capture the command and its arguments until end of line
   const commandPatterns = [
-    // npx commands - match until newline, backtick, or end
-    /(npx\s+create-[\w-]+(?:@[\w.]+)?\s+[^\n`]+)/i,
-    /(npx\s+[\w@/-]+\s+init[^\n`]*)/i,
+    // npx commands
+    /(npx\s+create-[\w-]+(?:@[\w.]+)?(?:\s+[^\s\n]+)*)/i,
+    /(npx\s+[\w@/-]+\s+init(?:\s+[^\s\n]+)*)/i,
     // npm/yarn/pnpm/bun create/init
-    /(npm\s+(?:init|create)\s+[^\n`]+)/i,
-    /(yarn\s+create\s+[^\n`]+)/i,
-    /(pnpm\s+create\s+[^\n`]+)/i,
-    /(bun\s+create\s+[^\n`]+)/i,
+    /(npm\s+(?:init|create)(?:\s+[^\s\n]+)*)/i,
+    /(yarn\s+create(?:\s+[^\s\n]+)*)/i,
+    /(pnpm\s+create(?:\s+[^\s\n]+)*)/i,
+    /(bun\s+create(?:\s+[^\s\n]+)*)/i,
     // Rust
-    /(cargo\s+(?:init|new)[^\n`]*)/i,
+    /(cargo\s+(?:init|new)(?:\s+[^\s\n]+)*)/i,
     // Go
-    /(go\s+mod\s+init[^\n`]*)/i,
+    /(go\s+mod\s+init(?:\s+[^\s\n]+)*)/i,
     // .NET
-    /(dotnet\s+new[^\n`]+)/i,
+    /(dotnet\s+new(?:\s+[^\s\n]+)*)/i,
     // Ruby
-    /(rails\s+new[^\n`]+)/i,
+    /(rails\s+new(?:\s+[^\s\n]+)*)/i,
     // PHP
-    /(composer\s+create-project[^\n`]+)/i,
+    /(composer\s+create-project(?:\s+[^\s\n]+)*)/i,
     // Mobile
-    /(flutter\s+create[^\n`]+)/i,
-    /(expo\s+init[^\n`]*)/i,
+    /(flutter\s+create(?:\s+[^\s\n]+)*)/i,
+    /(expo\s+init(?:\s+[^\s\n]+)*)/i,
   ];
 
   for (const pattern of commandPatterns) {
