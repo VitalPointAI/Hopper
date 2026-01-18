@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 5.1 of 10 (GSD Feature Parity)
-Plan: 3 of 5 complete
+Plan: 4 of 6 complete
 Status: In progress
-Last activity: 2026-01-17 — Completed 05.1-03-PLAN.md (UAT workflow)
+Last activity: 2026-01-17 — Completed 05.1-04-PLAN.md (Milestone management)
 
-Progress: ███████████░░░░░░░░░ 61%
+Progress: █████████████░░░░░░░ 67%
 
 ## Performance Metrics
 
@@ -35,11 +35,11 @@ Progress: ███████████░░░░░░░░░ 61%
 | 03-planning-commands | 3+FIX+FIX2 | 29 min | 5.8 min |
 | 04-execution-commands | 3+FIX+FIX-FIX+FIX-FIX-FIX+FIX-FIX-FIX-FIX+FIX5+FIX6+FIX7+FIX8+04-03-FIX | 66 min | 5.1 min |
 | 05-session-management | 3 | 10 min | 3.3 min |
-| 05.1-gsd-parity | 3+FIX | 23 min | 5.8 min |
+| 05.1-gsd-parity | 4+FIX | 35 min | 7.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 05.1-01 (6 min), 05.1-02 (8 min), 05.1-03 (5 min), 05.1-03-FIX (4 min)
-- Trend: Regular plans executing efficiently (~5 min avg)
+- Last 5 plans: 05.1-01 (6 min), 05.1-02 (8 min), 05.1-03 (5 min), 05.1-03-FIX (4 min), 05.1-04 (12 min)
+- Trend: Regular plans executing efficiently (~7 min avg)
 
 ## Accumulated Context
 
@@ -146,6 +146,9 @@ Recent decisions affecting current work:
 | 05.1-03 | Resume-task guides to re-execution | Agent context may have expired |
 | 05.1-03-FIX | vscode.window dialogs for interactive flow | Chat API doesn't support multi-turn |
 | 05.1-03-FIX | Auto-log issues from test results | Reduce manual steps for user |
+| 05.1-04 | LLM generates milestone details from description | Natural language to milestone structure |
+| 05.1-04 | Milestone archives in .planning/milestones/ | Separate from phase directories |
+| 05.1-04 | MILESTONE-CONTEXT.md for vision capture | Matches discuss-phase pattern |
 
 ### Deferred Issues
 
@@ -164,6 +167,6 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 05.1-03-FIX.md (UAT workflow fixes)
+Stopped at: Completed 05.1-04-PLAN.md (Milestone management)
 Resume file: None
-Next: Re-verify 05.1-03 or execute 05.1-04-PLAN.md
+Next: Execute 05.1-05-PLAN.md (Live discovery)
