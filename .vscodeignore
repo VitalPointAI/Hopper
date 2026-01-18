@@ -1,0 +1,47 @@
+# Build output
+out/
+dist/
+*.vsix
+
+# Dependencies
+node_modules/
+
+# Source files (we bundle to dist/)
+src/
+tsconfig.json
+esbuild.js
+
+# Development files
+.vscode/
+.vscode-test/
+.git/
+.gitignore
+.github/
+
+# Planning files
+.planning/
+
+# Workers (separate deployment)
+workers/
+
+# Contracts
+contracts/
+
+# Documentation (README is included by default)
+CHANGELOG.md
+
+# Test files
+**/*.test.ts
+**/*.spec.ts
+**/.eslintrc.json
+
+# Environment files
+.env*
+.dev.vars*
+
+# Temporary files
+*.log
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
