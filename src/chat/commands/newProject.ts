@@ -163,6 +163,8 @@ export async function handleNewProject(ctx: CommandContext): Promise<IHopperResu
 
     if (!config) {
       stream.markdown('**Error:** Could not parse project details.\n\n');
+      stream.markdown('**Debug - Model response:**\n');
+      stream.markdown('```\n' + fullResponse.slice(0, 500) + '\n```\n\n');
       stream.markdown('Please try again with a clearer description including:\n');
       stream.markdown('- Project name\n');
       stream.markdown('- What it does\n');
