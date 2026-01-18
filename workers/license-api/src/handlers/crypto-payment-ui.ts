@@ -27,7 +27,7 @@ function paymentPage(subscription: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Complete Payment - SpecFlow</title>
+  <title>Complete Payment - Hopper</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .token-option { transition: all 0.15s ease; }
@@ -41,7 +41,7 @@ function paymentPage(subscription: {
   <div class="min-h-screen flex flex-col items-center justify-center p-4">
     <!-- Header -->
     <div class="text-center mb-8">
-      <h1 class="text-3xl font-bold text-gray-900 mb-2">SpecFlow Subscription</h1>
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">Hopper Subscription</h1>
       <p class="text-gray-600">Complete your payment to activate your license</p>
     </div>
 
@@ -199,7 +199,7 @@ function paymentPage(subscription: {
               <div class="border-t border-gray-200"></div>
               <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">You Receive</span>
-                <span class="font-semibold text-gray-900">1 Month SpecFlow Pro</span>
+                <span class="font-semibold text-gray-900">1 Month Hopper Pro</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-600">Value</span>
@@ -241,7 +241,7 @@ function paymentPage(subscription: {
               </svg>
             </div>
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Payment Successful!</h3>
-            <p class="text-gray-600 mb-4">Your SpecFlow Pro license is now active.</p>
+            <p class="text-gray-600 mb-4">Your Hopper Pro license is now active.</p>
             <p class="text-sm text-gray-500">Redirecting back to VSCode...</p>
           </div>
 
@@ -908,7 +908,7 @@ function paymentPage(subscription: {
                       args: {
                         receiver_id: depositAddress,
                         amount: amountIn,
-                        memo: 'SpecFlow subscription payment'
+                        memo: 'Hopper subscription payment'
                       },
                       gas: '30000000000000', // 30 TGas
                       deposit: '1' // 1 yoctoNEAR required for ft_transfer
@@ -958,7 +958,7 @@ function paymentPage(subscription: {
                       args: {
                         receiver_id: depositAddress,
                         amount: amountIn,
-                        memo: 'SpecFlow subscription payment'
+                        memo: 'Hopper subscription payment'
                       },
                       gas: '30000000000000', // 30 TGas
                       deposit: '1' // 1 yoctoNEAR required for ft_transfer
@@ -987,7 +987,7 @@ function paymentPage(subscription: {
           setTimeout(() => {
             // Use the redirect URL from confirm response (includes wallet auth info)
             // Falls back to payment-success if not provided
-            window.location.href = confirmData.redirectUrl || 'vscode://vitalpointai.specflow/payment-success';
+            window.location.href = confirmData.redirectUrl || 'vscode://VitalPoint.hopper-velocity/payment-success';
           }, 2000);
 
         } else if (['eth', 'base', 'arb', 'pol', 'bsc', 'avax', 'op'].includes(selectedToken.blockchain)) {
@@ -1259,7 +1259,7 @@ function paymentPage(subscription: {
             showStep('success');
             setTimeout(() => {
               // Use the redirect URL from confirm response (includes wallet auth info)
-              window.location.href = data.redirectUrl || 'vscode://vitalpointai.specflow/payment-success';
+              window.location.href = data.redirectUrl || 'vscode://VitalPoint.hopper-velocity/payment-success';
             }, 2000);
             return;
           }
@@ -1305,7 +1305,7 @@ function notFoundPage(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Not Found - SpecFlow</title>
+  <title>Payment Not Found - Hopper</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">

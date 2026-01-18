@@ -149,7 +149,7 @@ export class AuthManager {
 
     // Build OAuth URL - callback is handled by Worker
     const oauthUrl = new URL(`${apiUrl}/auth/oauth/${provider}`);
-    oauthUrl.searchParams.set('callback', 'vscode://vitalpointai.hopper/auth-callback');
+    oauthUrl.searchParams.set('callback', 'vscode://VitalPoint.hopper-velocity/auth-callback');
 
     // If payment flow, tell OAuth to redirect to checkout after auth
     if (options?.payment === 'stripe') {
@@ -181,7 +181,7 @@ export class AuthManager {
     // Build wallet connection URL - opens multi-chain wallet page
     const walletUrl = new URL(`${apiUrl}/auth/wallet`);
     walletUrl.searchParams.set('network', network);
-    walletUrl.searchParams.set('callback', 'vscode://vitalpointai.hopper/auth-callback');
+    walletUrl.searchParams.set('callback', 'vscode://VitalPoint.hopper-velocity/auth-callback');
 
     vscode.window.showInformationMessage('Opening wallet connection page...');
     await vscode.env.openExternal(vscode.Uri.parse(walletUrl.toString()));
@@ -213,7 +213,7 @@ export class AuthManager {
     signingUrl.searchParams.set('timestamp', challenge.timestamp.toString());
     signingUrl.searchParams.set('message', challenge.message);
     signingUrl.searchParams.set('network', network);
-    signingUrl.searchParams.set('callback', 'vscode://vitalpointai.hopper/auth-callback');
+    signingUrl.searchParams.set('callback', 'vscode://VitalPoint.hopper-velocity/auth-callback');
 
     // If payment flow, tell sign page to handle checkout after auth
     if (options?.payment === 'crypto') {

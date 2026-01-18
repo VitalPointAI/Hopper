@@ -22,7 +22,7 @@ app.use('/api/*', cors());
 app.get('/api/health', (c) => {
   return c.json({
     status: 'ok',
-    service: 'specflow-license-api',
+    service: 'hopper-license-api',
     timestamp: new Date().toISOString(),
   });
 });

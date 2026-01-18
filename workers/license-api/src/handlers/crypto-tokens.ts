@@ -131,7 +131,7 @@ export async function handleGetQuote(c: Context<{ Bindings: Env }>): Promise<Res
       recipient: c.env.SETTLEMENT_ACCOUNT,
       recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN, // Send directly to wallet
       deadline,
-      referral: 'specflow',
+      referral: 'hopper',
     };
 
     const quoteResponse = await OneClickService.getQuote(quoteRequest);
@@ -222,7 +222,7 @@ export async function handleCreatePaymentQuote(c: Context<{ Bindings: Env }>): P
       recipient: c.env.SETTLEMENT_ACCOUNT, // USDC goes to settlement account
       recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN, // Send directly to wallet, not intents contract
       deadline,
-      referral: 'specflow',
+      referral: 'hopper',
     };
 
     console.log('[payment-quote] Creating quote:', {
@@ -939,7 +939,7 @@ async function createWalletToken(
       recipient: env.SETTLEMENT_ACCOUNT,
       recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN, // Send directly to wallet
       deadline,
-      referral: 'specflow',
+      referral: 'hopper',
     };
 
     const quoteResponse = await OneClickService.getQuote(quoteRequest);

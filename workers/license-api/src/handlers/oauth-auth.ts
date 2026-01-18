@@ -173,7 +173,7 @@ function errorPage(title: string, message: string): Response {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - SpecFlow</title>
+  <title>${title} - Hopper</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
@@ -226,7 +226,7 @@ async function createStripeCheckoutForOAuth(
     customer = await stripe.customers.create({
       email,
       metadata: {
-        source: 'specflow_extension',
+        source: 'hopper_extension',
         auth_type: 'oauth',
         user_id: userId,
       },
@@ -243,8 +243,8 @@ async function createStripeCheckoutForOAuth(
         quantity: 1,
       },
     ],
-    success_url: 'https://specflow.dev/success?session_id={CHECKOUT_SESSION_ID}',
-    cancel_url: 'https://specflow.dev/cancel',
+    success_url: 'https://hopper.dev/success?session_id={CHECKOUT_SESSION_ID}',
+    cancel_url: 'https://hopper.dev/cancel',
     subscription_data: {
       metadata: {
         auth_type: 'oauth',
@@ -512,7 +512,7 @@ export async function handleGitHubCallback(c: Context<{ Bindings: Env }>): Promi
       headers: {
         Authorization: `Bearer ${tokens.access_token}`,
         Accept: 'application/vnd.github.v3+json',
-        'User-Agent': 'SpecFlow-License-API',
+        'User-Agent': 'Hopper-License-API',
       },
     });
 
@@ -535,7 +535,7 @@ export async function handleGitHubCallback(c: Context<{ Bindings: Env }>): Promi
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
           Accept: 'application/vnd.github.v3+json',
-          'User-Agent': 'SpecFlow-License-API',
+          'User-Agent': 'Hopper-License-API',
         },
       });
 

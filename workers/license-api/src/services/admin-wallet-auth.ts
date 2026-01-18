@@ -27,7 +27,7 @@ export async function generateAdminChallenge(env: Env): Promise<string> {
     .join('');
 
   const timestamp = Date.now();
-  const challenge = `Sign this message to authenticate as SpecFlow admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
+  const challenge = `Sign this message to authenticate as Hopper admin.\n\nNonce: ${nonce}\nTimestamp: ${timestamp}`;
 
   // Store challenge in KV with TTL
   const challengeKey = `${CHALLENGE_PREFIX}${nonce}`;

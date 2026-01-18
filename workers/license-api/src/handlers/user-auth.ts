@@ -17,7 +17,7 @@ export async function generateUserChallenge(env: Env): Promise<string> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 
-  return `SpecFlow Authentication Challenge\n\nTimestamp: ${timestamp}\nRandom: ${random}\n\nSign this message to authenticate with SpecFlow.`;
+  return `Hopper Authentication Challenge\n\nTimestamp: ${timestamp}\nRandom: ${random}\n\nSign this message to authenticate with Hopper.`;
 }
 
 /**
@@ -337,7 +337,7 @@ export function userSignPage(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connect Wallet - SpecFlow</title>
+  <title>Connect Wallet - Hopper</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes gradient {
@@ -365,7 +365,7 @@ export function userSignPage(
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
         </svg>
       </div>
-      <h1 class="text-2xl font-bold text-gray-900">Connect to SpecFlow</h1>
+      <h1 class="text-2xl font-bold text-gray-900">Connect to Hopper</h1>
       <p class="text-gray-600 mt-2">Sign in with your NEAR wallet to continue</p>
     </div>
 
@@ -455,9 +455,9 @@ export function userSignPage(
     <!-- Footer -->
     <div class="mt-8 pt-6 border-t border-gray-200">
       <p class="text-xs text-center text-gray-400">
-        By connecting, you agree to SpecFlow's
-        <a href="https://specflow.dev/terms" class="text-blue-500 hover:underline">Terms</a> and
-        <a href="https://specflow.dev/privacy" class="text-blue-500 hover:underline">Privacy Policy</a>
+        By connecting, you agree to Hopper's
+        <a href="https://hopper.dev/terms" class="text-blue-500 hover:underline">Terms</a> and
+        <a href="https://hopper.dev/privacy" class="text-blue-500 hover:underline">Privacy Policy</a>
       </p>
     </div>
   </div>
@@ -521,7 +521,7 @@ export function userSignPage(
         // Sign the challenge message from extension
         const signResult = await wallet.signMessage({
           message: params.message,
-          recipient: 'specflow-auth',
+          recipient: 'hopper-auth',
           nonce: Array.from(nonce),
         });
 
@@ -541,7 +541,7 @@ export function userSignPage(
             publicKey: signResult.publicKey,
             message: params.message,
             nonce: Array.from(nonce),
-            recipient: 'specflow-auth',
+            recipient: 'hopper-auth',
           })
         });
 

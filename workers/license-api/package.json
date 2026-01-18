@@ -1,7 +1,7 @@
 {
-  "name": "specflow-license-api",
+  "name": "hopper-license-api",
   "version": "1.0.0",
-  "description": "Cloudflare Worker for SpecFlow license management with Stripe subscriptions",
+  "description": "Cloudflare Worker for Hopper license management with Stripe subscriptions",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

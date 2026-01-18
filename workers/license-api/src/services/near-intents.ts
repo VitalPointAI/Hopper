@@ -93,7 +93,7 @@ export async function createSubscriptionIntent(
     recipient: env.SETTLEMENT_ACCOUNT, // vitalpointai.near
     recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN, // Send directly to wallet, not intents contract
     deadline,
-    referral: 'specflow',
+    referral: 'hopper',
   };
 
   const quoteResponse: QuoteResponse = await OneClickService.getQuote(quoteRequest);

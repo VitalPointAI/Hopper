@@ -43,7 +43,7 @@ function baseLayout(title: string, content: string, includeAuth = true): string 
     <script>
       // Check for JWT token BEFORE htmx loads
       (function() {
-        var token = localStorage.getItem('specflow_admin_token');
+        var token = localStorage.getItem('hopper_admin_token');
         if (!token && !window.location.pathname.includes('/admin/login')) {
           window.location.href = '/admin/login';
         }
@@ -61,7 +61,7 @@ function baseLayout(title: string, content: string, includeAuth = true): string 
       // Add Authorization header to all htmx requests
       // Listen on document since body may not exist when this runs in <head>
       document.addEventListener('htmx:configRequest', function(event) {
-        var token = localStorage.getItem('specflow_admin_token');
+        var token = localStorage.getItem('hopper_admin_token');
         if (token) {
           event.detail.headers['Authorization'] = 'Bearer ' + token;
         }
@@ -70,13 +70,13 @@ function baseLayout(title: string, content: string, includeAuth = true): string 
       // Handle 401 responses (token expired)
       document.addEventListener('htmx:responseError', function(event) {
         if (event.detail.xhr.status === 401) {
-          localStorage.removeItem('specflow_admin_token');
+          localStorage.removeItem('hopper_admin_token');
           window.location.href = '/admin/login';
         }
       });
 
       function logout() {
-        localStorage.removeItem('specflow_admin_token');
+        localStorage.removeItem('hopper_admin_token');
         window.location.href = '/admin/login';
       }
     </script>
@@ -88,7 +88,7 @@ function baseLayout(title: string, content: string, includeAuth = true): string 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - SpecFlow Admin</title>
+  <title>${title} - Hopper Admin</title>
   ${authCheckScript}
   <script src="https://cdn.tailwindcss.com"></script>
   ${htmxConfigScript}
@@ -131,7 +131,7 @@ function navHeader(activePage: string): string {
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <span class="text-white text-xl font-bold">SpecFlow Admin</span>
+            <span class="text-white text-xl font-bold">Hopper Admin</span>
           </div>
           <div class="ml-10 flex items-baseline space-x-4">
             ${navLinks}
@@ -287,7 +287,7 @@ export function loginPage(network: string): string {
         // Sign the message
         const signResult = await wallet.signMessage({
           message: challengeData.challenge,
-          recipient: 'specflow-admin',
+          recipient: 'hopper-admin',
           nonce: Array.from(nonce),
         });
 
@@ -308,14 +308,14 @@ export function loginPage(network: string): string {
             publicKey: signResult.publicKey,
             message: challengeData.challenge,
             nonce: Array.from(nonce),
-            recipient: 'specflow-admin',
+            recipient: 'hopper-admin',
           })
         });
 
         const verifyData = await verifyResponse.json();
 
         if (verifyResponse.ok && verifyData.token) {
-          localStorage.setItem('specflow_admin_token', verifyData.token);
+          localStorage.setItem('hopper_admin_token', verifyData.token);
           showStep('success');
           setTimeout(() => {
             window.location.href = '/admin/dashboard';
@@ -719,7 +719,7 @@ export function licensesPage(): string {
       const durationDays = parseInt(document.getElementById('grant-duration').value, 10);
       const resultDiv = document.getElementById('grant-result');
 
-      const token = localStorage.getItem('specflow_admin_token');
+      const token = localStorage.getItem('hopper_admin_token');
       if (!token) {
         window.location.href = '/admin/login';
         return;
@@ -943,7 +943,7 @@ export function subscriptionsPage(): string {
         return;
       }
 
-      const token = localStorage.getItem('specflow_admin_token');
+      const token = localStorage.getItem('hopper_admin_token');
       if (!token) {
         window.location.href = '/admin/login';
         return;

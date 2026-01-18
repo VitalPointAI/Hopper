@@ -1,4 +1,4 @@
-name = "specflow-license-api"
+name = "hopper-license-api"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 

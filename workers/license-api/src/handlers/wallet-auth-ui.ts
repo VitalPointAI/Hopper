@@ -18,7 +18,7 @@ function walletAuthPage(params: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connect Wallet - SpecFlow</title>
+  <title>Connect Wallet - Hopper</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .chain-option { transition: all 0.15s ease; }
@@ -35,7 +35,7 @@ function walletAuthPage(params: {
     <!-- Header -->
     <div class="text-center mb-8">
       <h1 class="text-3xl font-bold text-gray-900 mb-2">Connect Wallet</h1>
-      <p class="text-gray-600">Select your wallet to authenticate with SpecFlow</p>
+      <p class="text-gray-600">Select your wallet to authenticate with Hopper</p>
     </div>
 
     <!-- Wallet Card -->
@@ -112,7 +112,7 @@ function walletAuthPage(params: {
           </div>
 
           <p class="text-xs text-center text-gray-500 mt-4">
-            Your wallet address will be used as your SpecFlow account ID
+            Your wallet address will be used as your Hopper account ID
           </p>
         </div>
 
@@ -428,7 +428,7 @@ function walletAuthPage(params: {
 export async function handleWalletAuthPage(
   c: Context<{ Bindings: Env }>
 ): Promise<Response> {
-  const callback = c.req.query('callback') || 'vscode://vitalpointai.specflow/auth-callback';
+  const callback = c.req.query('callback') || 'vscode://VitalPoint.hopper-velocity/auth-callback';
   const network = c.req.query('network') || 'mainnet';
 
   return c.html(walletAuthPage({ callback, network }));

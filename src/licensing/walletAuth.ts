@@ -119,7 +119,7 @@ export class WalletAuthManager {
     signingUrl.searchParams.set('timestamp', challenge.timestamp.toString());
     signingUrl.searchParams.set('message', challenge.message);
     signingUrl.searchParams.set('network', network);
-    signingUrl.searchParams.set('callback', 'vscode://vitalpointai.hopper/auth-callback');
+    signingUrl.searchParams.set('callback', 'vscode://VitalPoint.hopper-velocity/auth-callback');
 
     vscode.window.showInformationMessage('Opening NEAR wallet for authentication...');
     await vscode.env.openExternal(vscode.Uri.parse(signingUrl.toString()));

@@ -427,7 +427,7 @@ export async function handleCryptoSubscribeConfirm(
 
     // Build VSCode callback URL for wallet authentication
     // Include chain info so VSCode knows how to handle non-NEAR addresses
-    const vscodeCallback = `vscode://vitalpointai.specflow/auth-callback?` +
+    const vscodeCallback = `vscode://VitalPoint.hopper-velocity/auth-callback?` +
       `type=wallet&` +
       `accountId=${encodeURIComponent(walletAddress)}&` +
       `chain=${encodeURIComponent(walletChain)}&` +

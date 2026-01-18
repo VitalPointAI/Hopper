@@ -81,8 +81,8 @@ export async function handleCheckout(
   }
 
   // Use default URLs if not provided
-  const successUrl = body.successUrl || 'https://specflow.dev/success?session_id={CHECKOUT_SESSION_ID}';
-  const cancelUrl = body.cancelUrl || 'https://specflow.dev/cancel';
+  const successUrl = body.successUrl || 'https://hopper.dev/success?session_id={CHECKOUT_SESSION_ID}';
+  const cancelUrl = body.cancelUrl || 'https://hopper.dev/cancel';
 
   // Initialize Stripe client
   const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
@@ -109,7 +109,7 @@ export async function handleCheckout(
     } else {
       // Create new customer with user ID in metadata
       const customerMetadata: Record<string, string> = {
-        source: 'specflow_extension',
+        source: 'hopper_extension',
         auth_type: isOAuthUser ? 'oauth' : 'wallet',
         user_id: userId,
       };
