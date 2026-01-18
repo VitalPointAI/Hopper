@@ -94,6 +94,22 @@
             "description": "Resume interrupted task execution"
           },
           {
+            "name": "new-milestone",
+            "description": "Create a new milestone with phases"
+          },
+          {
+            "name": "complete-milestone",
+            "description": "Archive completed milestone"
+          },
+          {
+            "name": "discuss-milestone",
+            "description": "Gather context for next milestone"
+          },
+          {
+            "name": "discovery-phase",
+            "description": "Research current documentation before planning"
+          },
+          {
             "name": "status",
             "description": "Show current project status and phase"
           },
