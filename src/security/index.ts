@@ -33,3 +33,12 @@ export {
   matchAdvisoriesToDependencies,
   readPackageJson,
 } from './advisories';
+
+// Export ESLint scanner
+export {
+  scanFiles,
+  getConfig,
+  getRuleSeverity,
+  getRuleOwasp,
+  ScanResult,
+} from './scanner';
