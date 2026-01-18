@@ -191,6 +191,26 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-18
-Stopped at: Completed 07-04-PLAN.md (Gate implementation) — Milestone 1 complete
+Stopped at: Post-M1 enhancements — State management & GSD parity improvements
 Resume file: None
-Next: /gsd:complete-milestone to archive and prepare for next version
+Next: /complete-milestone or plan Milestone 2
+
+## Post-Milestone Enhancements
+
+### 2026-01-18: State Management & GSD Parity
+See: `.planning/phases/post-m1-enhancements/SESSION-2026-01-18-SUMMARY.md`
+
+**Summary:**
+- Created centralized STATE.md update utility (`src/chat/state/`)
+- Integrated state updates into `/execute-plan`, `/verify-work`, `/plan-phase`
+- Added Session Continuity parsing to project context
+- Enhanced `/progress` routing with agent detection and STATE.md suggestions
+- Added agent ID tracking for interrupted execution detection
+- Fixed VSCode callback URI (publisher case-sensitivity)
+- Increased tool iteration limit from 10 to 50
+
+**Key Decisions:**
+- 08-01 | Centralized state manager | Single source of truth for STATE.md updates
+- 08-02 | Agent ID tracking | Unique ID per execution enables interrupted detection
+- 08-03 | Session Continuity parsing | Matches GSD pattern for workflow routing
+- 08-04 | Route -1 priority for agents | Interrupted work highest priority (like GSD)

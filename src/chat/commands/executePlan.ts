@@ -19,6 +19,7 @@ import {
   executeScaffoldingWithProtection
 } from '../executor';
 import { clearHandoffAfterCompletion } from './resumeWork';
+import { updateStateAfterExecution, setCurrentAgentId, clearCurrentAgentId } from '../state';
 import {
   ConfigManager,
   shouldPauseAtCheckpoint,
@@ -173,7 +174,8 @@ async function executeWithTools(
   toolInvocationToken?: vscode.ChatParticipantToolToken,
   workspaceRoot?: string
 ): Promise<void> {
-  const MAX_ITERATIONS = 10;
+  // Allow up to 50 tool iterations per task - complex tasks may need many operations
+  const MAX_ITERATIONS = 50;
   let iteration = 0;
 
   while (iteration < MAX_ITERATIONS && !token.isCancellationRequested) {
@@ -260,7 +262,11 @@ async function executeWithTools(
   }
 
   if (iteration >= MAX_ITERATIONS) {
-    stream.markdown('\n\n*Maximum tool iterations reached.*\n\n');
+    stream.markdown('\n\n**Warning:** Maximum tool iterations (50) reached.\n\n');
+    stream.markdown('The task may be incomplete. You can:\n');
+    stream.markdown('- Run **/execute-plan** again to continue where it left off\n');
+    stream.markdown('- Use **/verify-work** to check what was completed\n');
+    stream.markdown('- Check the task manually and mark it complete if done\n\n');
   }
 }
 
@@ -517,6 +523,55 @@ function parseCurrentPhaseFromState(stateMd: string, roadmapMd?: string): Curren
     phaseName,
     phaseDir
   };
+}
+
+/**
+ * Count total phases in ROADMAP.md
+ */
+function countTotalPhases(roadmapMd: string): number {
+  const lines = roadmapMd.split('\n');
+  let count = 0;
+
+  for (const line of lines) {
+    // Match phase entries in various formats
+    if (line.match(/^-\s*\[.\]\s*\*\*Phase\s*\d+/i) ||
+        line.match(/^###\s*Phase\s*\d+/i)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Count plans and summaries in a phase directory
+ */
+async function countPhaseProgress(
+  workspaceUri: vscode.Uri,
+  phaseDir: string
+): Promise<{ totalPlans: number; completedPlans: number }> {
+  const phasePath = vscode.Uri.joinPath(workspaceUri, '.planning', 'phases', phaseDir);
+
+  try {
+    const entries = await vscode.workspace.fs.readDirectory(phasePath);
+
+    // Count non-FIX plan files (NN-NN-PLAN.md pattern)
+    const planFiles = entries
+      .filter(([name]) => name.match(/^\d+-\d+-PLAN\.md$/))
+      .map(([name]) => name);
+
+    // Count completed plans (those with matching SUMMARY.md)
+    const summaryFiles = entries
+      .filter(([name]) => name.match(/^\d+-\d+-SUMMARY\.md$/))
+      .map(([name]) => name);
+
+    return {
+      totalPlans: planFiles.length,
+      completedPlans: summaryFiles.length
+    };
+  } catch {
+    return { totalPlans: 0, completedPlans: 0 };
+  }
 }
 
 /**
@@ -895,6 +950,16 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
   // Track execution start time for summary generation
   const executionStartTime = new Date();
+
+  // Set agent ID for interrupted execution tracking
+  const executionId = `exec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  if (projectContext.planningUri) {
+    try {
+      await setCurrentAgentId(projectContext.planningUri, executionId);
+    } catch {
+      // Non-fatal if we can't write the ID
+    }
+  }
 
   // Check for existing execution state (resuming from checkpoint)
   const planPath = planUri.fsPath;
@@ -1391,6 +1456,41 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     // Clean up any handoff file from paused session now that plan is complete
     if (projectContext.planningUri) {
       await clearHandoffAfterCompletion(projectContext.planningUri, phaseDir);
+    }
+
+    // Update STATE.md with execution completion
+    if (projectContext.planningUri && projectContext.roadmapMd) {
+      try {
+        const totalPhases = countTotalPhases(projectContext.roadmapMd);
+        const phaseProgress = await countPhaseProgress(workspaceUri, phaseDir);
+        const durationMinutes = Math.round(durationMs / 60000);
+
+        // Extract phase name from phaseDir (e.g., "04-execution-commands" -> "execution-commands")
+        const phaseName = phaseDir.replace(/^\d+(?:\.\d+)*-/, '').replace(/-/g, ' ');
+
+        // Extract numeric phase from plan.phase (e.g., "04: Execution Commands" -> 4)
+        const phaseNum = parseInt(plan.phase.match(/^(\d+)/)?.[1] || '0', 10);
+
+        // Get plan file name for description (e.g., "04-03-PLAN.md")
+        const planFileName = pathParts[pathParts.length - 1] || `${String(phaseNum).padStart(2, '0')}-${String(plan.planNumber).padStart(2, '0')}-PLAN.md`;
+
+        await updateStateAfterExecution(
+          projectContext.planningUri,
+          phaseNum,
+          totalPhases,
+          phaseName,
+          phaseProgress.completedPlans,  // Current completed count (includes this plan's summary)
+          phaseProgress.totalPlans,
+          planFileName,
+          durationMinutes
+        );
+
+        // Clear agent ID - execution completed successfully
+        await clearCurrentAgentId(projectContext.planningUri);
+      } catch (stateErr) {
+        console.error('[Hopper] Failed to update STATE.md:', stateErr);
+        // Don't fail the overall execution, just log the error
+      }
     }
   }
 

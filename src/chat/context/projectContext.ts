@@ -1,6 +1,20 @@
 import * as vscode from 'vscode';
 
 /**
+ * Session continuity information from STATE.md
+ */
+export interface SessionContinuity {
+  /** Last session date (YYYY-MM-DD) */
+  lastSession?: string;
+  /** Description of where work stopped */
+  stoppedAt?: string;
+  /** Path to resume file if any */
+  resumeFile?: string;
+  /** Suggested next action */
+  next?: string;
+}
+
+/**
  * Project context information read from .planning directory
  */
 export interface ProjectContext {
@@ -20,6 +34,10 @@ export interface ProjectContext {
   currentPhase?: string;
   /** Issues from ISSUES.md if exists */
   issues?: string[];
+  /** Session continuity from STATE.md */
+  sessionContinuity?: SessionContinuity;
+  /** ID of currently running/interrupted agent */
+  currentAgentId?: string;
 }
 
 /**
@@ -64,6 +82,53 @@ function parseCurrentPhase(stateMd: string): string | undefined {
   // Look for "Phase: X of Y" pattern
   const match = stateMd.match(/Phase:\s*(\d+(?:\.\d+)?)\s*of\s*\d+/);
   return match ? match[1] : undefined;
+}
+
+/**
+ * Parse Session Continuity section from STATE.md
+ *
+ * Looks for patterns like:
+ * Last session: 2026-01-18
+ * Stopped at: Completed 07-04-PLAN.md
+ * Resume file: None
+ * Next: /execute-plan to continue
+ *
+ * @param stateMd - STATE.md content
+ * @returns SessionContinuity object
+ */
+function parseSessionContinuity(stateMd: string): SessionContinuity | undefined {
+  // Find Session Continuity section
+  const sectionMatch = stateMd.match(/## Session Continuity\s*\n([\s\S]*?)(?=\n## |$)/);
+  if (!sectionMatch) {
+    return undefined;
+  }
+
+  const section = sectionMatch[1];
+  const continuity: SessionContinuity = {};
+
+  // Parse each field
+  const lastSessionMatch = section.match(/Last session:\s*(.+)/);
+  if (lastSessionMatch) {
+    continuity.lastSession = lastSessionMatch[1].trim();
+  }
+
+  const stoppedAtMatch = section.match(/Stopped at:\s*(.+)/);
+  if (stoppedAtMatch) {
+    continuity.stoppedAt = stoppedAtMatch[1].trim();
+  }
+
+  const resumeFileMatch = section.match(/Resume file:\s*(.+)/);
+  if (resumeFileMatch) {
+    const value = resumeFileMatch[1].trim();
+    continuity.resumeFile = value.toLowerCase() === 'none' ? undefined : value;
+  }
+
+  const nextMatch = section.match(/Next:\s*(.+)/);
+  if (nextMatch) {
+    continuity.next = nextMatch[1].trim();
+  }
+
+  return continuity;
 }
 
 /**
@@ -119,11 +184,12 @@ export async function getProjectContext(): Promise<ProjectContext> {
   }
 
   // Read planning files in parallel
-  const [projectMdRaw, roadmapMdRaw, stateMdRaw, issuesMdRaw] = await Promise.all([
+  const [projectMdRaw, roadmapMdRaw, stateMdRaw, issuesMdRaw, agentIdRaw] = await Promise.all([
     readFileContent(vscode.Uri.joinPath(planningUri, 'PROJECT.md')),
     readFileContent(vscode.Uri.joinPath(planningUri, 'ROADMAP.md')),
     readFileContent(vscode.Uri.joinPath(planningUri, 'STATE.md')),
-    readFileContent(vscode.Uri.joinPath(planningUri, 'ISSUES.md'))
+    readFileContent(vscode.Uri.joinPath(planningUri, 'ISSUES.md')),
+    readFileContent(vscode.Uri.joinPath(planningUri, 'current-agent-id.txt'))
   ]);
 
   // Build context
@@ -136,14 +202,23 @@ export async function getProjectContext(): Promise<ProjectContext> {
     stateMd: stateMdRaw ? truncateContent(stateMdRaw) : undefined
   };
 
-  // Parse current phase from STATE.md
+  // Parse current phase and session continuity from STATE.md
   if (stateMdRaw) {
     context.currentPhase = parseCurrentPhase(stateMdRaw);
+    context.sessionContinuity = parseSessionContinuity(stateMdRaw);
   }
 
   // Parse issues from ISSUES.md
   if (issuesMdRaw) {
     context.issues = parseIssues(issuesMdRaw);
+  }
+
+  // Parse current agent ID (for interrupted execution tracking)
+  if (agentIdRaw) {
+    const agentId = agentIdRaw.trim();
+    if (agentId) {
+      context.currentAgentId = agentId;
+    }
   }
 
   return context;

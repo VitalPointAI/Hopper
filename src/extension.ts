@@ -326,6 +326,29 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(closeIssuesCommand);
 
+  // Register clearAgentId command for clearing interrupted execution tracking
+  const clearAgentIdCommand = vscode.commands.registerCommand(
+    'hopper.clearAgentId',
+    async () => {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder open.');
+        return;
+      }
+
+      const planningUri = vscode.Uri.joinPath(workspaceFolders[0].uri, '.planning');
+      const agentIdUri = vscode.Uri.joinPath(planningUri, 'current-agent-id.txt');
+
+      try {
+        await vscode.workspace.fs.delete(agentIdUri);
+        vscode.window.showInformationMessage('Agent ID cleared. Run /progress to continue.');
+      } catch {
+        vscode.window.showInformationMessage('No active agent ID to clear.');
+      }
+    }
+  );
+  context.subscriptions.push(clearAgentIdCommand);
+
   // Register verifyWorkResult command for UAT test result buttons
   const verifyWorkResultCommand = vscode.commands.registerCommand(
     'hopper.verifyWorkResult',

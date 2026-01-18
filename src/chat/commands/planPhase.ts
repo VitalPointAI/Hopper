@@ -6,6 +6,37 @@ import {
   savePlan,
   getNextPlanNumber
 } from '../generators';
+import { updateLastActivityAndSession } from '../state';
+
+/**
+ * System prompt for analyzing phase scope and determining plan breakdown
+ */
+const PHASE_ANALYSIS_PROMPT = `You are helping break down a software project phase into discrete, manageable plans.
+
+Analyze the phase goal and project context to determine how many separate plans are needed.
+Each plan should contain 2-3 closely related tasks that can be completed in one focused session.
+
+Output your response as JSON with this exact structure:
+{
+  "plans": [
+    {
+      "title": "Short descriptive title for this plan",
+      "items": ["First work item", "Second work item", "Third work item (optional)"]
+    }
+  ],
+  "reasoning": "Brief explanation of why you divided the work this way"
+}
+
+Guidelines:
+- Each plan should have 2-3 work items (tasks)
+- Group related work together (e.g., all API work in one plan, all UI work in another)
+- Order plans by dependency (foundational work first)
+- A typical phase needs 2-4 plans
+- Simple phases may need only 1 plan
+- Complex phases may need up to 6 plans
+- Each work item should be a concrete, actionable piece of work
+
+Always return valid JSON.`;
 
 /**
  * System prompt for generating plan tasks from phase requirements
@@ -171,6 +202,46 @@ function extractJsonFromResponse(response: string): string {
   }
 
   return response.trim();
+}
+
+/**
+ * Parse phase analysis response
+ */
+interface ParsedPhaseAnalysis {
+  plans: Array<{
+    title: string;
+    items: string[];
+  }>;
+  reasoning: string;
+}
+
+function parsePhaseAnalysis(response: string): ParsedPhaseAnalysis | null {
+  try {
+    const jsonStr = extractJsonFromResponse(response);
+    const parsed = JSON.parse(jsonStr);
+
+    // Validate structure
+    if (!parsed.plans || !Array.isArray(parsed.plans) || parsed.plans.length === 0) {
+      return null;
+    }
+
+    // Validate each plan has items
+    for (const plan of parsed.plans) {
+      if (!plan.items || !Array.isArray(plan.items) || plan.items.length === 0) {
+        return null;
+      }
+    }
+
+    return {
+      plans: parsed.plans.map((p: { title?: string; items: string[] }) => ({
+        title: p.title || 'Untitled plan',
+        items: p.items
+      })),
+      reasoning: parsed.reasoning || ''
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -420,52 +491,9 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     }
   }
 
-  // Get next plan number for this phase
+  // Get next plan number for this phase (will be used after we determine how many plans needed)
   stream.progress('Checking existing plans...');
-  const planNumber = await getNextPlanNumber(workspaceUri, targetPhase.dirName, targetPhase.number);
-
-  // Check if plan already exists - show existing plan and explain behavior
-  if (planNumber > 1) {
-    const existingPlanUri = vscode.Uri.joinPath(
-      workspaceUri,
-      '.planning',
-      'phases',
-      targetPhase.dirName,
-      `${targetPhase.number.toString().padStart(2, '0')}-${(planNumber - 1).toString().padStart(2, '0')}-PLAN.md`
-    );
-
-    stream.markdown('## Plan Already Exists\n\n');
-    stream.markdown(`Phase ${targetPhase.number} (${targetPhase.name}) already has a plan.\n\n`);
-    stream.markdown('**Existing plan:**\n');
-    stream.reference(existingPlanUri);
-    stream.markdown('\n\n');
-    stream.markdown('**Options:**\n');
-    stream.markdown(`- Edit the existing plan directly in the file\n`);
-    stream.markdown(`- Delete the existing plan and run \`/plan-phase ${targetPhaseNum}\` again to regenerate\n`);
-    stream.markdown(`- Run \`/plan-phase ${targetPhaseNum} additional\` to create Plan ${planNumber} for additional work\n\n`);
-
-    // Only create additional plan if user explicitly requested it
-    const promptLower = promptText.toLowerCase();
-    const wantsAdditional = promptLower.includes('additional') ||
-                           promptLower.includes('new') ||
-                           promptLower.includes('another');
-
-    if (!wantsAdditional) {
-      stream.button({
-        command: 'vscode.open',
-        arguments: [existingPlanUri],
-        title: 'Edit Existing Plan'
-      });
-      stream.markdown(' ');
-      stream.button({
-        command: 'hopper.chat-participant.execute-plan',
-        title: 'Execute Plan'
-      });
-      return { metadata: { lastCommand: 'plan-phase', phaseNumber: targetPhase.number } };
-    }
-
-    stream.markdown(`Creating **Plan ${planNumber}** for additional work in this phase.\n\n`);
-  }
+  const existingPlanCount = await getNextPlanNumber(workspaceUri, targetPhase.dirName, targetPhase.number) - 1;
 
   stream.progress('Reading project context...');
 
@@ -599,35 +627,107 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
 
   // Batch plan items into groups of MAX_TASKS_PER_PLAN
   const planItems = targetPhase.planItems;
-  const batches: string[][] = [];
+  let batches: string[][] = [];
 
   if (planItems.length === 0) {
-    // No specific items - create single batch with empty array (will use phase goal)
-    batches.push([]);
+    // No specific items in roadmap - use LLM to analyze phase and determine plan breakdown
+    stream.progress('Analyzing phase scope...');
+
+    const analysisMessages: vscode.LanguageModelChatMessage[] = [
+      vscode.LanguageModelChatMessage.User(PHASE_ANALYSIS_PROMPT),
+      vscode.LanguageModelChatMessage.User(`Project context:\n\n${baseContext}\n\nAnalyze this phase and break it down into discrete plans with 2-3 work items each.`)
+    ];
+
+    try {
+      const analysisResponse = await request.model.sendRequest(analysisMessages, {}, token);
+      let analysisText = '';
+      for await (const fragment of analysisResponse.text) {
+        if (token.isCancellationRequested) {
+          stream.markdown('**Cancelled**\n');
+          return { metadata: { lastCommand: 'plan-phase' } };
+        }
+        analysisText += fragment;
+      }
+
+      const analysis = parsePhaseAnalysis(analysisText);
+      if (analysis && analysis.plans.length > 0) {
+        // Use LLM-determined plan breakdown
+        stream.markdown(`*Phase analysis: ${analysis.plans.length} plans identified*\n\n`);
+        if (analysis.reasoning) {
+          stream.markdown(`> ${analysis.reasoning}\n\n`);
+        }
+        batches = analysis.plans.map(p => p.items);
+      } else {
+        // Fallback: create single batch with empty array
+        console.warn('[planPhase] Failed to parse phase analysis, falling back to single plan');
+        batches.push([]);
+      }
+    } catch (err) {
+      // Fallback on error
+      console.error('[planPhase] Phase analysis failed:', err);
+      batches.push([]);
+    }
   } else {
-    // Split into batches of MAX_TASKS_PER_PLAN
+    // Split pre-defined items into batches of MAX_TASKS_PER_PLAN
     for (let i = 0; i < planItems.length; i += MAX_TASKS_PER_PLAN) {
       batches.push(planItems.slice(i, i + MAX_TASKS_PER_PLAN));
     }
   }
 
   const totalPlans = batches.length;
-  if (totalPlans > 1) {
-    stream.markdown(`**Creating ${totalPlans} plans** for Phase ${targetPhase.number} (${planItems.length} roadmap items)\n\n`);
+
+  // Check if all plans already exist
+  if (existingPlanCount >= totalPlans) {
+    // All plans for this phase already exist
+    const firstPlanUri = vscode.Uri.joinPath(
+      workspaceUri,
+      '.planning',
+      'phases',
+      targetPhase.dirName,
+      `${targetPhase.number.toString().padStart(2, '0')}-01-PLAN.md`
+    );
+
+    stream.markdown('## Plans Already Exist\n\n');
+    stream.markdown(`Phase ${targetPhase.number} (${targetPhase.name}) already has ${existingPlanCount} plan(s).\n\n`);
+    stream.markdown('**Options:**\n');
+    stream.markdown(`- Edit the existing plans directly\n`);
+    stream.markdown(`- Delete the plan files and run \`/plan-phase ${targetPhaseNum}\` again to regenerate\n\n`);
+
+    stream.button({
+      command: 'vscode.open',
+      arguments: [firstPlanUri],
+      title: 'Open First Plan'
+    });
+    stream.markdown(' ');
+    stream.button({
+      command: 'hopper.chat-participant.execute-plan',
+      title: 'Execute Plan'
+    });
+    return { metadata: { lastCommand: 'plan-phase', phaseNumber: targetPhase.number } };
   }
 
-  stream.progress('Analyzing phase requirements...');
+  // Some or all plans need to be created
+  const plansToCreate = totalPlans - existingPlanCount;
+  if (existingPlanCount > 0) {
+    stream.markdown(`*${existingPlanCount} plan(s) already exist, creating ${plansToCreate} more*\n\n`);
+  } else if (totalPlans > 1) {
+    stream.markdown(`**Creating ${totalPlans} plans** for Phase ${targetPhase.number}\n\n`);
+  }
+
+  stream.progress('Generating execution plans...');
 
   const createdPlans: vscode.Uri[] = [];
-  let currentPlanNumber = planNumber;
+  let currentPlanNumber = existingPlanCount + 1;
 
   try {
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    // Start from the first batch that doesn't have a plan yet
+    for (let batchIndex = existingPlanCount; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
-      const isMultiplePlans = batches.length > 1;
+      const isMultiplePlans = plansToCreate > 1;
+      const planIndexInRun = batchIndex - existingPlanCount + 1;
 
       if (isMultiplePlans) {
-        stream.progress(`Generating plan ${batchIndex + 1} of ${totalPlans}...`);
+        stream.progress(`Generating plan ${planIndexInRun} of ${plansToCreate}...`);
       } else {
         stream.progress('Generating execution plan...');
       }
@@ -741,6 +841,24 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
 
     stream.markdown('\n### Next Steps\n\n');
     stream.markdown('Review the plan(s) and use **/execute-plan** to execute them in order.\n\n');
+
+    // Update STATE.md with planning activity
+    if (projectContext.planningUri) {
+      try {
+        const planCount = createdPlans.length;
+        const description = planCount === 1
+          ? `Created plan for Phase ${targetPhase.number}`
+          : `Created ${planCount} plans for Phase ${targetPhase.number}`;
+        await updateLastActivityAndSession(
+          projectContext.planningUri,
+          description,
+          `/execute-plan to begin Phase ${targetPhase.number}`
+        );
+      } catch (stateErr) {
+        console.error('[Hopper] Failed to update STATE.md after planning:', stateErr);
+        // Don't fail the planning, just log the error
+      }
+    }
 
     return {
       metadata: {

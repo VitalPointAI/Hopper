@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { CommandContext, IHopperResult } from './types';
 import { truncateContent } from '../context/projectContext';
+import { updateStateAfterVerification } from '../state';
 
 /**
  * Test result from user
@@ -162,7 +163,7 @@ async function generateTestChecklist(
 
   const model = models[0];
 
-  const prompt = `Generate a manual user acceptance test checklist for the following deliverables.
+  const prompt = `Generate detailed manual user acceptance test instructions for the following deliverables.
 
 ## Deliverables
 **Plan:** ${planName}
@@ -173,15 +174,21 @@ ${deliverables.accomplishments.map(a => `- ${a}`).join('\n')}
 ${deliverables.files.slice(0, 10).map(f => `- ${f}`).join('\n')}
 
 ## Instructions
-Create 3-8 testable items that a USER can manually verify. Focus on:
-1. User-observable behaviors (what they can see/click/interact with)
-2. Expected outcomes (what should happen)
-3. Edge cases relevant to the features
+Create 3-8 detailed test instructions that a USER can follow step-by-step. Each test MUST include:
+1. **What to do** - Specific actions (click X, type Y, navigate to Z)
+2. **How to do it** - Exact steps to reproduce
+3. **What to expect** - The expected result when the feature works correctly
 
-Respond with a JSON array of test descriptions. Each should be a single, actionable test.
+The test description should be detailed enough that someone unfamiliar with the code can follow along.
+
+Respond with a JSON array of test descriptions. Each should be a complete, actionable test instruction.
 
 Example format:
-["Check that login button appears on home page", "Verify form validation shows error for empty email"]
+[
+  "Open the application in browser, navigate to Settings page via the gear icon in the top-right, then click 'Dark Mode' toggle. Expected: The entire UI should switch to dark theme with dark backgrounds and light text.",
+  "In the login form, leave the email field empty and click Submit. Expected: A red error message 'Email is required' should appear below the email field and the form should not submit.",
+  "Navigate to /dashboard after logging in. Expected: You should see a welcome message with your username and a list of recent activity items."
+]
 
 Only output the JSON array, no other text.`;
 
@@ -301,36 +308,47 @@ async function runInteractiveTests(
   const results: TestResult[] = [];
 
   stream.markdown('### Interactive Testing\n\n');
-  stream.markdown('A dialog will appear for each test. Please perform the test and report the result.\n\n');
+  stream.markdown('Follow the instructions below for each test, then select the result from the dialog.\n\n');
+  stream.markdown('**Important:** Keep your eyes on this chat panel for test instructions - a small dialog will appear asking for results.\n\n');
 
   for (let i = 0; i < testItems.length; i++) {
     const testItem = testItems[i];
 
-    stream.markdown(`**Test ${i + 1}/${testItems.length}:** ${testItem}\n`);
+    // Display test with clear formatting
+    stream.markdown(`---\n\n`);
+    stream.markdown(`### Test ${i + 1} of ${testItems.length}\n\n`);
+    stream.markdown(`${testItem}\n\n`);
 
-    // Show QuickPick for test result
+    // Show QuickPick for test result - use shorter title since full instructions are in chat
     const statusResult = await vscode.window.showQuickPick(
       [
-        { label: 'Pass', description: 'Test works correctly', value: 'pass' as const },
-        { label: 'Fail', description: 'Test does not work', value: 'fail' as const },
-        { label: 'Partial', description: 'Works but has issues', value: 'partial' as const },
-        { label: 'Skip', description: 'Cannot test right now', value: 'skip' as const }
+        { label: '$(pass) Pass', description: 'Feature works as described', value: 'pass' as const },
+        { label: '$(error) Fail', description: 'Feature does not work', value: 'fail' as const },
+        { label: '$(warning) Partial', description: 'Works but has issues', value: 'partial' as const },
+        { label: '$(debug-step-over) Skip', description: 'Cannot test right now', value: 'skip' as const }
       ],
       {
-        title: `Test ${i + 1} of ${testItems.length}`,
-        placeHolder: testItem
+        title: `Test ${i + 1}/${testItems.length}: What is the result?`,
+        placeHolder: 'Read the test instructions in the chat panel, then select result'
       }
     );
 
     if (!statusResult) {
-      // User cancelled - treat remaining tests as skipped
-      stream.markdown(`  - *Cancelled*\n\n`);
+      // User cancelled (clicked elsewhere, pressed Escape, etc.)
+      stream.markdown(`  - *Testing paused*\n\n`);
+      stream.markdown('---\n\n');
+      stream.markdown('**Testing paused.** You clicked away or pressed Escape.\n\n');
+      stream.markdown(`Progress: **${i}/${testItems.length}** tests completed.\n\n`);
+
+      // Mark remaining as skipped
       for (let j = i; j < testItems.length; j++) {
         results.push({
           feature: testItems[j],
           status: 'skip'
         });
       }
+
+      stream.markdown('To continue testing, run **/verify-work** again.\n\n');
       break;
     }
 
@@ -575,6 +593,24 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
 
   stream.markdown('\n');
   stream.reference(target.uri);
+
+  // Update STATE.md with verification results
+  if (projectContext.planningUri) {
+    try {
+      const planRef = `${target.phase}-${target.plan.padStart(2, '0')}`;
+      await updateStateAfterVerification(
+        projectContext.planningUri,
+        planRef,
+        passed,
+        failed,
+        partial,
+        skipped
+      );
+    } catch (stateErr) {
+      console.error('[Hopper] Failed to update STATE.md after verification:', stateErr);
+      // Don't fail the verification, just log the error
+    }
+  }
 
   return {
     metadata: {

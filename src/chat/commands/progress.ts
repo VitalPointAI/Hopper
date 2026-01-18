@@ -540,6 +540,17 @@ export async function handleProgress(ctx: CommandContext): Promise<IHopperResult
       // No context file
     }
   }
+
+  // Show session continuity info if available
+  if (projectContext.sessionContinuity) {
+    const session = projectContext.sessionContinuity;
+    if (session.lastSession) {
+      stream.markdown(`**Last session:** ${session.lastSession}\n`);
+    }
+    if (session.stoppedAt) {
+      stream.markdown(`**Stopped at:** ${session.stoppedAt}\n`);
+    }
+  }
   stream.markdown('\n');
 
   // Key Decisions section
@@ -610,6 +621,34 @@ export async function handleProgress(ctx: CommandContext): Promise<IHopperResult
   const handoffs = await findHandoffFiles(projectContext.planningUri);
 
   stream.markdown('---\n\n');
+
+  // Route -1: Interrupted agent exists (highest priority)
+  if (projectContext.currentAgentId) {
+    stream.markdown('## Interrupted Execution Detected\n\n');
+    stream.markdown(`**Agent ID:** \`${projectContext.currentAgentId}\`\n\n`);
+    stream.markdown('A previous plan execution was interrupted. You can:\n\n');
+    stream.markdown('1. **Resume** the interrupted execution (if context is still valid)\n');
+    stream.markdown('2. **Clear** the agent ID and continue with normal routing\n\n');
+
+    stream.button({
+      command: 'hopper.chat-participant.resume-task',
+      arguments: [projectContext.currentAgentId],
+      title: 'Resume Task'
+    });
+    stream.markdown(' ');
+    stream.button({
+      command: 'hopper.clearAgentId',
+      title: 'Clear & Continue'
+    });
+    stream.markdown('\n\n');
+
+    // Also show the STATE.md "Next" suggestion if available
+    if (projectContext.sessionContinuity?.next) {
+      stream.markdown(`**STATE.md suggests:** ${projectContext.sessionContinuity.next}\n\n`);
+    }
+
+    return { metadata: { lastCommand: 'progress', nextAction: 'resume-task', agentId: projectContext.currentAgentId } };
+  }
 
   // Route 0: Handoff file exists (paused work from previous session)
   if (handoffs.length > 0) {
@@ -784,7 +823,14 @@ export async function handleProgress(ctx: CommandContext): Promise<IHopperResult
     return { metadata: { lastCommand: 'progress', nextAction: 'complete-milestone' } };
   }
 
-  // Fallback
+  // Fallback - use STATE.md "Next" suggestion if available
+  if (projectContext.sessionContinuity?.next) {
+    stream.markdown('## Suggested Next Action\n\n');
+    stream.markdown(`From STATE.md: **${projectContext.sessionContinuity.next}**\n\n`);
+    stream.markdown('*This suggestion was recorded from the last session.*\n\n');
+    return { metadata: { lastCommand: 'progress', nextAction: 'state-suggestion', suggestion: projectContext.sessionContinuity.next } };
+  }
+
   stream.markdown('## Status\n\n');
   stream.markdown('Unable to determine next action. Check your `.planning` directory structure.\n\n');
 
