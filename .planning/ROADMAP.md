@@ -25,8 +25,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Planning Commands** - PROJECT.md, ROADMAP.md, STATE.md generation
 - [x] **Phase 4: Execution Commands** - PLAN.md execution, verification, git integration
 - [x] **Phase 5: Session Management** - Progress tracking, resumption, issue logging
-- [ ] **Phase 5.1: GSD Feature Parity** - INSERTED - Complete all GSD framework commands (In progress)
-- [ ] **Phase 6: Security Review** - Security audit and hardening
+- [x] **Phase 5.1: GSD Feature Parity** - INSERTED - Complete all GSD framework commands
+- [x] **Phase 6: Security Review** - Security audit and hardening
 
 ## Phase Details
 
@@ -160,7 +160,7 @@ Plans:
 - [x] 06-01: Security types and GitHub Advisory client with caching
 - [x] 06-02: ESLint scanner with security plugins and OWASP mapping
 - [x] 06-03: Auto-fix transforms using jscodeshift
-- [ ] 06-04: /security-check command with two-phase UX
+- [x] 06-04: /security-check command with two-phase UX
 
 ## Progress
 
@@ -179,4 +179,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
 | 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
-| 6. Security Review | 3/4 | In progress | - |
+| 6. Security Review | 4/4 | Complete | 2026-01-18 |
