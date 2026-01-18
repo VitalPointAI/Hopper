@@ -172,7 +172,7 @@ Plans:
 Plans:
 - [x] 07-01: Configuration types and manager (HopperConfig, load/save from .planning/config.json)
 - [x] 07-02: Interactive selection UI (depth and mode picker during /new-project)
-- [ ] 07-03: Depth-aware prompts (vary PROJECT.md and ROADMAP.md detail based on depth)
+- [x] 07-03: Depth-aware prompts (vary PROJECT.md and ROADMAP.md detail based on depth)
 - [ ] 07-04: Gate implementation (confirmation flow based on execution mode)
 
 ## Progress
@@ -193,4 +193,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
 | 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
 | 6. Security Review | 4/4 | Complete | 2026-01-18 |
-| 7. Planning Depth | 2/4 | In progress | - |
+| 7. Planning Depth | 3/4 | In progress | - |
