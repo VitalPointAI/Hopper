@@ -159,7 +159,7 @@ Plans:
 Plans:
 - [x] 06-01: Security types and GitHub Advisory client with caching
 - [x] 06-02: ESLint scanner with security plugins and OWASP mapping
-- [ ] 06-03: Auto-fix transforms using jscodeshift
+- [x] 06-03: Auto-fix transforms using jscodeshift
 - [ ] 06-04: /security-check command with two-phase UX
 
 ## Progress
@@ -179,4 +179,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 4. Execution Commands | 3/3 | Complete | 2026-01-17 |
 | 5. Session Management | 3/3 | Complete | 2026-01-17 |
 | 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
-| 6. Security Review | 2/4 | In progress | - |
+| 6. Security Review | 3/4 | In progress | - |
