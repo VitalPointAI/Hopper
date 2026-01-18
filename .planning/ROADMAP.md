@@ -183,7 +183,8 @@ Plans:
 **Plans**: 2
 
 Plans:
-- [ ] 08-01: State persistence and non-blocking UI infrastructure
+- [x] 08-01: State persistence and non-blocking UI infrastructure
+- [x] 08-01-FIX: Button-based verify-work flow
 - [ ] 08-02: Enhanced test instructions and explicit pause/resume UX
 
 ## Progress
@@ -205,4 +206,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
 | 6. Security Review | 4/4 | Complete | 2026-01-18 |
 | 7. Planning Depth | 4/4 | Complete | 2026-01-18 |
-| 8. Fix Improperly Built Functions | 0/2 | Not Started | - |
+| 8. Fix Improperly Built Functions | 2/3 | In Progress | - |
