@@ -28,6 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5.1: GSD Feature Parity** - INSERTED - Complete all GSD framework commands
 - [x] **Phase 6: Security Review** - Security audit and hardening
 - [x] **Phase 7: Planning Depth** - User-selectable planning depth and execution control modes
+- [ ] **Phase 8: Fix Improperly Built Functions** - Fix functions that were not built correctly
 
 ## Phase Details
 
@@ -175,6 +176,16 @@ Plans:
 - [x] 07-03: Depth-aware prompts (vary PROJECT.md and ROADMAP.md detail based on depth)
 - [x] 07-04: Gate implementation (confirmation flow based on execution mode)
 
+### Phase 8: Fix Improperly Built Functions
+**Goal**: Fix /verify-work command UX issues: state persistence, non-blocking UI, detailed test instructions
+**Depends on**: Phase 7
+**Research**: Unlikely (fixing existing code)
+**Plans**: 2
+
+Plans:
+- [ ] 08-01: State persistence and non-blocking UI infrastructure
+- [ ] 08-02: Enhanced test instructions and explicit pause/resume UX
+
 ## Progress
 
 **Execution Order:**
@@ -194,3 +205,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
 | 6. Security Review | 4/4 | Complete | 2026-01-18 |
 | 7. Planning Depth | 4/4 | Complete | 2026-01-18 |
+| 8. Fix Improperly Built Functions | 0/2 | Not Started | - |
