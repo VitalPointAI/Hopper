@@ -7,10 +7,13 @@
  */
 
 import * as vscode from 'vscode';
+import * as semver from 'semver';
 import {
   GitHubAdvisory,
   AdvisoryCache,
   AdvisoryFetchResult,
+  DependencyIssue,
+  Severity,
 } from './types';
 
 /** Cache key for storing advisories in globalState */
@@ -201,4 +204,143 @@ export async function clearAdvisoryCache(
   context: vscode.ExtensionContext
 ): Promise<void> {
   await context.globalState.update(CACHE_KEY, undefined);
+}
+
+/**
+ * Map GitHub advisory severity to internal Severity type
+ */
+function mapSeverity(ghSeverity: 'low' | 'medium' | 'high' | 'critical'): Severity {
+  return ghSeverity; // Direct mapping - types align
+}
+
+/**
+ * Check if an installed version is within a vulnerable range
+ *
+ * GitHub uses npm semver syntax for vulnerability ranges.
+ * Examples: ">=1.0.0 <1.5.0", "<2.0.0", ">=3.0.0"
+ *
+ * @param installedVersion - Currently installed version (may include ^, ~, etc.)
+ * @param vulnerableRange - Semver range of vulnerable versions
+ * @returns true if installed version is vulnerable
+ */
+function isVulnerableVersion(
+  installedVersion: string,
+  vulnerableRange: string
+): boolean {
+  try {
+    // Clean the installed version (remove ^, ~, etc.)
+    const cleanVersion = semver.coerce(installedVersion);
+    if (!cleanVersion) {
+      // Cannot parse version - assume not vulnerable to avoid false positives
+      return false;
+    }
+
+    // GitHub's vulnerable_version_range uses npm semver syntax
+    // semver.satisfies checks if version is in the range
+    return semver.satisfies(cleanVersion.version, vulnerableRange);
+  } catch {
+    // Semver parsing error - assume not vulnerable
+    return false;
+  }
+}
+
+/**
+ * Match advisories to project dependencies
+ *
+ * Checks each advisory's vulnerable packages against installed dependencies.
+ * Creates DependencyIssue objects for each match.
+ *
+ * @param advisories - Advisories from GitHub Advisory Database
+ * @param dependencies - Project dependencies (name → version)
+ * @returns Array of DependencyIssue for vulnerable packages
+ */
+export function matchAdvisoriesToDependencies(
+  advisories: GitHubAdvisory[],
+  dependencies: Record<string, string>
+): DependencyIssue[] {
+  const issues: DependencyIssue[] = [];
+
+  for (const advisory of advisories) {
+    for (const vuln of advisory.vulnerabilities) {
+      // Only process npm ecosystem packages
+      if (vuln.package.ecosystem !== 'npm') {
+        continue;
+      }
+
+      const packageName = vuln.package.name;
+      const installedVersion = dependencies[packageName];
+
+      // Skip if package not in dependencies
+      if (!installedVersion) {
+        continue;
+      }
+
+      // Check if installed version is vulnerable
+      if (!isVulnerableVersion(installedVersion, vuln.vulnerable_version_range)) {
+        continue;
+      }
+
+      // Create DependencyIssue for this match
+      const hasPatch = vuln.patched_versions !== null;
+      const issue: DependencyIssue = {
+        id: advisory.ghsa_id,
+        type: 'dependency',
+        ghsaId: advisory.ghsa_id,
+        cveId: advisory.cve_id || undefined,
+        package: packageName,
+        installedVersion,
+        vulnerableRange: vuln.vulnerable_version_range,
+        patchedVersions: vuln.patched_versions || undefined,
+        message: advisory.summary,
+        severity: mapSeverity(advisory.severity),
+        owasp: 'A03:2025-Supply-Chain-Failures', // All dependency issues map to supply chain
+        cvssScore: advisory.cvss?.score,
+        cwes: advisory.cwes.map((c) => c.cwe_id),
+        fixable: hasPatch,
+        fixConfidence: hasPatch ? 'high' : undefined,
+        suggestedFix: hasPatch
+          ? `Update ${packageName} to ${vuln.patched_versions}`
+          : undefined,
+      };
+
+      issues.push(issue);
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Read package.json from workspace
+ *
+ * Extracts both dependencies and devDependencies.
+ *
+ * @param workspaceUri - Workspace root URI
+ * @returns Merged dependencies map (name → version)
+ */
+export async function readPackageJson(
+  workspaceUri: vscode.Uri
+): Promise<Record<string, string>> {
+  try {
+    const packageJsonUri = vscode.Uri.joinPath(workspaceUri, 'package.json');
+    const content = await vscode.workspace.fs.readFile(packageJsonUri);
+    const packageJson = JSON.parse(Buffer.from(content).toString('utf-8'));
+
+    const dependencies: Record<string, string> = {};
+
+    // Merge dependencies
+    if (packageJson.dependencies && typeof packageJson.dependencies === 'object') {
+      Object.assign(dependencies, packageJson.dependencies);
+    }
+
+    // Merge devDependencies
+    if (packageJson.devDependencies && typeof packageJson.devDependencies === 'object') {
+      Object.assign(dependencies, packageJson.devDependencies);
+    }
+
+    return dependencies;
+  } catch {
+    // Failed to read or parse package.json
+    return {};
+  }
 }
