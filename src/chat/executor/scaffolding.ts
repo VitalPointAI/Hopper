@@ -117,6 +117,96 @@ export function extractScaffoldingCommand(action: string): string | null {
 }
 
 /**
+ * Default .gitignore content for new projects.
+ * Covers common patterns across different ecosystems.
+ */
+const DEFAULT_GITIGNORE = `# Dependencies
+node_modules/
+vendor/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+target/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs and caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cache/
+.parcel-cache/
+.turbo/
+
+# Testing
+coverage/
+.nyc_output/
+
+# OS files
+Thumbs.db
+`;
+
+/**
+ * Ensure a .gitignore file exists with sensible defaults.
+ * If one already exists, append any missing critical entries.
+ */
+async function ensureGitignore(workspacePath: string, stream: vscode.ChatResponseStream): Promise<void> {
+  const gitignorePath = path.join(workspacePath, '.gitignore');
+  const gitignoreUri = vscode.Uri.file(gitignorePath);
+
+  // Critical entries that should always be present
+  const criticalEntries = ['node_modules/', '.env', 'dist/', 'build/', '.next/'];
+
+  try {
+    // Check if .gitignore exists
+    let existingContent = '';
+    try {
+      const content = await vscode.workspace.fs.readFile(gitignoreUri);
+      existingContent = Buffer.from(content).toString('utf8');
+    } catch {
+      // File doesn't exist - create with defaults
+      await vscode.workspace.fs.writeFile(gitignoreUri, Buffer.from(DEFAULT_GITIGNORE, 'utf8'));
+      stream.markdown('*Created .gitignore with sensible defaults*\n\n');
+      return;
+    }
+
+    // Check for missing critical entries
+    const missingEntries = criticalEntries.filter(entry => !existingContent.includes(entry));
+
+    if (missingEntries.length > 0) {
+      // Append missing entries
+      const appendContent = '\n# Added by Hopper\n' + missingEntries.join('\n') + '\n';
+      const newContent = existingContent.trimEnd() + appendContent;
+      await vscode.workspace.fs.writeFile(gitignoreUri, Buffer.from(newContent, 'utf8'));
+      stream.markdown(`*Added missing entries to .gitignore: ${missingEntries.join(', ')}*\n\n`);
+    }
+  } catch (error) {
+    // Non-fatal - just warn
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    stream.markdown(`*Warning: Could not update .gitignore: ${errorMsg}*\n\n`);
+  }
+}
+
+/**
  * Result of scaffolding execution.
  */
 export interface ScaffoldingResult {
@@ -208,6 +298,9 @@ export async function executeScaffoldingWithProtection(
       stream.markdown('*Restoring .planning/...*\n\n');
       await execAsync(`mv "${tempPath}" "${planningPath}"`, { cwd: workspacePath });
     }
+
+    // Step 4: Ensure .gitignore exists with sensible defaults
+    await ensureGitignore(workspacePath, stream);
 
     return {
       success: true,
