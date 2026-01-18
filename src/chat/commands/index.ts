@@ -18,6 +18,9 @@ import { handleListPhaseAssumptions } from './listPhaseAssumptions';
 import { handleVerifyWork } from './verifyWork';
 import { handlePlanFix } from './planFix';
 import { handleResumeTask } from './resumeTask';
+import { handleNewMilestone } from './newMilestone';
+import { handleCompleteMilestone } from './completeMilestone';
+import { handleDiscussMilestone } from './discussMilestone';
 
 /**
  * Command definitions with descriptions for help output
@@ -40,6 +43,9 @@ const COMMAND_DEFINITIONS = [
   { name: 'verify-work', description: 'Guide manual user acceptance testing' },
   { name: 'plan-fix', description: 'Plan fixes for UAT issues' },
   { name: 'resume-task', description: 'Resume interrupted task execution' },
+  { name: 'new-milestone', description: 'Create a new milestone with phases' },
+  { name: 'complete-milestone', description: 'Archive completed milestone' },
+  { name: 'discuss-milestone', description: 'Gather context for next milestone' },
   { name: 'status', description: 'Show current project status and phase' },
   { name: 'help', description: 'Show available Hopper commands' }
 ];
@@ -279,6 +285,9 @@ registry.set('list-phase-assumptions', handleListPhaseAssumptions);
 registry.set('verify-work', handleVerifyWork);
 registry.set('plan-fix', handlePlanFix);
 registry.set('resume-task', handleResumeTask);
+registry.set('new-milestone', handleNewMilestone);
+registry.set('complete-milestone', handleCompleteMilestone);
+registry.set('discuss-milestone', handleDiscussMilestone);
 
 /**
  * Get a command handler by name
