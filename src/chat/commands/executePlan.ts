@@ -30,6 +30,27 @@ import {
 import { getLogger } from '../../logging';
 
 /**
+ * Patterns that indicate a transient error which should be retried.
+ * These are temporary failures that may succeed on retry.
+ */
+const TRANSIENT_ERROR_PATTERNS = [
+  /rate limit/i,
+  /timeout/i,
+  /network/i,
+  /ECONNRESET/i,
+  /ETIMEDOUT/i,
+  /503/i,
+  /429/i,
+];
+
+/**
+ * Check if an error message indicates a transient failure that should be retried.
+ */
+function isTransientError(error: string): boolean {
+  return TRANSIENT_ERROR_PATTERNS.some(pattern => pattern.test(error));
+}
+
+/**
  * Format a tool invocation message with contextual information.
  * Provides user-friendly descriptions for file and directory operations.
  */
@@ -206,42 +227,83 @@ async function executeWithTools(
         // Show tool invocation in stream with context
         stream.markdown(`\n\n${toolMsg.start}\n\n`);
 
-        try {
-          // Log tool invocation to output channel
-          const logger = getLogger();
-          logger.toolStart(part.name, part.input);
+        // Retry logic for transient failures
+        const MAX_RETRIES = 2; // 3 total attempts
+        let lastError: string | undefined;
+        let toolResult: vscode.LanguageModelToolResult | undefined;
 
-          // Invoke the tool with toolInvocationToken for proper chat UI integration
-          // The token is required for file operations like copilot_createFile
-          const result = await vscode.lm.invokeTool(
-            part.name,
-            {
-              input: part.input,
-              toolInvocationToken
-            },
-            token
-          );
+        for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+          // Check for cancellation before each attempt
+          if (token.isCancellationRequested) {
+            break;
+          }
 
-          // Log successful completion
-          logger.toolComplete(part.name, 'success');
+          try {
+            // Log tool invocation to output channel
+            const logger = getLogger();
+            if (attempt === 1) {
+              logger.toolStart(part.name, part.input);
+            } else {
+              logger.warn(`Retry ${attempt}/${MAX_RETRIES + 1} for ${part.name}: ${lastError}`);
+              stream.markdown(`*Retry ${attempt}/${MAX_RETRIES + 1}...*\n\n`);
+            }
 
+            // Invoke the tool with toolInvocationToken for proper chat UI integration
+            // The token is required for file operations like copilot_createFile
+            toolResult = await vscode.lm.invokeTool(
+              part.name,
+              {
+                input: part.input,
+                toolInvocationToken
+              },
+              token
+            );
+
+            // Log successful completion
+            logger.toolComplete(part.name, 'success');
+            lastError = undefined;
+            break; // Success - exit retry loop
+
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            lastError = errorMsg;
+
+            // Check if this is a transient error that should be retried
+            if (isTransientError(errorMsg) && attempt <= MAX_RETRIES && !token.isCancellationRequested) {
+              // Exponential backoff: 1s, 2s
+              const delay = attempt * 1000;
+              getLogger().warn(`Transient error in ${part.name}, retrying in ${delay}ms: ${errorMsg}`);
+              await new Promise(r => setTimeout(r, delay));
+              continue;
+            }
+
+            // Non-transient error or max retries reached
+            if (attempt > MAX_RETRIES) {
+              getLogger().error(`Tool ${part.name} failed after ${MAX_RETRIES + 1} attempts: ${errorMsg}`);
+            } else {
+              getLogger().error(`Tool ${part.name} failed (non-retryable): ${errorMsg}`);
+            }
+            break;
+          }
+        }
+
+        // Process result or error
+        if (toolResult && !lastError) {
           // Collect tool result for next iteration
           // invokeTool returns LanguageModelToolResult, we need its content array
           toolResults.push(
-            new vscode.LanguageModelToolResultPart(part.callId, result.content)
+            new vscode.LanguageModelToolResultPart(part.callId, toolResult.content)
           );
 
           stream.markdown(`${toolMsg.complete}\n\n`);
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          // Log error to output channel (auto-shows channel)
-          getLogger().toolError(part.name, errorMsg);
-          stream.markdown(`**Failed:** ${part.name} - ${errorMsg}\n\n`);
+        } else {
+          // Report error
+          stream.markdown(`**Failed:** ${part.name} - ${lastError || 'Unknown error'}\n\n`);
 
           toolResults.push(
             new vscode.LanguageModelToolResultPart(
               part.callId,
-              [new vscode.LanguageModelTextPart(`Error: ${errorMsg}`)]
+              [new vscode.LanguageModelTextPart(`Error: ${lastError || 'Unknown error'}`)]
             )
           );
         }
