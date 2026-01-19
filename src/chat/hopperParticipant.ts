@@ -4,7 +4,12 @@ import { getCommandHandler, IHopperResult, CommandContext } from './commands';
 import { getProjectContext, formatContextForPrompt } from './context/projectContext';
 import { getContextTracker } from '../context/contextTracker';
 import { getLogger } from '../logging';
-import { getActiveExecution, storeExecutionContext } from './commands/executePlan';
+import {
+  getActiveExecution,
+  storeExecutionContext,
+  getCancelledExecution,
+  clearCancelledExecution
+} from './commands/executePlan';
 
 /**
  * Patterns that indicate the user wants direct action, not advice or workflow redirection.
@@ -71,6 +76,56 @@ export function createHopperParticipant(
     if (projectContext.hasPlanning) {
       const formattedContext = formatContextForPrompt(projectContext);
       contextTracker.addInput(formattedContext);
+    }
+
+    // Check for recently cancelled execution that could be resumed with context
+    // This is the "stop and resume with context" flow - user stopped execution,
+    // pasted context information, and we auto-resume with the context
+    const cancelledExecution = getCancelledExecution(context);
+    const isResumeWithContext = cancelledExecution &&
+      !request.command &&
+      request.prompt.trim().length > 0;
+
+    if (isResumeWithContext) {
+      const logger = getLogger();
+      logger.info(`Resuming execution ${cancelledExecution.planPath} at task ${cancelledExecution.taskIndex} with user context`);
+
+      // Store the context for the resumed execution
+      await storeExecutionContext(context, cancelledExecution.planPath, request.prompt);
+
+      // Clear the cancelled execution state (we're resuming now)
+      await clearCancelledExecution(context);
+
+      // Acknowledge and resume
+      stream.markdown('**Got it.** Resuming execution with your context...\n\n');
+      stream.markdown('*Your input will be incorporated into the current task.*\n\n');
+
+      // Track the context storage
+      contextTracker.addOutput(`Context stored, resuming ${cancelledExecution.planPath}`);
+
+      // Get the execute-plan handler and call it with the plan path
+      const executeHandler = getCommandHandler('execute-plan');
+      if (executeHandler) {
+        const resumeCtx: CommandContext = {
+          request: {
+            ...request,
+            prompt: cancelledExecution.planPath,
+            command: 'execute-plan'
+          } as vscode.ChatRequest,
+          context: chatContext,
+          stream,
+          token,
+          licenseValidator,
+          projectContext,
+          extensionContext: context
+        };
+
+        return executeHandler(resumeCtx);
+      }
+
+      // Fallback if handler not found (shouldn't happen)
+      stream.markdown('**Error:** Could not resume execution. Please run `/execute-plan` manually.\n');
+      return { metadata: { lastCommand: 'error' } };
     }
 
     // Check for active execution that could receive context

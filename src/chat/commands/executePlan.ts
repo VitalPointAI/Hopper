@@ -465,12 +465,27 @@ async function clearExecutionState(
 const ACTIVE_EXECUTION_KEY = 'hopper.activeExecution';
 
 /**
+ * Key for tracking recently cancelled executions (for resume with context)
+ */
+const CANCELLED_EXECUTION_KEY = 'hopper.cancelledExecution';
+
+/**
  * Active execution info stored in globalState
  */
 interface ActiveExecutionInfo {
   planPath: string;
   taskIndex: number;
   lastActivityTimestamp: number;
+}
+
+/**
+ * Cancelled execution info stored in globalState
+ * Used for "stop and resume with context" flow
+ */
+interface CancelledExecutionInfo {
+  planPath: string;
+  taskIndex: number;
+  cancelledAt: number;
 }
 
 /**
@@ -522,6 +537,55 @@ export function getActiveExecution(
   context: vscode.ExtensionContext
 ): ActiveExecutionInfo | undefined {
   return context.globalState.get<ActiveExecutionInfo>(ACTIVE_EXECUTION_KEY);
+}
+
+/**
+ * Save cancelled execution state for potential resume with context.
+ * Called when execution is cancelled (Stop button) to preserve position.
+ */
+export async function saveCancelledExecution(
+  context: vscode.ExtensionContext,
+  planPath: string,
+  taskIndex: number
+): Promise<void> {
+  const info: CancelledExecutionInfo = {
+    planPath,
+    taskIndex,
+    cancelledAt: Date.now()
+  };
+  await context.globalState.update(CANCELLED_EXECUTION_KEY, info);
+}
+
+/**
+ * Get cancelled execution info if any and still recent.
+ * Returns undefined if no cancelled execution or if older than 5 minutes.
+ * The 5 minute window allows user to paste context and resume.
+ */
+export function getCancelledExecution(
+  context: vscode.ExtensionContext
+): CancelledExecutionInfo | undefined {
+  const info = context.globalState.get<CancelledExecutionInfo>(CANCELLED_EXECUTION_KEY);
+  if (!info) {
+    return undefined;
+  }
+
+  // Only return if within resume window (5 minutes)
+  const RESUME_WINDOW_MS = 300000; // 5 minutes
+  if ((Date.now() - info.cancelledAt) > RESUME_WINDOW_MS) {
+    return undefined;
+  }
+
+  return info;
+}
+
+/**
+ * Clear cancelled execution state.
+ * Called after successful resume or when stale.
+ */
+export async function clearCancelledExecution(
+  context: vscode.ExtensionContext
+): Promise<void> {
+  await context.globalState.update(CANCELLED_EXECUTION_KEY, undefined);
 }
 
 /**
@@ -1330,16 +1394,25 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
     // Check for cancellation before each task
     if (token.isCancellationRequested) {
-      // Clear active execution state on cancellation
+      // Save cancelled execution state for potential resume with context
+      await saveCancelledExecution(ctx.extensionContext, planPath, i);
+
+      // Clear active execution state
       await clearActiveExecution(ctx.extensionContext);
 
       stream.markdown('\n\n---\n\n');
-      stream.markdown('## Execution Cancelled\n\n');
-      stream.markdown(`Completed ${results.filter(r => r.success).length} of ${plan.tasks.length} tasks before cancellation.\n\n`);
+      stream.markdown('## Execution Paused\n\n');
+      stream.markdown(`Completed ${results.filter(r => r.success).length} of ${plan.tasks.length} tasks.\n\n`);
+      stream.markdown(`**Paused at:** Task ${i + 1} (${plan.tasks[i]?.name || 'unknown'})\n\n`);
 
       for (const result of results) {
         stream.markdown(`- **Task ${result.taskId}:** ${result.name} - ${result.success ? 'Completed' : 'Failed'}\n`);
       }
+
+      stream.markdown('\n---\n\n');
+      stream.markdown('**Need to add context?** Paste your information and send it.\n');
+      stream.markdown('I\'ll resume execution with your context incorporated.\n\n');
+      stream.markdown('*This option is available for 5 minutes.*\n');
 
       return { metadata: { lastCommand: 'execute-plan' } };
     }
