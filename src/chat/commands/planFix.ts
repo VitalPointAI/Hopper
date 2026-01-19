@@ -13,6 +13,10 @@ interface UATIssue {
   expected?: string;
   actual?: string;
   feature?: string;
+  /** Full error output from ISSUES.md (for execution failures) */
+  fullOutput?: string;
+  /** Files involved in the failure */
+  affectedFiles?: string[];
 }
 
 /**
@@ -56,7 +60,7 @@ function parseIssues(content: string): UATIssue[] {
 
     // Parse fields from body - handle both UAT and EXE formats
     // UAT uses: Severity, Description, Expected, Actual, Feature
-    // EXE uses: Type, Impact, Description
+    // EXE uses: Type, Impact, Description, Affected Files, Full Error Output
     const severityMatch = body.match(/\*\*Severity:\*\*\s*([^\n]+)/);
     const typeMatch = body.match(/\*\*Type:\*\*\s*([^\n]+)/);
     const impactMatch = body.match(/\*\*Impact:\*\*\s*([^\n]+)/);
@@ -64,6 +68,24 @@ function parseIssues(content: string): UATIssue[] {
     const expectedMatch = body.match(/\*\*Expected:\*\*\s*([^\n]+)/);
     const actualMatch = body.match(/\*\*Actual:\*\*\s*([^\n]+)/);
     const featureMatch = body.match(/\*\*Feature:\*\*\s*([^\n]+)/);
+    const affectedFilesMatch = body.match(/\*\*Affected Files:\*\*\s*([^\n]+)/);
+
+    // Extract Full Error Output code block
+    const fullOutputMatch = body.match(/\*\*Full Error Output:\*\*\s*```[\s\S]*?```/);
+    let fullOutput: string | undefined;
+    if (fullOutputMatch) {
+      // Extract content between ``` markers
+      const codeBlockMatch = fullOutputMatch[0].match(/```\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        fullOutput = codeBlockMatch[1].trim();
+      }
+    }
+
+    // Parse affected files into array
+    let affectedFiles: string[] | undefined;
+    if (affectedFilesMatch) {
+      affectedFiles = affectedFilesMatch[1].trim().split(',').map(f => f.trim()).filter(Boolean);
+    }
 
     // Determine severity: prefer Severity field, fallback to Impact/Type mapping
     let severity = 'Unknown';
@@ -93,7 +115,9 @@ function parseIssues(content: string): UATIssue[] {
       description: descMatch ? descMatch[1].trim() : title,
       expected: expectedMatch ? expectedMatch[1].trim() : undefined,
       actual: actualMatch ? actualMatch[1].trim() : undefined,
-      feature: featureMatch ? featureMatch[1].trim() : undefined
+      feature: featureMatch ? featureMatch[1].trim() : undefined,
+      fullOutput,
+      affectedFiles
     });
   }
 
@@ -173,6 +197,16 @@ async function findIssuesFile(
 }
 
 /**
+ * Truncate error output for LLM prompt (keep it concise but useful)
+ */
+function truncateForPrompt(output: string, maxLength: number = 500): string {
+  if (output.length <= maxLength) {
+    return output;
+  }
+  return output.slice(0, maxLength) + '\n...[truncated]';
+}
+
+/**
  * Generate fix tasks using LLM
  */
 async function generateFixTasks(
@@ -192,13 +226,27 @@ async function generateFixTasks(
 
   const model = models[0];
 
-  const issuesText = issues.map(issue => `
+  const issuesText = issues.map(issue => {
+    let text = `
 ### ${issue.id}: ${issue.title}
 - Severity: ${issue.severity}
-- Description: ${issue.description}
-${issue.expected ? `- Expected: ${issue.expected}` : ''}
-${issue.actual ? `- Actual: ${issue.actual}` : ''}
-`).join('\n');
+- Description: ${issue.description}`;
+
+    if (issue.expected) {
+      text += `\n- Expected: ${issue.expected}`;
+    }
+    if (issue.actual) {
+      text += `\n- Actual: ${issue.actual}`;
+    }
+    if (issue.affectedFiles && issue.affectedFiles.length > 0) {
+      text += `\n- Affected Files: ${issue.affectedFiles.join(', ')}`;
+    }
+    if (issue.fullOutput) {
+      text += `\n- Error Output:\n\`\`\`\n${truncateForPrompt(issue.fullOutput)}\n\`\`\``;
+    }
+
+    return text;
+  }).join('\n');
 
   const prompt = `Generate fix tasks for the following UAT issues.
 
@@ -275,6 +323,26 @@ Output ONLY the task XML elements, no other text.`;
 }
 
 /**
+ * Detect error type from output for targeted fix guidance
+ */
+function detectErrorType(output: string): 'test' | 'typescript' | 'build' | 'runtime' | 'unknown' {
+  const lowerOutput = output.toLowerCase();
+  if (lowerOutput.includes('test failed') || lowerOutput.includes('expect(') || lowerOutput.includes('assertion')) {
+    return 'test';
+  }
+  if (lowerOutput.includes('error ts') || lowerOutput.includes('typescript')) {
+    return 'typescript';
+  }
+  if (lowerOutput.includes('build failed') || lowerOutput.includes('compilation')) {
+    return 'build';
+  }
+  if (lowerOutput.includes('typeerror') || lowerOutput.includes('referenceerror') || lowerOutput.includes('syntaxerror')) {
+    return 'runtime';
+  }
+  return 'unknown';
+}
+
+/**
  * Generate basic fix tasks without LLM
  * Creates actionable guidance based on issue fields
  */
@@ -297,29 +365,75 @@ function generateBasicFixTasks(issues: UATIssue[]): string {
     // Build actionable steps based on available fields
     const steps: string[] = [];
 
-    // Step 1: Investigation
-    if (issue.feature) {
-      steps.push(`1. Investigate the ${issue.feature} functionality`);
+    // Determine files to target
+    const targetFiles = issue.affectedFiles && issue.affectedFiles.length > 0
+      ? issue.affectedFiles.join(', ')
+      : 'the affected source files';
+
+    // Build error context section if we have fullOutput
+    let errorContext = '';
+    if (issue.fullOutput) {
+      const errorType = detectErrorType(issue.fullOutput);
+      const truncatedError = truncateForPrompt(issue.fullOutput, 300);
+
+      errorContext = `
+**Error output:**
+\`\`\`
+${truncatedError}
+\`\`\`
+
+`;
+
+      // Add error-type specific guidance
+      switch (errorType) {
+        case 'test':
+          steps.push('1. Review the test output above for the specific failing assertions');
+          steps.push('2. Open the test file and the source file being tested');
+          steps.push('3. Fix the implementation to match expected behavior, OR update test expectations if they were wrong');
+          break;
+        case 'typescript':
+          steps.push('1. Review the TypeScript errors shown above');
+          steps.push(`2. Open ${targetFiles} and fix the type errors`);
+          steps.push('3. Run npm run compile to verify all errors are fixed');
+          break;
+        case 'build':
+          steps.push('1. Review the build errors shown above');
+          steps.push('2. Resolve compilation/build configuration issues');
+          steps.push('3. Verify the build passes with npm run compile');
+          break;
+        case 'runtime':
+          steps.push('1. Review the runtime error and stack trace above');
+          steps.push(`2. Open ${targetFiles} and locate the error source`);
+          steps.push('3. Add null checks, fix type mismatches, or correct logic errors');
+          break;
+        default:
+          steps.push(`1. Review the error output above to identify the root cause`);
+          steps.push(`2. Open ${targetFiles}`);
+          steps.push('3. Fix the underlying issue based on the error message');
+      }
     } else {
-      steps.push(`1. Read the related PLAN.md to understand what was attempted`);
+      // No error output - use generic guidance
+      if (issue.feature) {
+        steps.push(`1. Investigate the ${issue.feature} functionality`);
+      } else {
+        steps.push(`1. Read the related PLAN.md to understand what was attempted`);
+      }
+
+      if (issue.actual && issue.expected) {
+        steps.push(`2. The issue: Currently "${issue.actual}" but should "${issue.expected}"`);
+      } else if (issue.description) {
+        steps.push(`2. Identify the root cause: ${issue.description}`);
+      }
+
+      if (issue.expected) {
+        steps.push(`3. Implement the fix to achieve: ${issue.expected}`);
+      } else {
+        steps.push(`3. Fix the underlying code to resolve the issue`);
+      }
     }
 
-    // Step 2: Identify the problem
-    if (issue.actual && issue.expected) {
-      steps.push(`2. The issue: Currently "${issue.actual}" but should "${issue.expected}"`);
-    } else if (issue.description) {
-      steps.push(`2. Identify the root cause: ${issue.description}`);
-    }
-
-    // Step 3: Implementation guidance
-    if (issue.expected) {
-      steps.push(`3. Implement the fix to achieve: ${issue.expected}`);
-    } else {
-      steps.push(`3. Fix the underlying code to resolve the issue`);
-    }
-
-    // Step 4: Verification
-    steps.push(`4. Test your fix by verifying the expected behavior works`);
+    // Step N: Verification
+    steps.push(`${steps.length + 1}. Test your fix by verifying the expected behavior works`);
 
     // Build verify instruction based on available fields
     let verifyInstruction = 'Test that the issue is resolved';
@@ -327,12 +441,19 @@ function generateBasicFixTasks(issues: UATIssue[]): string {
       verifyInstruction = `Verify that: ${issue.expected}`;
     } else if (issue.feature) {
       verifyInstruction = `Test the ${issue.feature} functionality works correctly`;
+    } else if (issue.fullOutput) {
+      verifyInstruction = 'Re-run the original command/test - it should now pass';
     }
 
+    // Build files section if we have affected files
+    const filesSection = issue.affectedFiles && issue.affectedFiles.length > 0
+      ? `\n  <files>${issue.affectedFiles.join(', ')}</files>`
+      : '';
+
     return `<task type="auto">
-  <name>Fix ${issue.id}: ${issue.title}</name>
+  <name>Fix ${issue.id}: ${issue.title}</name>${filesSection}
   <action>
-${steps.join('\n')}
+${errorContext}${steps.join('\n')}
 
 IMPORTANT: After fixing, stage ONLY the specific files you modified using 'git add <filename>' for each file.
 Do NOT use 'git add .' or stage files you didn't change.
