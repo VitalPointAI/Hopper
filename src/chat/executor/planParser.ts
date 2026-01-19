@@ -168,10 +168,15 @@ export function parseTasksXml(tasksSection: string): ExecutionTask[] {
       const verifyMatch = taskContent.match(/<verify>([\s\S]*?)<\/verify>/i);
       const doneMatch = taskContent.match(/<done>([\s\S]*?)<\/done>/i);
 
-      // Parse files - split by comma
+      // Parse files - split by comma and filter out placeholder text
       let files: string[] | undefined;
       if (filesMatch) {
-        files = filesMatch[1].trim().split(/,\s*/).filter(f => f.length > 0);
+        const parsed = filesMatch[1].trim().split(/,\s*/).filter(f =>
+          f.length > 0 &&
+          !f.startsWith('[') &&  // Filter out [Identify affected files...] placeholders
+          !f.startsWith('{')     // Filter out {template} variables
+        );
+        files = parsed.length > 0 ? parsed : undefined;
       }
 
       const autoTask: AutoExecutionTask = {
