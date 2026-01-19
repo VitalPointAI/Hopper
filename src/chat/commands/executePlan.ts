@@ -1466,7 +1466,18 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       try {
         // Build prompt for this task
-        const prompt = buildTaskPrompt(task, planContext, usedAgentMode, workspaceUri.fsPath);
+        let prompt = buildTaskPrompt(task, planContext, usedAgentMode, workspaceUri.fsPath);
+
+        // Check for stored execution context (from user pasting during execution)
+        const storedContext = getExecutionContext(ctx.extensionContext, planPath);
+        if (storedContext) {
+          // Append user-provided context to the prompt
+          prompt += `\n\n**User-provided context:**\n${storedContext}\n\nUse this information to inform your implementation.`;
+          // Clear after incorporating (one-time use)
+          await clearExecutionContext(ctx.extensionContext, planPath);
+          stream.markdown('*Using additional context from user...*\n\n');
+          logger.info(`Incorporated stored context for task ${task.id}`);
+        }
 
         // Get available tools from vscode.lm.tools
         const tools = vscode.lm.tools.filter(tool =>
