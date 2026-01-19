@@ -28,9 +28,11 @@ async function readFileContent(uri: vscode.Uri): Promise<string | undefined> {
 }
 
 /**
- * Parse issues from a UAT ISSUES.md file
+ * Parse issues from an ISSUES.md file.
+ * Handles both UAT issues (UAT-XXX format from verify-work) and
+ * execution issues (EXE-XX-YY-NN format from execute-plan failures).
  */
-function parseUATIssues(content: string): UATIssue[] {
+function parseIssues(content: string): UATIssue[] {
   const issues: UATIssue[] = [];
 
   // Find the Open Issues section
@@ -41,8 +43,10 @@ function parseUATIssues(content: string): UATIssue[] {
 
   const openContent = openSection[1];
 
-  // Match individual issue blocks starting with ### UAT-XXX
-  const issuePattern = /### (UAT-\d+):\s*([^\n]+)([\s\S]*?)(?=### UAT-\d+:|$)/g;
+  // Match individual issue blocks starting with ### UAT-XXX or ### EXE-XX-YY-NN
+  // UAT format: UAT-001, UAT-002, etc.
+  // EXE format: EXE-02-01-01, EXE-09-02-FIX-01, etc.
+  const issuePattern = /### ((?:UAT|EXE)-[\d-]+(?:-FIX)*(?:-\d+)?):\s*([^\n]+)([\s\S]*?)(?=### (?:UAT|EXE)-[\d-]+(?:-FIX)*(?:-\d+)?:|$)/g;
   let match;
 
   while ((match = issuePattern.exec(openContent)) !== null) {
@@ -50,17 +54,42 @@ function parseUATIssues(content: string): UATIssue[] {
     const title = match[2].trim();
     const body = match[3];
 
-    // Parse fields from body
+    // Parse fields from body - handle both UAT and EXE formats
+    // UAT uses: Severity, Description, Expected, Actual, Feature
+    // EXE uses: Type, Impact, Description
     const severityMatch = body.match(/\*\*Severity:\*\*\s*([^\n]+)/);
+    const typeMatch = body.match(/\*\*Type:\*\*\s*([^\n]+)/);
+    const impactMatch = body.match(/\*\*Impact:\*\*\s*([^\n]+)/);
     const descMatch = body.match(/\*\*Description:\*\*\s*([^\n]+)/);
     const expectedMatch = body.match(/\*\*Expected:\*\*\s*([^\n]+)/);
     const actualMatch = body.match(/\*\*Actual:\*\*\s*([^\n]+)/);
     const featureMatch = body.match(/\*\*Feature:\*\*\s*([^\n]+)/);
 
+    // Determine severity: prefer Severity field, fallback to Impact/Type mapping
+    let severity = 'Unknown';
+    if (severityMatch) {
+      severity = severityMatch[1].trim();
+    } else if (impactMatch) {
+      // Map Impact field to severity
+      const impact = impactMatch[1].trim().toLowerCase();
+      if (impact.includes('blocking') || impact.includes('blocker')) {
+        severity = 'Blocker';
+      } else if (impact.includes('major')) {
+        severity = 'Major';
+      } else if (impact.includes('minor')) {
+        severity = 'Minor';
+      } else {
+        severity = 'Major'; // Default for execution failures
+      }
+    } else if (typeMatch) {
+      // Map Type field to severity (execution failures are typically Major)
+      severity = 'Major';
+    }
+
     issues.push({
       id,
       title,
-      severity: severityMatch ? severityMatch[1].trim() : 'Unknown',
+      severity,
       description: descMatch ? descMatch[1].trim() : title,
       expected: expectedMatch ? expectedMatch[1].trim() : undefined,
       actual: actualMatch ? actualMatch[1].trim() : undefined,
@@ -302,7 +331,7 @@ export async function handlePlanFix(ctx: CommandContext): Promise<IHopperResult>
     return { metadata: { lastCommand: 'plan-fix' } };
   }
 
-  const issues = parseUATIssues(issuesContent);
+  const issues = parseIssues(issuesContent);
 
   if (issues.length === 0) {
     stream.markdown('## No Open Issues\n\n');
