@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 8 of 8 (Fix Improperly Built Functions)
-Plan: 3 of 3 complete (08-02 done)
+Plan: 4 of 4 complete (08-02-FIX done)
 Status: Complete
-Last activity: 2026-01-19 — Completed 08-02-PLAN.md
+Last activity: 2026-01-19 — Completed 08-02-FIX-PLAN.md
 
 Progress: ████████████████████ 100%
 
@@ -181,6 +181,9 @@ Recent decisions affecting current work:
 | 08-02 | LLM prompt with good/bad examples | Concrete examples guide better output quality |
 | 08-02 | Pause saves pausedAt timestamp | State persists without recording a test result |
 | 08-02 | Resume shows truncated prior results | Compact display with 60-char limit per item |
+| 08-02-FIX | Auth type determines expiresAt unit | Wallet uses nanoseconds, OAuth uses milliseconds |
+| 08-02-FIX | Button-based discuss-phase flow | Non-blocking UX matching verify-work pattern |
+| 08-02-FIX | Generate 3-5 questions upfront | All questions ready at start for button display |
 
 ### Deferred Issues
 
@@ -202,9 +205,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 08-02-PLAN.md (enhanced test instructions)
+Stopped at: Completed 08-02-FIX-PLAN.md (license check + discuss-phase UX)
 Resume file: None
-Next: Phase 8 complete - ready for next milestone or verification
+Next: Milestone 1 complete - all 8 phases done!
 
 ## Post-Milestone Enhancements
 
