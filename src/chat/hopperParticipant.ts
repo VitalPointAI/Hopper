@@ -3,6 +3,27 @@ import { LicenseValidator } from '../licensing/validator';
 import { getCommandHandler, IHopperResult, CommandContext } from './commands';
 import { getProjectContext, formatContextForPrompt } from './context/projectContext';
 import { getContextTracker } from '../context/contextTracker';
+import { getLogger } from '../logging';
+
+/**
+ * Patterns that indicate the user wants direct action, not advice or workflow redirection.
+ * These detect imperative requests like "fix this", "add a comment", "update the file", etc.
+ */
+const ACTION_INTENT_PATTERNS = [
+  /^(fix|update|change|modify|edit|add|remove|delete|create|refactor)\s/i,
+  /^(can you|please|could you)\s+(fix|update|change|add|remove|create)/i,
+  /^(make|do|run|execute|implement)\s/i,
+  /(fix this|do this|update this|change this)/i,
+  /you (missed|forgot|skipped|didn't)/i,
+];
+
+/**
+ * Detect if the user's prompt indicates they want direct action.
+ * Returns true for imperative requests, false for questions or general conversation.
+ */
+function detectActionIntent(prompt: string): boolean {
+  return ACTION_INTENT_PATTERNS.some(pattern => pattern.test(prompt.trim()));
+}
 
 /**
  * Create and register the @hopper chat participant
@@ -75,7 +96,14 @@ export function createHopperParticipant(
       return { metadata: { lastCommand: 'error' } };
     }
 
-    // No command - general chat assistance
+    // No command - check for action intent
+    const logger = getLogger();
+    const hasActionIntent = detectActionIntent(request.prompt);
+
+    if (hasActionIntent) {
+      logger.info(`Action intent detected: "${request.prompt.slice(0, 50)}..."`);
+    }
+
     // Build messages for the model with Hopper context
     const messages: vscode.LanguageModelChatMessage[] = [];
 
