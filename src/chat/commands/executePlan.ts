@@ -1409,6 +1409,9 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
               taskId: task.id,
               taskName: task.name,
               error: `Verify step failed: ${verifyCheck.reason}`,
+              fullOutput: executionResult.toolOutput,
+              verifyOutput: verifyCheck.reason,
+              files: task.files?.filter(Boolean),
               phase: plan.phase,
               planNumber: String(plan.planNumber).padStart(2, '0'),
               timestamp: new Date()
@@ -1490,11 +1493,14 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         // In yolo mode, auto-log failed tasks to ISSUES.md
         // (In guided/manual mode, user is aware of failures interactively)
         if (executionMode === 'yolo') {
+          // For exceptions, we use error message as fullOutput since there's no tool output
           const failure: TaskFailure = {
             planPath,
             taskId: task.id,
             taskName: task.name,
             error: errorMessage,
+            fullOutput: errorMessage,
+            files: task.files?.filter(Boolean),
             phase: plan.phase,
             planNumber: String(plan.planNumber).padStart(2, '0'),
             timestamp: new Date()
