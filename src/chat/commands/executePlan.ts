@@ -52,6 +52,54 @@ function isTransientError(error: string): boolean {
 }
 
 /**
+ * Patterns that indicate a verify step failure in tool output.
+ * These are command failures that appear in "successful" tool results.
+ */
+const VERIFY_FAILURE_PATTERNS = [
+  /npm error/i,
+  /npm ERR!/i,
+  /test failed/i,
+  /tests? failed/i,
+  /FAIL\s+/,
+  /Error:/,
+  /error TS\d+:/i,  // TypeScript errors
+  /build failed/i,
+  /compilation failed/i,
+  /exit code [1-9]/i,
+  /non-zero exit/i,
+  /command failed/i,
+  /ENOENT/i,  // File not found
+  /Cannot find module/i,
+  /SyntaxError/i,
+  /TypeError/i,
+  /ReferenceError/i,
+];
+
+/**
+ * Detect if tool output indicates a verify step failure.
+ * Returns failure info if patterns match, otherwise indicates success.
+ */
+function detectVerifyFailure(toolOutput: string): { failed: boolean; reason?: string } {
+  for (const pattern of VERIFY_FAILURE_PATTERNS) {
+    const match = toolOutput.match(pattern);
+    if (match) {
+      // Extract a meaningful snippet around the match
+      const matchIndex = toolOutput.indexOf(match[0]);
+      const snippetStart = Math.max(0, matchIndex - 20);
+      const snippetEnd = Math.min(toolOutput.length, matchIndex + match[0].length + 80);
+      const snippet = toolOutput.slice(snippetStart, snippetEnd).trim();
+
+      return {
+        failed: true,
+        reason: snippet.length > 100 ? snippet.slice(0, 100) + '...' : snippet
+      };
+    }
+  }
+
+  return { failed: false };
+}
+
+/**
  * Format a tool invocation message with contextual information.
  * Provides user-friendly descriptions for file and directory operations.
  */
@@ -187,6 +235,7 @@ function formatToolMessage(toolName: string, input: Record<string, unknown>, wor
  * @param token Cancellation token
  * @param toolInvocationToken Token from chat request for proper UI integration (required for file operations)
  * @param workspaceRoot Optional workspace root for relative path formatting
+ * @returns Object containing concatenated tool output text for verification analysis
  */
 async function executeWithTools(
   model: vscode.LanguageModelChat,
@@ -196,10 +245,13 @@ async function executeWithTools(
   token: vscode.CancellationToken,
   toolInvocationToken?: vscode.ChatParticipantToolToken,
   workspaceRoot?: string
-): Promise<void> {
+): Promise<{ toolOutput: string }> {
   // Allow up to 50 tool iterations per task - complex tasks may need many operations
   const MAX_ITERATIONS = 50;
   let iteration = 0;
+
+  // Accumulate tool output text for verify failure detection
+  const toolOutputParts: string[] = [];
 
   while (iteration < MAX_ITERATIONS && !token.isCancellationRequested) {
     iteration++;
@@ -296,15 +348,25 @@ async function executeWithTools(
             new vscode.LanguageModelToolResultPart(part.callId, toolResult.content)
           );
 
+          // Capture tool output text for verify failure detection
+          for (const contentPart of toolResult.content) {
+            if (contentPart instanceof vscode.LanguageModelTextPart) {
+              toolOutputParts.push(contentPart.value);
+            }
+          }
+
           stream.markdown(`${toolMsg.complete}\n\n`);
         } else {
-          // Report error
+          // Report error - also capture for verify failure detection
+          const errorText = `Error: ${lastError || 'Unknown error'}`;
+          toolOutputParts.push(errorText);
+
           stream.markdown(`**Failed:** ${part.name} - ${lastError || 'Unknown error'}\n\n`);
 
           toolResults.push(
             new vscode.LanguageModelToolResultPart(
               part.callId,
-              [new vscode.LanguageModelTextPart(`Error: ${lastError || 'Unknown error'}`)]
+              [new vscode.LanguageModelTextPart(errorText)]
             )
           );
         }
@@ -331,6 +393,9 @@ async function executeWithTools(
     stream.markdown('- Use **/verify-work** to check what was completed\n');
     stream.markdown('- Check the task manually and mark it complete if done\n\n');
   }
+
+  // Return accumulated tool output for verify failure detection
+  return { toolOutput: toolOutputParts.join('\n') };
 }
 
 /**
@@ -1288,7 +1353,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         // Execute with manual tool orchestration
         stream.markdown('**Agent executing...**\n\n');
 
-        await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken, workspaceUri.fsPath);
+        const executionResult = await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken, workspaceUri.fsPath);
 
         stream.markdown('\n\n');
 
@@ -1298,6 +1363,40 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         }
         if (task.done) {
           stream.markdown(`**Done when:** ${task.done}\n\n`);
+        }
+
+        // Check for verify step failures in tool output
+        const verifyCheck = detectVerifyFailure(executionResult.toolOutput);
+
+        if (verifyCheck.failed) {
+          // Do NOT mark as completed - verify step failed
+          logger.warn(`Task ${task.id} verify failed: ${verifyCheck.reason}`);
+          stream.markdown(`**Verify failed:** ${verifyCheck.reason}\n\n`);
+          stream.markdown(`**Status:** Task ${task.id}/${plan.tasks.length} FAILED (verify step)\n\n`);
+
+          // In yolo mode, auto-log issue
+          if (executionMode === 'yolo') {
+            const failure: TaskFailure = {
+              planPath,
+              taskId: task.id,
+              taskName: task.name,
+              error: `Verify step failed: ${verifyCheck.reason}`,
+              phase: plan.phase,
+              timestamp: new Date()
+            };
+
+            const logResult = await logTaskFailure(workspaceUri, failure);
+            if (logResult.success && logResult.issueId) {
+              logger.warn(`Issue logged: ${logResult.issueId}`);
+              stream.markdown(`*Issue logged: ${logResult.issueId}*\n\n`);
+            } else if (logResult.error) {
+              logger.warn(`Failed to log issue: ${logResult.error}`);
+            }
+          }
+
+          stream.markdown('---\n\n');
+          results.push({ taskId: task.id, success: false, name: task.name });
+          continue;
         }
 
         stream.markdown(`**Status:** Task ${task.id}/${plan.tasks.length} completed\n\n`);
