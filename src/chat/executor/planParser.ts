@@ -293,12 +293,15 @@ export function parsePlanMd(content: string): ExecutionPlan | null {
       ? parseSuccessCriteria(successCriteriaSection)
       : [];
 
-    // Parse plan number from frontmatter
+    // Parse plan number from frontmatter (numeric portion)
     const planNumber = parseInt(frontmatter.plan, 10) || 1;
+    // Store raw plan value to preserve FIX suffixes (e.g., "02-FIX-FIX")
+    const rawPlan = frontmatter.plan || String(planNumber);
 
     return {
       phase: frontmatter.phase,
       planNumber,
+      rawPlan,
       objective,
       purpose,
       tasks,

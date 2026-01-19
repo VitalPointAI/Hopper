@@ -131,6 +131,8 @@ export interface ExecutionPlan {
   phase: string;
   /** Plan number within phase */
   planNumber: number;
+  /** Raw plan value from frontmatter (e.g., "02-FIX-FIX" for FIX plans, "02" for regular plans) */
+  rawPlan: string;
   /** Plan objective */
   objective: string;
   /** Why this plan matters */

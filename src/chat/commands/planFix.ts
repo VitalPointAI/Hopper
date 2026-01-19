@@ -73,19 +73,21 @@ function parseUATIssues(content: string): UATIssue[] {
 
 /**
  * Find ISSUES.md file for a plan
+ * Handles both regular plans (e.g., "04-02") and FIX plans (e.g., "09-02-FIX-FIX")
  */
 async function findIssuesFile(
   planningUri: vscode.Uri,
   planArg: string
 ): Promise<{ uri: vscode.Uri; phase: string; plan: string; phaseDir: string } | null> {
-  // Parse plan argument (e.g., "04-02" or "05.1-03")
-  const planMatch = planArg.match(/^(\d+(?:\.\d+)?)-(\d+)/);
+  // Parse plan argument - capture phase and full plan name (including FIX suffixes)
+  // Examples: "04-02", "05.1-03", "09-02-FIX", "09-02-FIX-FIX"
+  const planMatch = planArg.match(/^(\d+(?:\.\d+)?)-(.+)$/);
   if (!planMatch) {
     return null;
   }
 
   const phase = planMatch[1];
-  const plan = planMatch[2];
+  const plan = planMatch[2]; // Full plan name including FIX suffixes
 
   try {
     // Search for matching ISSUES.md in phases
@@ -102,22 +104,34 @@ async function findIssuesFile(
       const phaseDir = vscode.Uri.joinPath(phasesUri, phaseName);
       const files = await vscode.workspace.fs.readDirectory(phaseDir);
 
-      // Look for matching ISSUES.md
-      const issuesFileName = `${phase}-${plan.padStart(2, '0')}-ISSUES.md`;
+      // Build expected ISSUES.md filename
+      // For "02-FIX-FIX" -> "09-02-FIX-FIX-ISSUES.md"
+      // For "02" -> "09-02-ISSUES.md"
+      const issuesFileName = `${phase}-${plan}-ISSUES.md`;
+
       for (const [fileName] of files) {
-        if (fileName === issuesFileName || fileName.endsWith('-ISSUES.md')) {
-          // Verify it matches the plan
-          const fileMatch = fileName.match(/^(\d+(?:\.\d+)?)-(\d+)-ISSUES\.md$/);
-          if (fileMatch) {
-            const [, filePhase, filePlan] = fileMatch;
-            if (filePhase === phase && filePlan === plan) {
-              return {
-                uri: vscode.Uri.joinPath(phaseDir, fileName),
-                phase,
-                plan,
-                phaseDir: phaseName
-              };
-            }
+        // Direct match is preferred
+        if (fileName === issuesFileName) {
+          return {
+            uri: vscode.Uri.joinPath(phaseDir, fileName),
+            phase,
+            plan,
+            phaseDir: phaseName
+          };
+        }
+      }
+
+      // Also check for padded numeric plan (backwards compatibility for "02" -> "09-02-ISSUES.md")
+      if (!plan.includes('-')) {
+        const paddedIssuesFileName = `${phase}-${plan.padStart(2, '0')}-ISSUES.md`;
+        for (const [fileName] of files) {
+          if (fileName === paddedIssuesFileName) {
+            return {
+              uri: vscode.Uri.joinPath(phaseDir, fileName),
+              phase,
+              plan: plan.padStart(2, '0'),
+              phaseDir: phaseName
+            };
           }
         }
       }

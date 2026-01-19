@@ -1698,10 +1698,10 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
     // Failure flow: Plan Fix is primary action
     stream.markdown('Some tasks failed during execution.\n\n');
 
-    // Construct plan identifier (e.g., "09-02" from phase "09-useability-and-skills" and planNumber "02")
+    // Construct plan identifier using rawPlan to preserve FIX suffixes
+    // e.g., phase "09-useability-and-skills" + rawPlan "02-FIX-FIX" -> "09-02-FIX-FIX"
     const phaseNum = plan.phase.match(/^(\d+)/)?.[1] || '00';
-    const planNum = String(plan.planNumber).padStart(2, '0');
-    const planIdentifier = `${phaseNum}-${planNum}`;
+    const planIdentifier = `${phaseNum}-${plan.rawPlan}`;
 
     stream.markdown('1. **Plan fixes** to address the failed tasks\n');
     stream.button({
