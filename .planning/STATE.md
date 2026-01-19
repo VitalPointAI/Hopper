@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 11 of 11 (Log Paste Context)
-Plan: 1 of 1 + FIX
-Status: Phase complete (with fix)
-Last activity: 2026-01-19 — Completed 11-01-FIX-PLAN.md
+Plan: 1 of 1 + FIX + FIX-FIX
+Status: Phase complete (with fixes)
+Last activity: 2026-01-19 — Completed 11-01-FIX-FIX-PLAN.md
 
 Progress: ██████████████████████ 100% (11 of 11 phases complete)
 
@@ -210,6 +210,7 @@ Recent decisions affecting current work:
 | 09-03 | Max 20 iterations for action tool loop | Sufficient for most direct actions |
 | 11-01-FIX | 5-minute window for cancelled execution resume | Balances convenience with stale state cleanup |
 | 11-01-FIX | Auto-resume on non-command input after cancel | Simplest UX for context injection |
+| 11-01-FIX-FIX | Immediate cancellation check after executeWithTools | Shows guidance immediately when Stop clicked mid-task |
 
 ### Deferred Issues
 
