@@ -121,6 +121,10 @@ export interface ExecutionState {
   checkpointType?: 'human-verify' | 'decision';
   /** Timestamp when state was saved */
   savedAt: number;
+  /** Whether execution is actively running (not just paused at checkpoint) */
+  activelyExecuting?: boolean;
+  /** Timestamp of last activity during active execution (for stale detection) */
+  lastActivityTimestamp?: number;
 }
 
 /**

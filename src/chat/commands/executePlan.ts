@@ -460,6 +460,113 @@ async function clearExecutionState(
 }
 
 /**
+ * Key for tracking the currently active execution
+ */
+const ACTIVE_EXECUTION_KEY = 'hopper.activeExecution';
+
+/**
+ * Active execution info stored in globalState
+ */
+interface ActiveExecutionInfo {
+  planPath: string;
+  taskIndex: number;
+  lastActivityTimestamp: number;
+}
+
+/**
+ * Mark execution as actively running.
+ * Called at the start of task execution loop.
+ */
+export async function setActiveExecution(
+  context: vscode.ExtensionContext,
+  planPath: string,
+  taskIndex: number
+): Promise<void> {
+  const info: ActiveExecutionInfo = {
+    planPath,
+    taskIndex,
+    lastActivityTimestamp: Date.now()
+  };
+  await context.globalState.update(ACTIVE_EXECUTION_KEY, info);
+}
+
+/**
+ * Update the activity timestamp for active execution.
+ * Called during tool calls to keep state fresh.
+ */
+export async function updateActiveExecutionTimestamp(
+  context: vscode.ExtensionContext
+): Promise<void> {
+  const existing = context.globalState.get<ActiveExecutionInfo>(ACTIVE_EXECUTION_KEY);
+  if (existing) {
+    existing.lastActivityTimestamp = Date.now();
+    await context.globalState.update(ACTIVE_EXECUTION_KEY, existing);
+  }
+}
+
+/**
+ * Clear active execution state.
+ * Called when execution completes, is cancelled, or errors.
+ */
+export async function clearActiveExecution(
+  context: vscode.ExtensionContext
+): Promise<void> {
+  await context.globalState.update(ACTIVE_EXECUTION_KEY, undefined);
+}
+
+/**
+ * Get active execution info if any.
+ * Returns undefined if no execution is active or if execution is stale.
+ */
+export function getActiveExecution(
+  context: vscode.ExtensionContext
+): ActiveExecutionInfo | undefined {
+  return context.globalState.get<ActiveExecutionInfo>(ACTIVE_EXECUTION_KEY);
+}
+
+/**
+ * Key for storing mid-execution context from user pastes
+ */
+function getExecutionContextKey(planPath: string): string {
+  return `hopper.executionContext.${planPath}`;
+}
+
+/**
+ * Store context pasted by user during execution.
+ * Will be picked up by the next task execution iteration.
+ */
+export async function storeExecutionContext(
+  context: vscode.ExtensionContext,
+  planPath: string,
+  content: string
+): Promise<void> {
+  const key = getExecutionContextKey(planPath);
+  await context.globalState.update(key, content);
+}
+
+/**
+ * Get stored execution context if any.
+ */
+export function getExecutionContext(
+  context: vscode.ExtensionContext,
+  planPath: string
+): string | undefined {
+  const key = getExecutionContextKey(planPath);
+  return context.globalState.get<string>(key);
+}
+
+/**
+ * Clear stored execution context after it's been used.
+ */
+export async function clearExecutionContext(
+  context: vscode.ExtensionContext,
+  planPath: string
+): Promise<void> {
+  const key = getExecutionContextKey(planPath);
+  await context.globalState.update(key, undefined);
+}
+
+/**
  * Type guard to check if a task is an auto task
  */
 function isAutoTask(task: ExecutionTask): task is AutoExecutionTask {
@@ -1218,8 +1325,14 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
   // Execute tasks sequentially starting from startTaskIndex
   for (let i = startTaskIndex; i < plan.tasks.length; i++) {
+    // Mark execution as active for this task (enables mid-execution context detection)
+    await setActiveExecution(ctx.extensionContext, planPath, i);
+
     // Check for cancellation before each task
     if (token.isCancellationRequested) {
+      // Clear active execution state on cancellation
+      await clearActiveExecution(ctx.extensionContext);
+
       stream.markdown('\n\n---\n\n');
       stream.markdown('## Execution Cancelled\n\n');
       stream.markdown(`Completed ${results.filter(r => r.success).length} of ${plan.tasks.length} tasks before cancellation.\n\n`);
@@ -1523,6 +1636,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
   // Clear execution state on completion
   await clearExecutionState(ctx.extensionContext, planPath);
+  await clearActiveExecution(ctx.extensionContext);
 
   // Gather decisions made during execution
   const decisionsFromState = existingState?.decisions || {};
