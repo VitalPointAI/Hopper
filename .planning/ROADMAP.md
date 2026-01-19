@@ -29,6 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Security Review** - Security audit and hardening
 - [x] **Phase 7: Planning Depth** - User-selectable planning depth and execution control modes
 - [x] **Phase 8: Fix Improperly Built Functions** - Fix functions that were not built correctly
+- [ ] **Phase 9: Useability and Skills** - Useability improvements and skills system
 
 ## Phase Details
 
@@ -189,10 +190,21 @@ Plans:
 - [x] 08-02-FIX: Fix license check and discuss-phase button-based UX
 - [x] 08-02-FIX-FIX: Fix UAT issues (output channel, cache clearing, numbered buttons)
 
+### Phase 9: Useability and Skills
+**Goal**: Observable execution with visible logging, automatic error recovery, and responsive user input handling
+**Depends on**: Phase 8
+**Research**: Unlikely (internal patterns)
+**Plans**: 3
+
+Plans:
+- [ ] 09-01: Output channel logging and error visibility
+- [ ] 09-02: Auto-retry for transient failures and auto-issue creation
+- [ ] 09-03: User input responsiveness (direct action execution)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5 → 5.1 → 6 → 7
+Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 → 3 → 4 → 5 → 5.1 → 6 → 7 → 8 → 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -209,3 +221,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 6. Security Review | 4/4 | Complete | 2026-01-18 |
 | 7. Planning Depth | 4/4 | Complete | 2026-01-18 |
 | 8. Fix Improperly Built Functions | 5/5 | Complete | 2026-01-19 |
+| 9. Useability and Skills | 0/3 | Not Started | - |
