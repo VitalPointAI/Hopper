@@ -198,8 +198,9 @@ async function findIssuesFile(
 
 /**
  * Truncate error output for LLM prompt (keep it concise but useful)
+ * Default 800 chars gives room for file paths while staying manageable
  */
-function truncateForPrompt(output: string, maxLength: number = 500): string {
+function truncateForPrompt(output: string, maxLength: number = 800): string {
   if (output.length <= maxLength) {
     return output;
   }
@@ -374,7 +375,7 @@ function generateBasicFixTasks(issues: UATIssue[]): string {
     let errorContext = '';
     if (issue.fullOutput) {
       const errorType = detectErrorType(issue.fullOutput);
-      const truncatedError = truncateForPrompt(issue.fullOutput, 300);
+      const truncatedError = truncateForPrompt(issue.fullOutput, 500);
 
       errorContext = `
 **Error output:**
