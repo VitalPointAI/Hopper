@@ -1580,6 +1580,31 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
         const executionResult = await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken, workspaceUri.fsPath);
 
+        // Check for cancellation immediately after tool execution
+        if (token.isCancellationRequested) {
+          // Save cancelled execution state for potential resume with context
+          await saveCancelledExecution(ctx.extensionContext, planPath, i);
+
+          // Clear active execution state
+          await clearActiveExecution(ctx.extensionContext);
+
+          stream.markdown('\n\n---\n\n');
+          stream.markdown('## Execution Paused\n\n');
+          stream.markdown(`Completed ${results.filter(r => r.success).length} of ${plan.tasks.length} tasks.\n\n`);
+          stream.markdown(`**Paused during:** Task ${i + 1} (${task.name})\n\n`);
+
+          for (const result of results) {
+            stream.markdown(`- **Task ${result.taskId}:** ${result.name} - ${result.success ? 'Completed' : 'Failed'}\n`);
+          }
+
+          stream.markdown('\n---\n\n');
+          stream.markdown('**Need to add context?** Paste your information and send it.\n');
+          stream.markdown('I\'ll resume execution with your context incorporated.\n\n');
+          stream.markdown('*This option is available for 5 minutes.*\n');
+
+          return { metadata: { lastCommand: 'execute-plan' } };
+        }
+
         stream.markdown('\n\n');
 
         // Show verification criteria after task execution
