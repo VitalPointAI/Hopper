@@ -80,13 +80,19 @@ function displayQuestionWithButtons(
   stream.markdown(`**${question.question}**\n\n`);
   stream.markdown(`*${question.context}*\n\n`);
 
-  // Show interpretation options as buttons
-  question.interpretationOptions.forEach((option) => {
-    const truncatedOption = option.length > 45 ? option.substring(0, 42) + '...' : option;
+  // Show full option text as numbered markdown list
+  stream.markdown('**Options:**\n\n');
+  question.interpretationOptions.forEach((option, idx) => {
+    stream.markdown(`${idx + 1}. ${option}\n`);
+  });
+  stream.markdown('\n');
+
+  // Show short numbered buttons that correspond to the options above
+  question.interpretationOptions.forEach((option, idx) => {
     stream.button({
       command: 'hopper.discussPhaseResponse',
       arguments: [phaseNum, questionIndex, option],
-      title: truncatedOption
+      title: String(idx + 1)
     });
     stream.markdown(' ');
   });
@@ -97,15 +103,15 @@ function displayQuestionWithButtons(
     arguments: [phaseNum, questionIndex],
     title: 'Other...'
   });
+  stream.markdown(' ');
 
-  stream.markdown('\n\n');
   stream.button({
     command: 'hopper.discussPhasePause',
     arguments: [phaseNum],
     title: '⏸ Pause'
   });
   stream.markdown('\n\n');
-  stream.markdown('*Type in chat anytime to provide custom input. Buttons remain active.*\n\n');
+  stream.markdown('*Click a number to select that option, or type in chat for custom input.*\n\n');
 }
 
 /**
