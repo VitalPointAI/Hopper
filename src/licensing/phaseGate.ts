@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { LicenseValidator } from './validator';
 import { UpgradeModalPanel } from './upgradeModal';
+import { log, logError } from '../logging';
 
 /**
  * Options for checkPhaseAccess behavior
@@ -60,7 +61,7 @@ export async function checkPhaseAccess(
   const authSession = validator.getSession();
   if (!authSession) {
     // This shouldn't happen if isAuthenticated() is true, but handle it
-    console.error('Authenticated but no session');
+    logError('license', 'Authenticated but no session');
     return false;
   }
 
@@ -69,7 +70,7 @@ export async function checkPhaseAccess(
 
   // Check license status
   const status = await validator.checkLicense();
-  console.log('[checkPhaseAccess] License status:', status);
+  log('license', 'checkPhaseAccess license status', status);
 
   if (!status) {
     // Not authenticated (shouldn't reach here)
@@ -92,7 +93,13 @@ export async function checkPhaseAccess(
         expiresAtMs = status.expiresAt;
       }
     }
-    console.log('[checkPhaseAccess] Auth type:', authType, 'expiresAt raw:', status.expiresAt, 'expiresAtMs:', expiresAtMs, 'now:', Date.now());
+    log('license', 'checkPhaseAccess expiry check', {
+      authType,
+      expiresAtRaw: status.expiresAt,
+      expiresAtMs,
+      now: Date.now(),
+      isExpired: expiresAtMs ? expiresAtMs < Date.now() : false
+    });
 
     if (expiresAtMs && expiresAtMs < Date.now()) {
       // License expired - clear cache and recheck
@@ -168,9 +175,9 @@ export async function connect(validator: LicenseValidator): Promise<void> {
  * Disconnect / logout (unified disconnect)
  */
 export async function disconnect(validator: LicenseValidator): Promise<void> {
-  console.log('[disconnect] Before logout - isAuthenticated:', validator.isAuthenticated());
+  log('license', 'disconnect - before logout', { isAuthenticated: validator.isAuthenticated() });
   await validator.logout();
-  console.log('[disconnect] After logout - isAuthenticated:', validator.isAuthenticated());
+  log('license', 'disconnect - after logout', { isAuthenticated: validator.isAuthenticated() });
   vscode.window.showInformationMessage('Signed out successfully');
 }
 

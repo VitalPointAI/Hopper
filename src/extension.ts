@@ -10,6 +10,7 @@ import { AuthType, AuthProvider } from './licensing/types';
 import { registerFileTools } from './tools/fileTools';
 import { registerTerminalTools } from './tools/terminalTools';
 import { registerContextTracker } from './context/contextTracker';
+import { initLogging, log } from './logging';
 
 // Export license validator for use by chat participant
 let licenseValidator: LicenseValidator | undefined;
@@ -19,7 +20,10 @@ let licenseValidator: LicenseValidator | undefined;
  * @param context - The extension context provided by VSCode
  */
 export function activate(context: vscode.ExtensionContext): void {
-  console.log('Hopper extension activated');
+  // Initialize logging first (creates "Hopper" output channel)
+  const outputChannel = initLogging();
+  context.subscriptions.push(outputChannel);
+  log('extension', 'Hopper extension activated');
 
   // Track activation telemetry (async, non-blocking)
   trackActivation(context).catch(() => {

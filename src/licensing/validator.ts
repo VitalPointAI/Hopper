@@ -3,6 +3,7 @@ import { LicenseConfig, LicenseStatus, DEFAULT_LICENSE_CONFIG, NEAR_RPC_URLS, Au
 import { viewIsLicensed, viewGetExpiry } from './nearRpc';
 import { AuthManager } from './authManager';
 import { trackLogin, trackUpgrade } from '../telemetry/telemetryService';
+import { log, logError } from '../logging';
 
 /**
  * License validator with caching support and dual authentication
@@ -107,11 +108,11 @@ export class LicenseValidator {
     // Must be authenticated first
     const session = this.authManager.getSession();
     if (!session || !this.authManager.isAuthenticated()) {
-      console.log('[checkLicense] Failed: not authenticated');
+      log('license', 'checkLicense failed: not authenticated');
       return null;
     }
 
-    console.log('[checkLicense] Session:', {
+    log('license', 'checkLicense session', {
       userId: session.userId,
       authType: session.authType,
       hasToken: !!session.token
@@ -136,17 +137,19 @@ export class LicenseValidator {
     const now = Date.now();
 
     if (cached && (now - cached.cachedAt) < this.config.cacheTtlMs) {
-      console.log(`License cache hit for ${accountId}`);
+      log('license', `Cache hit for ${accountId}`, { isLicensed: cached.isLicensed, expiresAt: cached.expiresAt });
       return cached;
     }
 
-    console.log(`License cache miss for ${accountId}, checking contract...`);
+    log('license', `Cache miss for ${accountId}, checking contract at ${this.config.contractId}...`);
 
     // Fetch fresh status from contract
     const [isLicensed, expiresAt] = await Promise.all([
       viewIsLicensed(accountId, this.config),
       viewGetExpiry(accountId, this.config),
     ]);
+
+    log('license', `Contract response for ${accountId}`, { isLicensed, expiresAt });
 
     const status: LicenseStatus = {
       isLicensed,
@@ -179,11 +182,11 @@ export class LicenseValidator {
     const now = Date.now();
 
     if (cached && (now - cached.cachedAt) < this.config.cacheTtlMs) {
-      console.log(`License cache hit for ${session.userId}`);
+      log('license', `Cache hit for ${session.userId}`, { isLicensed: cached.isLicensed, expiresAt: cached.expiresAt });
       return cached;
     }
 
-    console.log(`License cache miss for ${session.userId}, checking API...`);
+    log('license', `Cache miss for ${session.userId}, checking API at ${apiUrl}...`);
 
     try {
       const response = await fetch(`${apiUrl}/api/license/check`, {
@@ -198,7 +201,7 @@ export class LicenseValidator {
       }
 
       const data = await response.json() as { isLicensed: boolean; expiresAt: number | null };
-      console.log('[checkLicenseOnApi] Response:', data);
+      log('license', 'API response', data);
       const status: LicenseStatus = {
         isLicensed: data.isLicensed,
         expiresAt: data.expiresAt,
@@ -217,7 +220,7 @@ export class LicenseValidator {
 
       return status;
     } catch (error) {
-      console.error('OAuth license check failed:', error);
+      logError('license', 'OAuth license check failed', error);
       return { isLicensed: false, expiresAt: null, cachedAt: now };
     }
   }
@@ -236,11 +239,11 @@ export class LicenseValidator {
     const now = Date.now();
 
     if (cached && (now - cached.cachedAt) < this.config.cacheTtlMs) {
-      console.log(`License cache hit for ${walletAddress}`);
+      log('license', `Cache hit for ${walletAddress}`, { isLicensed: cached.isLicensed, expiresAt: cached.expiresAt });
       return cached;
     }
 
-    console.log(`License cache miss for ${walletAddress}, checking NEAR contract...`);
+    log('license', `Cache miss for ${walletAddress}, checking NEAR contract...`);
 
     // Fetch fresh status from NEAR contract
     // The contract now accepts any wallet address string
@@ -269,7 +272,7 @@ export class LicenseValidator {
    */
   clearCache(nearAccountId: string): void {
     this.licenseCache.delete(nearAccountId);
-    console.log(`License cache cleared for ${nearAccountId}`);
+    log('license', `Cache cleared for ${nearAccountId}`);
   }
 
   /**
@@ -277,7 +280,7 @@ export class LicenseValidator {
    */
   clearAllCache(): void {
     this.licenseCache.clear();
-    console.log('License cache cleared for all accounts');
+    log('license', 'Cache cleared for all accounts');
   }
 
   /**

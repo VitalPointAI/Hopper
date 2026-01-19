@@ -1,4 +1,5 @@
 import { LicenseConfig } from './types';
+import { log, logError } from '../logging';
 
 /**
  * NEAR RPC response structure
@@ -64,25 +65,27 @@ async function callViewFunction<T>(
     });
 
     if (!response.ok) {
-      console.error(`NEAR RPC request failed: ${response.status} ${response.statusText}`);
+      logError('rpc', `NEAR RPC request failed: ${response.status} ${response.statusText}`);
       return null;
     }
 
     const data = (await response.json()) as NearRpcResponse;
 
     if (data.error) {
-      console.error(`NEAR RPC error: ${data.error.message}`);
+      logError('rpc', `NEAR RPC error: ${data.error.message}`);
       return null;
     }
 
     if (!data.result?.result) {
-      console.error('NEAR RPC: No result in response');
+      logError('rpc', 'NEAR RPC: No result in response');
       return null;
     }
 
-    return decodeResult<T>(data.result.result);
+    const decoded = decodeResult<T>(data.result.result);
+    log('rpc', `${methodName} response`, { args, result: decoded });
+    return decoded;
   } catch (error) {
-    console.error('NEAR RPC call failed:', error);
+    logError('rpc', `NEAR RPC call ${methodName} failed`, error);
     return null;
   }
 }
