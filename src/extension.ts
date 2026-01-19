@@ -569,7 +569,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register URI handler for auth callbacks (both OAuth and wallet)
   const uriHandler = vscode.window.registerUriHandler({
     handleUri: async (uri: vscode.Uri) => {
-      console.log('Received URI callback:', uri.toString());
+      log('auth', 'Received URI callback:', uri.toString());
 
       if (uri.path === '/auth-callback') {
         // Parse query parameters
@@ -635,7 +635,12 @@ export function activate(context: vscode.ExtensionContext): void {
           }
 
           if (success) {
-            // Refresh license status after authentication
+            // Clear cache for this user to ensure fresh license check
+            // Cache may have stale "unlicensed" data from before auth or purchase
+            if (userId) {
+              licenseValidator.clearCache(userId);
+            }
+            // Now check fresh license status
             await licenseValidator.checkLicense();
 
             // Check for pending payment to resume
