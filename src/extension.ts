@@ -507,6 +507,61 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   context.subscriptions.push(verifyWorkSeverityCommand);
 
+  // Register discussPhaseResponse command for discuss-phase button clicks
+  const discussPhaseResponseCommand = vscode.commands.registerCommand(
+    'hopper.discussPhaseResponse',
+    async (phaseNum: number, questionIndex: number, selectedOption: string) => {
+      const { handleDiscussPhaseResponse } = await import('./chat/commands/discussPhase.js');
+      const response = await handleDiscussPhaseResponse(context, phaseNum, questionIndex, selectedOption);
+
+      vscode.window.showInformationMessage(response.message);
+
+      // Continue via chat to show next question or summary
+      await vscode.commands.executeCommand('workbench.action.chat.open', {
+        query: '@hopper /discuss-phase ' + phaseNum
+      });
+    }
+  );
+  context.subscriptions.push(discussPhaseResponseCommand);
+
+  // Register discussPhaseOther command for custom input option
+  const discussPhaseOtherCommand = vscode.commands.registerCommand(
+    'hopper.discussPhaseOther',
+    async (phaseNum: number, questionIndex: number) => {
+      const customInput = await vscode.window.showInputBox({
+        title: 'Custom Response',
+        prompt: 'Share your thoughts on this question',
+        placeHolder: 'Type your response...',
+        ignoreFocusOut: true
+      });
+
+      if (customInput) {
+        const { handleDiscussPhaseResponse } = await import('./chat/commands/discussPhase.js');
+        const response = await handleDiscussPhaseResponse(context, phaseNum, questionIndex, undefined, customInput);
+
+        vscode.window.showInformationMessage(response.message);
+
+        // Continue via chat
+        await vscode.commands.executeCommand('workbench.action.chat.open', {
+          query: '@hopper /discuss-phase ' + phaseNum
+        });
+      }
+    }
+  );
+  context.subscriptions.push(discussPhaseOtherCommand);
+
+  // Register discussPhasePause command for pausing discussion
+  const discussPhasePauseCommand = vscode.commands.registerCommand(
+    'hopper.discussPhasePause',
+    async (phaseNum: number) => {
+      const { handleDiscussPhasePause } = await import('./chat/commands/discussPhase.js');
+      const response = await handleDiscussPhasePause(context, phaseNum);
+
+      vscode.window.showInformationMessage(response.message);
+    }
+  );
+  context.subscriptions.push(discussPhasePauseCommand);
+
   // Register URI handler for auth callbacks (both OAuth and wallet)
   const uriHandler = vscode.window.registerUriHandler({
     handleUri: async (uri: vscode.Uri) => {

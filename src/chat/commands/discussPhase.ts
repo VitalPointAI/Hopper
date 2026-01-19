@@ -2,7 +2,155 @@ import * as vscode from 'vscode';
 import { CommandContext, IHopperResult } from './types';
 
 /**
- * System prompt for initial phase vision question
+ * Discussion state for persistence and resume capability
+ */
+interface DiscussionState {
+  phaseNum: number;
+  phaseName: string;
+  phaseGoal: string;
+  questions: Array<{
+    question: string;
+    interpretationOptions: string[];
+    context: string;
+  }>;
+  responses: Array<{
+    questionIndex: number;
+    selectedOption?: string;
+    customResponse?: string;
+  }>;
+  currentQuestionIndex: number;
+  startedAt: string;
+  pausedAt?: string;
+  waitingForResponse?: boolean;
+}
+
+/**
+ * Get the storage key for discussion state
+ */
+function getDiscussionStateKey(phaseNum: number): string {
+  return `hopper.discussionState.${phaseNum}`;
+}
+
+/**
+ * Save discussion state to extension globalState
+ */
+async function saveDiscussionState(
+  context: vscode.ExtensionContext,
+  state: DiscussionState
+): Promise<void> {
+  const key = getDiscussionStateKey(state.phaseNum);
+  await context.globalState.update(key, state);
+  context.globalState.setKeysForSync([key]);
+}
+
+/**
+ * Load discussion state from extension globalState
+ */
+function loadDiscussionState(
+  context: vscode.ExtensionContext,
+  phaseNum: number
+): DiscussionState | undefined {
+  const key = getDiscussionStateKey(phaseNum);
+  return context.globalState.get<DiscussionState>(key);
+}
+
+/**
+ * Clear discussion state from extension globalState
+ */
+async function clearDiscussionState(
+  context: vscode.ExtensionContext,
+  phaseNum: number
+): Promise<void> {
+  const key = getDiscussionStateKey(phaseNum);
+  await context.globalState.update(key, undefined);
+}
+
+/**
+ * Display a question with buttons for answer selection
+ */
+function displayQuestionWithButtons(
+  stream: vscode.ChatResponseStream,
+  question: { question: string; interpretationOptions: string[]; context: string },
+  questionIndex: number,
+  totalQuestions: number,
+  phaseNum: number
+): void {
+  stream.markdown(`---\n\n`);
+  stream.markdown(`### Question ${questionIndex + 1} of ${totalQuestions}\n\n`);
+  stream.markdown(`**${question.question}**\n\n`);
+  stream.markdown(`*${question.context}*\n\n`);
+
+  // Show interpretation options as buttons
+  question.interpretationOptions.forEach((option) => {
+    const truncatedOption = option.length > 45 ? option.substring(0, 42) + '...' : option;
+    stream.button({
+      command: 'hopper.discussPhaseResponse',
+      arguments: [phaseNum, questionIndex, option],
+      title: truncatedOption
+    });
+    stream.markdown(' ');
+  });
+
+  // Other option for custom input
+  stream.button({
+    command: 'hopper.discussPhaseOther',
+    arguments: [phaseNum, questionIndex],
+    title: 'Other...'
+  });
+
+  stream.markdown('\n\n');
+  stream.button({
+    command: 'hopper.discussPhasePause',
+    arguments: [phaseNum],
+    title: '⏸ Pause'
+  });
+  stream.markdown('\n\n');
+  stream.markdown('*Type in chat anytime to provide custom input. Buttons remain active.*\n\n');
+}
+
+/**
+ * System prompt for generating multiple phase discussion questions
+ */
+const QUESTIONS_GENERATION_PROMPT = `You are helping gather context for a project phase before planning.
+
+Your role is to be a thinking partner - help the user articulate their vision through collaborative thinking, not interrogation.
+
+Based on the phase description, generate 3-5 questions that help understand the user's vision.
+
+Output your response as JSON:
+{
+  "questions": [
+    {
+      "question": "Question 1 text (natural, conversational)",
+      "interpretationOptions": ["Option A", "Option B", "Option C"],
+      "context": "Brief context about why you're asking this"
+    },
+    {
+      "question": "Question 2 text",
+      "interpretationOptions": ["Option A", "Option B", "Option C"],
+      "context": "Why asking"
+    }
+  ]
+}
+
+Guidelines:
+- Generate 3-5 questions total
+- Each question should have 2-4 interpretation options
+- Ask about vision, feel, essential outcomes, boundaries
+- DON'T ask about technical risks (you figure those out)
+- DON'T ask about codebase patterns (you read the code)
+- DON'T ask about success metrics (too corporate)
+- Keep it natural and conversational
+- First question should be about overall vision/feel
+- Middle questions about specifics
+- Last question about boundaries/out-of-scope
+
+The user is the visionary, you are the builder.
+
+Always return valid JSON.`;
+
+/**
+ * System prompt for initial phase vision question (legacy, kept for fallback)
  */
 const VISION_QUESTION_PROMPT = `You are helping gather context for a project phase before planning.
 
@@ -251,17 +399,17 @@ ${context.additionalNotes || 'No additional notes'}
 /**
  * Handle /discuss-phase command
  *
- * Engages user in adaptive questioning to gather phase context:
+ * Engages user in adaptive questioning to gather phase context using
+ * button-based flow (like verify-work) for non-blocking interaction:
  * 1. Validates phase number and checks if phase exists
  * 2. Checks if CONTEXT.md already exists
  * 3. Loads phase description from roadmap
- * 4. Presents initial vision question
- * 5. Since VSCode Chat doesn't support interactive questioning,
- *    we generate a context document based on available information
- *    and invite the user to provide more details in follow-up messages
+ * 4. Generates 3-5 questions about user's vision
+ * 5. Presents questions one at a time with button options
+ * 6. After all questions answered, synthesizes into CONTEXT.md
  */
 export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperResult> {
-  const { request, stream, token, projectContext } = ctx;
+  const { request, stream, token, projectContext, extensionContext } = ctx;
 
   // Check for workspace
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -525,14 +673,157 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
       };
     }
 
-    // No user context provided - generate initial question
+    // Check for existing discussion state (resume capability)
+    const savedState = loadDiscussionState(extensionContext, phaseNum);
+
+    // If we have saved state that's complete (all questions answered), synthesize context
+    if (savedState && savedState.currentQuestionIndex >= savedState.questions.length && savedState.responses.length > 0) {
+      stream.progress('Synthesizing your responses...');
+
+      // Collect all responses
+      const allResponses = savedState.responses.map(r => {
+        const q = savedState.questions[r.questionIndex];
+        return `Q: ${q.question}\nA: ${r.selectedOption || r.customResponse || 'No answer'}`;
+      }).join('\n\n');
+
+      // Use LLM to synthesize into context
+      const synthesisMessages: vscode.LanguageModelChatMessage[] = [
+        vscode.LanguageModelChatMessage.User(CONTEXT_SYNTHESIS_PROMPT),
+        vscode.LanguageModelChatMessage.User(`Phase: ${targetPhase.name}\nGoal: ${targetPhase.goal}\n\nDiscussion:\n${allResponses}`)
+      ];
+
+      const synthesisResponse = await request.model.sendRequest(synthesisMessages, {}, token);
+      let synthesisText = '';
+      for await (const fragment of synthesisResponse.text) {
+        if (token.isCancellationRequested) {
+          stream.markdown('**Cancelled**\n');
+          return { metadata: { lastCommand: 'discuss-phase' } };
+        }
+        synthesisText += fragment;
+      }
+
+      // Parse synthesis
+      let context: {
+        vision: string;
+        essential: string[];
+        outOfScope: string[];
+        specificIdeas: string;
+        additionalNotes: string;
+      };
+
+      try {
+        const jsonStr = extractJsonFromResponse(synthesisText);
+        context = JSON.parse(jsonStr);
+        context.vision = context.vision || 'Vision captured from discussion';
+        context.essential = context.essential || ['To be refined'];
+        context.outOfScope = context.outOfScope || ['To be determined'];
+        context.specificIdeas = context.specificIdeas || '';
+        context.additionalNotes = context.additionalNotes || '';
+      } catch {
+        context = {
+          vision: 'Context gathered through discussion',
+          essential: ['Captured from discussion'],
+          outOfScope: ['To be determined'],
+          specificIdeas: '',
+          additionalNotes: ''
+        };
+      }
+
+      // Generate and save CONTEXT.md
+      const contextContent = generateContextMarkdown(phaseNum, targetPhase.name, context);
+      const phaseDirUri = vscode.Uri.joinPath(workspaceUri, '.planning', 'phases', dirName);
+      try {
+        await vscode.workspace.fs.createDirectory(phaseDirUri);
+      } catch { /* Directory may already exist */ }
+
+      await vscode.workspace.fs.writeFile(contextUri, Buffer.from(contextContent, 'utf-8'));
+      await clearDiscussionState(extensionContext, phaseNum);
+
+      stream.markdown('## Context Captured\n\n');
+      stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
+      stream.markdown('### Vision Summary\n\n');
+      stream.markdown(`${context.vision}\n\n`);
+
+      if (context.essential.length > 0) {
+        stream.markdown('### What Must Be Nailed\n\n');
+        for (const item of context.essential) {
+          stream.markdown(`- ${item}\n`);
+        }
+        stream.markdown('\n');
+      }
+
+      stream.markdown('**Created:**\n');
+      stream.reference(contextUri);
+      stream.markdown('\n\n');
+
+      stream.markdown('### Next Steps\n\n');
+      stream.button({
+        command: 'hopper.chat-participant.research-phase',
+        arguments: [phaseNum],
+        title: `Research Phase ${phaseNum}`
+      });
+      stream.markdown(' ');
+      stream.button({
+        command: 'hopper.chat-participant.plan-phase',
+        arguments: [phaseNum],
+        title: `Plan Phase ${phaseNum}`
+      });
+
+      return { metadata: { lastCommand: 'discuss-phase', phaseNumber: phaseNum } };
+    }
+
+    // If we have saved state with questions, continue from current question
+    if (savedState && savedState.questions.length > 0 && savedState.currentQuestionIndex < savedState.questions.length) {
+      const isResuming = savedState.pausedAt || savedState.responses.length > 0;
+
+      if (isResuming) {
+        stream.markdown('## Resuming Discussion\n\n');
+        stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n`);
+        stream.markdown(`**Progress:** ${savedState.responses.length} of ${savedState.questions.length} questions answered\n\n`);
+
+        // Show prior responses briefly
+        if (savedState.responses.length > 0) {
+          stream.markdown('### Prior Responses\n\n');
+          for (const r of savedState.responses) {
+            const q = savedState.questions[r.questionIndex];
+            const answer = r.selectedOption || r.customResponse || 'No answer';
+            const truncated = answer.length > 50 ? answer.substring(0, 47) + '...' : answer;
+            stream.markdown(`- Q${r.questionIndex + 1}: ${truncated}\n`);
+          }
+          stream.markdown('\n');
+        }
+      } else {
+        stream.markdown('## Let\'s Discuss This Phase\n\n');
+        stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n`);
+        stream.markdown(`**Goal:** ${targetPhase.goal}\n\n`);
+        stream.markdown('Click the buttons below to share your vision. **You can type in chat anytime** for custom responses.\n\n');
+      }
+
+      // Display current question with buttons
+      displayQuestionWithButtons(
+        stream,
+        savedState.questions[savedState.currentQuestionIndex],
+        savedState.currentQuestionIndex,
+        savedState.questions.length,
+        phaseNum
+      );
+
+      // Mark as waiting for response
+      savedState.waitingForResponse = true;
+      await saveDiscussionState(extensionContext, savedState);
+
+      return { metadata: { lastCommand: 'discuss-phase', phaseNumber: phaseNum, waitingForResponse: true } };
+    }
+
+    // No saved state - generate questions and start fresh
+    stream.progress('Generating discussion questions...');
+
     const questionMessages: vscode.LanguageModelChatMessage[] = [
-      vscode.LanguageModelChatMessage.User(VISION_QUESTION_PROMPT),
+      vscode.LanguageModelChatMessage.User(QUESTIONS_GENERATION_PROMPT),
       vscode.LanguageModelChatMessage.User(`Phase: ${targetPhase.name}\nGoal: ${targetPhase.goal}`)
     ];
 
     const questionResponse = await request.model.sendRequest(questionMessages, {}, token);
-
     let questionText = '';
     for await (const fragment of questionResponse.text) {
       if (token.isCancellationRequested) {
@@ -542,64 +833,62 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
       questionText += fragment;
     }
 
-    // Parse question
-    let question: {
-      question: string;
-      interpretationOptions: string[];
-      context: string;
-    };
-
+    // Parse questions
+    let questions: Array<{ question: string; interpretationOptions: string[]; context: string }>;
     try {
       const jsonStr = extractJsonFromResponse(questionText);
-      question = JSON.parse(jsonStr);
+      const parsed = JSON.parse(jsonStr);
+      questions = parsed.questions || [];
+      if (questions.length === 0) throw new Error('No questions');
     } catch {
-      // Fallback
-      question = {
-        question: `How do you imagine ${targetPhase.name} working?`,
-        interpretationOptions: [
-          'Something simple and focused',
-          'Something feature-rich',
-          'Something that feels like [reference product]'
-        ],
-        context: 'Understanding your vision helps create a better plan.'
-      };
+      // Fallback questions
+      questions = [
+        {
+          question: `How do you imagine ${targetPhase.name} working?`,
+          interpretationOptions: ['Something simple and focused', 'Something feature-rich', 'Somewhere in between'],
+          context: 'Understanding your vision helps create a better plan.'
+        },
+        {
+          question: 'What\'s the most important thing to get right?',
+          interpretationOptions: ['Performance and speed', 'User experience', 'Flexibility and extensibility'],
+          context: 'Prioritizing helps make tradeoff decisions.'
+        },
+        {
+          question: 'What should we explicitly NOT do in this phase?',
+          interpretationOptions: ['Avoid over-engineering', 'Skip advanced features', 'Don\'t touch existing code'],
+          context: 'Clear boundaries prevent scope creep.'
+        }
+      ];
     }
 
-    // Present the phase and question
+    // Create and save new discussion state
+    const newState: DiscussionState = {
+      phaseNum,
+      phaseName: targetPhase.name,
+      phaseGoal: targetPhase.goal,
+      questions,
+      responses: [],
+      currentQuestionIndex: 0,
+      startedAt: new Date().toISOString(),
+      waitingForResponse: true
+    };
+    await saveDiscussionState(extensionContext, newState);
+
+    // Present the phase and first question
     stream.markdown('## Let\'s Discuss This Phase\n\n');
-    stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n\n`);
+    stream.markdown(`**Phase ${phaseNum}: ${targetPhase.name}**\n`);
     stream.markdown(`**Goal:** ${targetPhase.goal}\n\n`);
+    stream.markdown(`**${questions.length} questions** to help capture your vision.\n`);
+    stream.markdown('Click buttons to answer, or type in chat for custom responses.\n\n');
 
-    stream.markdown('---\n\n');
-    stream.markdown(`### ${question.question}\n\n`);
-    stream.markdown(`*${question.context}*\n\n`);
-
-    stream.markdown('**Some possibilities:**\n');
-    for (const option of question.interpretationOptions) {
-      stream.markdown(`- ${option}\n`);
-    }
-    stream.markdown('\n');
-
-    stream.markdown('---\n\n');
-    stream.markdown('### How to Respond\n\n');
-    stream.markdown('Share your vision by running the command again with your thoughts:\n\n');
-    stream.markdown(`\`/discuss-phase ${phaseNum} [your vision for this phase]\`\n\n`);
-    stream.markdown('**Example:**\n');
-    stream.markdown(`\`/discuss-phase ${phaseNum} I want it to feel calm and organized, not overwhelming. The main thing is seeing what needs attention at a glance.\`\n\n`);
-
-    stream.markdown('### Or Skip to Planning\n\n');
-    stream.markdown('If you\'re ready to plan without detailed context:\n\n');
-    stream.button({
-      command: 'hopper.chat-participant.plan-phase',
-      arguments: [phaseNum],
-      title: `Plan Phase ${phaseNum}`
-    });
+    // Display first question with buttons
+    displayQuestionWithButtons(stream, questions[0], 0, questions.length, phaseNum);
 
     return {
       metadata: {
         lastCommand: 'discuss-phase',
         phaseNumber: phaseNum,
-        nextAction: 'provide-context'
+        waitingForResponse: true
       }
     };
 
@@ -613,4 +902,68 @@ export async function handleDiscussPhase(ctx: CommandContext): Promise<IHopperRe
     }
     return { metadata: { lastCommand: 'discuss-phase' } };
   }
+}
+
+/**
+ * Handle response button click from discuss-phase UI
+ * Called when user clicks an option button or provides custom input
+ */
+export async function handleDiscussPhaseResponse(
+  extensionContext: vscode.ExtensionContext,
+  phaseNum: number,
+  questionIndex: number,
+  selectedOption?: string,
+  customResponse?: string
+): Promise<{ completed: boolean; message: string }> {
+  // Load current state
+  const state = loadDiscussionState(extensionContext, phaseNum);
+
+  if (!state) {
+    return { completed: false, message: 'No discussion state found. Run /discuss-phase to start.' };
+  }
+
+  // Record the response
+  state.responses.push({
+    questionIndex,
+    selectedOption,
+    customResponse
+  });
+
+  // Move to next question
+  state.currentQuestionIndex = questionIndex + 1;
+  state.waitingForResponse = false;
+  await saveDiscussionState(extensionContext, state);
+
+  if (state.currentQuestionIndex >= state.questions.length) {
+    return { completed: true, message: `Question ${questionIndex + 1} answered. All questions complete! Creating context...` };
+  }
+
+  return { completed: false, message: `Question ${questionIndex + 1} answered. Continue with next question.` };
+}
+
+/**
+ * Handle pause button click from discuss-phase UI
+ * Saves state with timestamp for resume
+ */
+export async function handleDiscussPhasePause(
+  extensionContext: vscode.ExtensionContext,
+  phaseNum: number
+): Promise<{ message: string }> {
+  // Load current state
+  const state = loadDiscussionState(extensionContext, phaseNum);
+
+  if (!state) {
+    return { message: 'No discussion state found. Run /discuss-phase to start.' };
+  }
+
+  state.pausedAt = new Date().toISOString();
+  state.waitingForResponse = false;
+  await saveDiscussionState(extensionContext, state);
+
+  const completed = state.responses.length;
+  const remaining = state.questions.length - completed;
+
+  return {
+    message: `Discussion paused. ${completed} answered, ${remaining} remaining. Run /discuss-phase ${phaseNum} to resume.`
+  };
 }
