@@ -1691,25 +1691,52 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
   stream.markdown('### Next Steps\n\n');
 
-  if (usedAgentMode) {
-    stream.markdown('1. **Review changes** made by the agent\n');
-    stream.button({
-      command: 'git.viewChanges',
-      title: 'View Git Changes'
-    });
-    stream.markdown('\n2. **Verify** all criteria above\n');
-    stream.markdown('3. **Commit** if verification passes\n');
-  } else {
-    stream.markdown('1. **Apply the changes** shown above to your codebase\n');
-    stream.markdown('2. **Test** your changes\n');
-    stream.markdown('3. **Commit** when ready\n');
-  }
+  // Check if any tasks failed - show failure-specific next steps
+  const hasFailures = failedCount > 0;
 
-  stream.markdown('\n4. **Update progress** to track completion\n');
-  stream.button({
-    command: 'hopper.chat-participant.progress',
-    title: 'Check Progress'
-  });
+  if (hasFailures) {
+    // Failure flow: Plan Fix is primary action
+    stream.markdown('Some tasks failed during execution.\n\n');
+
+    // Construct plan identifier (e.g., "09-02" from phase "09-useability-and-skills" and planNumber "02")
+    const phaseNum = plan.phase.match(/^(\d+)/)?.[1] || '00';
+    const planNum = String(plan.planNumber).padStart(2, '0');
+    const planIdentifier = `${phaseNum}-${planNum}`;
+
+    stream.markdown('1. **Plan fixes** to address the failed tasks\n');
+    stream.button({
+      command: 'hopper.chat-participant.plan-fix',
+      arguments: [planIdentifier],
+      title: 'Plan Fix'
+    });
+
+    stream.markdown('\n2. **Check progress** to see overall status\n');
+    stream.button({
+      command: 'hopper.chat-participant.progress',
+      title: 'Check Progress'
+    });
+  } else {
+    // Success flow: existing behavior
+    if (usedAgentMode) {
+      stream.markdown('1. **Review changes** made by the agent\n');
+      stream.button({
+        command: 'git.viewChanges',
+        title: 'View Git Changes'
+      });
+      stream.markdown('\n2. **Verify** all criteria above\n');
+      stream.markdown('3. **Commit** if verification passes\n');
+    } else {
+      stream.markdown('1. **Apply the changes** shown above to your codebase\n');
+      stream.markdown('2. **Test** your changes\n');
+      stream.markdown('3. **Commit** when ready\n');
+    }
+
+    stream.markdown('\n4. **Update progress** to track completion\n');
+    stream.button({
+      command: 'hopper.chat-participant.progress',
+      title: 'Check Progress'
+    });
+  }
 
   stream.markdown('\n\n');
   stream.reference(planUri);
