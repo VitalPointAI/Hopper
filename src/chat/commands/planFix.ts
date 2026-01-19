@@ -331,9 +331,11 @@ function generateBasicFixTasks(issues: UATIssue[]): string {
 
     return `<task type="auto">
   <name>Fix ${issue.id}: ${issue.title}</name>
-  <files>[Identify affected files from the issue context]</files>
   <action>
 ${steps.join('\n')}
+
+IMPORTANT: After fixing, stage ONLY the specific files you modified using 'git add <filename>' for each file.
+Do NOT use 'git add .' or stage files you didn't change.
   </action>
   <verify>${verifyInstruction}</verify>
   <done>${issue.id} acceptance criteria met - ${issue.expected || 'issue resolved'}</done>
