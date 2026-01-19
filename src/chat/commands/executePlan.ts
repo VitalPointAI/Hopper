@@ -28,6 +28,7 @@ import {
   getModeDescription
 } from '../../config';
 import { getLogger } from '../../logging';
+import { logTaskFailure, TaskFailure } from '../issues/autoLog';
 
 /**
  * Patterns that indicate a transient error which should be retried.
@@ -1347,6 +1348,27 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
             command: 'hopper.chat-participant.execute-plan',
             title: 'Retry'
           });
+        }
+
+        // In yolo mode, auto-log failed tasks to ISSUES.md
+        // (In guided/manual mode, user is aware of failures interactively)
+        if (executionMode === 'yolo') {
+          const failure: TaskFailure = {
+            planPath,
+            taskId: task.id,
+            taskName: task.name,
+            error: errorMessage,
+            phase: plan.phase,
+            timestamp: new Date()
+          };
+
+          const logResult = await logTaskFailure(workspaceUri, failure);
+          if (logResult.success && logResult.issueId) {
+            logger.warn(`Issue logged: ${logResult.issueId}`);
+            stream.markdown(`*Issue logged: ${logResult.issueId}*\n\n`);
+          } else if (logResult.error) {
+            logger.warn(`Failed to log issue: ${logResult.error}`);
+          }
         }
 
         stream.markdown('---\n\n');
