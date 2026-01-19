@@ -143,13 +143,26 @@ async function readFileContent(uri: vscode.Uri): Promise<string | undefined> {
 }
 
 /**
+ * Parsed issue from ISSUES.md for FIX plan context
+ */
+interface FixIssueContext {
+  id: string;
+  title: string;
+  description: string;
+  expected?: string;
+  actual?: string;
+  feature?: string;
+}
+
+/**
  * Find SUMMARY.md files based on argument (phase or plan number)
+ * Returns the full plan name including FIX suffixes for FIX plan detection
  */
 async function findSummaryFiles(
   planningUri: vscode.Uri,
   arg?: string
-): Promise<{ uri: vscode.Uri; phase: string; plan: string }[]> {
-  const results: { uri: vscode.Uri; phase: string; plan: string }[] = [];
+): Promise<{ uri: vscode.Uri; phase: string; plan: string; fullPlanName: string; isFix: boolean }[]> {
+  const results: { uri: vscode.Uri; phase: string; plan: string; fullPlanName: string; isFix: boolean }[] = [];
 
   try {
     // List all phase directories
@@ -163,8 +176,8 @@ async function findSummaryFiles(
       if (arg) {
         const phaseNum = phaseName.match(/^(\d+(?:\.\d+)?)/)?.[1];
         if (arg.includes('-')) {
-          // Plan identifier like "04-02"
-          const [argPhase, argPlan] = arg.split('-');
+          // Plan identifier like "04-02" or "09-02-FIX"
+          const argPhase = arg.split('-')[0];
           if (phaseNum !== argPhase && !phaseNum?.startsWith(argPhase)) continue;
         } else {
           // Just phase number like "4" or "4.5"
@@ -178,24 +191,37 @@ async function findSummaryFiles(
       for (const [fileName] of files) {
         if (!fileName.endsWith('-SUMMARY.md')) continue;
 
-        // If specific plan requested, check match
+        // If specific plan requested, check match (support FIX suffixes)
         if (arg?.includes('-')) {
-          const planMatch = fileName.match(/^(\d+(?:\.\d+)?)-(\d+)-SUMMARY\.md$/);
-          if (planMatch) {
-            const [, filePhase, filePlan] = planMatch;
-            const [argPhase, argPlan] = arg.split('-');
+          // Extract full plan name from arg (e.g., "09-02-FIX" -> "02-FIX")
+          const argParts = arg.split('-');
+          const argPhase = argParts[0];
+          const argPlanPart = argParts.slice(1).join('-'); // "02-FIX" or just "02"
+
+          // Check if filename matches the requested plan
+          const fileMatch = fileName.match(/^(\d+(?:\.\d+)?)-(.+)-SUMMARY\.md$/);
+          if (fileMatch) {
+            const [, filePhase, filePlanPart] = fileMatch;
             if (filePhase !== argPhase && !filePhase?.startsWith(argPhase + '.')) continue;
-            if (filePlan !== argPlan) continue;
+            // Compare plan parts (handles both "02" and "02-FIX-FIX")
+            if (!filePlanPart.startsWith(argPlanPart.replace(/^0+/, ''))) continue;
           }
         }
 
         const summaryUri = vscode.Uri.joinPath(phaseDir, fileName);
-        const planMatch = fileName.match(/^(\d+(?:\.\d+)?)-(\d+)/);
+        // Match full plan name including any FIX suffixes
+        // Examples: "09-02-SUMMARY.md" -> plan="02", "09-02-FIX-SUMMARY.md" -> plan="02", fullPlanName="02-FIX"
+        const planMatch = fileName.match(/^(\d+(?:\.\d+)?)-(.+)-SUMMARY\.md$/);
         if (planMatch) {
+          const fullPlanName = planMatch[2]; // e.g., "02" or "02-FIX" or "02-FIX-FIX"
+          const basePlan = fullPlanName.split('-')[0]; // Extract just the number part
+          const isFix = fullPlanName.includes('-FIX');
           results.push({
             uri: summaryUri,
             phase: planMatch[1],
-            plan: planMatch[2]
+            plan: basePlan,
+            fullPlanName,
+            isFix
           });
         }
       }
@@ -204,37 +230,169 @@ async function findSummaryFiles(
     // Phases directory doesn't exist
   }
 
-  // Sort by phase and plan number, most recent first
+  // Sort by phase and plan number, most recent first (FIX plans sort after base plans)
   results.sort((a, b) => {
     const phaseA = parseFloat(a.phase);
     const phaseB = parseFloat(b.phase);
     if (phaseA !== phaseB) return phaseB - phaseA;
-    return parseInt(b.plan) - parseInt(a.plan);
+    const planA = parseInt(a.plan);
+    const planB = parseInt(b.plan);
+    if (planA !== planB) return planB - planA;
+    // For same phase-plan, FIX plans come first (more recent)
+    const fixCountA = (a.fullPlanName.match(/-FIX/g) || []).length;
+    const fixCountB = (b.fullPlanName.match(/-FIX/g) || []).length;
+    return fixCountB - fixCountA;
   });
 
   return results;
 }
 
 /**
+ * Load issues from ISSUES.md for a FIX plan to provide context
+ */
+async function loadIssuesForFixPlan(
+  planningUri: vscode.Uri,
+  phase: string,
+  fullPlanName: string
+): Promise<FixIssueContext[]> {
+  const issues: FixIssueContext[] = [];
+
+  try {
+    const phasesUri = vscode.Uri.joinPath(planningUri, 'phases');
+    const phaseDirs = await vscode.workspace.fs.readDirectory(phasesUri);
+
+    // Find matching phase directory
+    for (const [dirName, type] of phaseDirs) {
+      if (type !== vscode.FileType.Directory) continue;
+      if (!dirName.startsWith(phase)) continue;
+
+      const phaseDir = vscode.Uri.joinPath(phasesUri, dirName);
+      const files = await vscode.workspace.fs.readDirectory(phaseDir);
+
+      // For a FIX plan like "02-FIX-FIX", look for "09-02-FIX-ISSUES.md" (parent's issues)
+      // Remove one -FIX suffix to get the parent plan's issues
+      let issuesPlanName = fullPlanName;
+      if (fullPlanName.includes('-FIX')) {
+        // Remove the last -FIX to get parent's ISSUES.md
+        issuesPlanName = fullPlanName.replace(/-FIX$/, '');
+      }
+      const issuesFileName = `${phase}-${issuesPlanName}-ISSUES.md`;
+
+      for (const [fileName] of files) {
+        if (fileName === issuesFileName) {
+          const issuesUri = vscode.Uri.joinPath(phaseDir, fileName);
+          const content = await readFileContent(issuesUri);
+          if (content) {
+            // Parse issues from the file
+            const openSection = content.match(/## Open Issues\s*([\s\S]*?)(?=## Resolved Issues|$)/i);
+            if (openSection) {
+              const issuePattern = /### ((?:UAT|EXE)-[\d-]+(?:-FIX)*(?:-\d+)?):\s*([^\n]+)([\s\S]*?)(?=### (?:UAT|EXE)-|$)/g;
+              let match;
+              while ((match = issuePattern.exec(openSection[1])) !== null) {
+                const id = match[1];
+                const title = match[2].trim();
+                const body = match[3];
+
+                const descMatch = body.match(/\*\*Description:\*\*\s*([^\n]+)/);
+                const expectedMatch = body.match(/\*\*Expected:\*\*\s*([\s\S]*?)(?=\*\*|$)/);
+                const actualMatch = body.match(/\*\*Actual:\*\*\s*([^\n]+)/);
+                const featureMatch = body.match(/\*\*Feature:\*\*\s*([^\n]+)/);
+
+                issues.push({
+                  id,
+                  title,
+                  description: descMatch ? descMatch[1].trim() : title,
+                  expected: expectedMatch ? expectedMatch[1].trim() : undefined,
+                  actual: actualMatch ? actualMatch[1].trim() : undefined,
+                  feature: featureMatch ? featureMatch[1].trim() : undefined
+                });
+              }
+            }
+          }
+          break;
+        }
+      }
+      break;
+    }
+  } catch {
+    // Failed to load issues
+  }
+
+  return issues;
+}
+
+/**
  * Generate test checklist from deliverables using LLM
+ * For FIX plans, includes original issue context for meaningful test instructions
  */
 async function generateTestChecklist(
   ctx: CommandContext,
   deliverables: { accomplishments: string[]; files: string[] },
-  planName: string
+  planName: string,
+  fixContext?: { issues: FixIssueContext[]; isFix: boolean }
 ): Promise<string[]> {
   const { token } = ctx;
 
   // Get available LLM models
   const models = await vscode.lm.selectChatModels();
   if (models.length === 0) {
-    // Fallback: convert accomplishments directly to test items
-    return deliverables.accomplishments.map(a => `Verify: ${a}`);
+    // Fallback: generate appropriate test items based on plan type
+    return generateFallbackTests(deliverables, fixContext);
   }
 
   const model = models[0];
 
-  const prompt = `Generate detailed manual test instructions for verifying these deliverables.
+  // Build different prompts for FIX plans vs regular plans
+  let prompt: string;
+
+  if (fixContext?.isFix && fixContext.issues.length > 0) {
+    // FIX plan prompt with issue context
+    const issuesText = fixContext.issues.map(issue => `
+- **${issue.id}**: ${issue.title}
+  - Description: ${issue.description}
+  ${issue.expected ? `- Expected: ${issue.expected}` : ''}
+  ${issue.actual ? `- Actual: ${issue.actual}` : ''}
+  ${issue.feature ? `- Feature: ${issue.feature}` : ''}`).join('\n');
+
+    prompt = `Generate detailed manual test instructions for verifying a FIX plan.
+
+## Context
+This is a FIX plan that addressed the following issues:
+${issuesText}
+
+## What was fixed
+**Plan:** ${planName}
+**Accomplishments:**
+${deliverables.accomplishments.map(a => `- ${a}`).join('\n')}
+
+**Files changed:**
+${deliverables.files.slice(0, 10).map(f => `- ${f}`).join('\n')}
+
+## Requirements for EACH test instruction:
+For FIX plans, tests must verify that the original issue is RESOLVED:
+1. CONTEXT: What issue was fixed
+2. REPRODUCE: How to test the scenario that was previously broken
+3. EXPECTED: What should now work correctly
+4. CONFIRM: How to verify the fix is working
+
+## Format
+Each test must be 2-4 sentences explaining WHAT was broken and HOW to verify it's now fixed.
+
+BAD: "Verify: Fix EXE-02-01-01"
+GOOD: "Test fix for EXE-02-01-01 (task generation issue): Run /plan-fix on an existing ISSUES.md file. Previously, the generated tasks had non-actionable content like 'Fix the issue: [error message]'. Expected: Generated tasks now contain specific implementation steps with numbered instructions. Confirm: Open the generated FIX-PLAN.md and verify the <action> tags have detailed, actionable content."
+
+BAD: "Verify: Fix UAT-001"
+GOOD: "Test fix for UAT-001 (unhelpful test instructions): Run /verify-work on a FIX plan summary. The original issue was that test instructions just said 'Verify: Fix [issue ID]' without context. Expected: Test instructions now explain what was broken, how to reproduce the original issue scenario, and how to confirm it's fixed. Confirm: The displayed test has context about the original problem."
+
+Create 3-8 test instructions. Respond with a JSON array only, no other text.
+
+[
+  "Test instruction 1...",
+  "Test instruction 2..."
+]`;
+  } else {
+    // Regular plan prompt
+    prompt = `Generate detailed manual test instructions for verifying these deliverables.
 
 ## Deliverables
 **Plan:** ${planName}
@@ -268,6 +426,7 @@ Create 3-8 test instructions. Respond with a JSON array only, no other text.
   "Test instruction 1 with ACTION, STEPS, EXPECTED, CONFIRM...",
   "Test instruction 2 with ACTION, STEPS, EXPECTED, CONFIRM..."
 ]`;
+  }
 
   try {
     const messages = [vscode.LanguageModelChatMessage.User(prompt)];
@@ -295,6 +454,48 @@ Create 3-8 test instructions. Respond with a JSON array only, no other text.
   }
 
   // Fallback
+  return generateFallbackTests(deliverables, fixContext);
+}
+
+/**
+ * Generate fallback test instructions without LLM
+ * For FIX plans, generates meaningful tests from issue context
+ */
+function generateFallbackTests(
+  deliverables: { accomplishments: string[]; files: string[] },
+  fixContext?: { issues: FixIssueContext[]; isFix: boolean }
+): string[] {
+  if (fixContext?.isFix && fixContext.issues.length > 0) {
+    // For FIX plans, generate tests from issue context
+    return fixContext.issues.map(issue => {
+      let test = `Test fix for ${issue.id}`;
+      if (issue.feature) {
+        test += ` (${issue.feature})`;
+      }
+      test += ': ';
+
+      // Describe what was broken
+      if (issue.description) {
+        test += `The original issue was: "${issue.description}". `;
+      }
+
+      // Explain how to test the fix
+      if (issue.expected) {
+        test += `Verify that: ${issue.expected}. `;
+      } else {
+        test += `Verify the issue no longer occurs. `;
+      }
+
+      // If we have expected vs actual, make it more specific
+      if (issue.actual && issue.expected) {
+        test += `Previously showed "${issue.actual}" but should now show "${issue.expected}".`;
+      }
+
+      return test;
+    });
+  }
+
+  // For regular plans, use accomplishments
   return deliverables.accomplishments.map(a => `Verify: ${a}`);
 }
 
@@ -750,8 +951,21 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
 
   // Start fresh - generate test checklist
   stream.progress('Generating test checklist...');
-  const planName = `Phase ${target.phase} Plan ${target.plan}`;
-  testItems = await generateTestChecklist(ctx, deliverables, planName);
+  const planName = `Phase ${target.phase} Plan ${target.plan}${target.isFix ? ' (FIX)' : ''}`;
+
+  // For FIX plans, load the original issues to provide context
+  let fixContext: { issues: FixIssueContext[]; isFix: boolean } | undefined;
+  if (target.isFix) {
+    stream.progress('Loading issue context for FIX plan...');
+    const issues = await loadIssuesForFixPlan(
+      projectContext.planningUri,
+      target.phase,
+      target.fullPlanName
+    );
+    fixContext = { issues, isFix: true };
+  }
+
+  testItems = await generateTestChecklist(ctx, deliverables, planName, fixContext);
 
   verificationState = {
     planPath,
