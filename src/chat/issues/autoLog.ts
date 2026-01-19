@@ -11,6 +11,12 @@ export interface TaskFailure {
   phase: string;
   planNumber: string;
   timestamp: Date;
+  /** The complete tool output captured during execution */
+  fullOutput?: string;
+  /** The specific verify step output if available */
+  verifyOutput?: string;
+  /** Files that were being modified when failure occurred */
+  files?: string[];
 }
 
 /**
@@ -64,19 +70,53 @@ function createIssuesTemplate(phase: string, planNumber: string): string {
 }
 
 /**
+ * Truncate string to max length, adding ellipsis if truncated.
+ */
+function truncateOutput(output: string, maxLength: number = 2000): string {
+  if (output.length <= maxLength) {
+    return output;
+  }
+  return output.slice(0, maxLength) + '\n...[truncated]';
+}
+
+/**
  * Format a task failure as an issue entry for ISSUES.md.
  */
 function formatIssueEntry(failure: TaskFailure, issueId: string): string {
   const dateStr = failure.timestamp.toISOString().split('T')[0];
   const planFile = failure.planPath.split('/').pop() || failure.planPath;
 
+  // Build affected files section if available
+  const affectedFilesSection = failure.files && failure.files.length > 0
+    ? `- **Affected Files:** ${failure.files.join(', ')}\n`
+    : '';
+
+  // Build full error output section if available
+  let fullOutputSection = '';
+  if (failure.fullOutput) {
+    const truncatedOutput = truncateOutput(failure.fullOutput);
+    fullOutputSection = `
+**Full Error Output:**
+\`\`\`
+${truncatedOutput}
+\`\`\`
+
+`;
+  }
+
+  // Build suggested fix based on whether we have error context
+  const suggestedFix = failure.fullOutput
+    ? 'See error output above for root cause. Check test output for specific failing assertions.'
+    : 'Review error, adjust plan or retry manually';
+
   return `### ${issueId}: Task failure in ${planFile}
 
 - **Discovered:** Execution of ${planFile} (${dateStr})
 - **Type:** Execution Failure
-- **Description:** Task "${failure.taskName}" failed: ${failure.error}
+- **Task:** "${failure.taskName}"
+- **Description:** Task failed: ${failure.error}
 - **Impact:** Blocking (task did not complete)
-- **Suggested fix:** Review error, adjust plan or retry manually
+${affectedFilesSection}${fullOutputSection}- **Suggested fix:** ${suggestedFix}
 - **Phase:** ${failure.phase}
 - **Task ID:** ${failure.taskId}
 
