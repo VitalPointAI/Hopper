@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 9 of 9 (Useability and Skills)
-Plan: 2 of 3 complete (+ 09-02-FIX + 09-02-FIX-FIX + 09-02-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX)
+Plan: 2 of 3 complete (+ 09-02-FIX + 09-02-FIX-FIX + 09-02-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX-FIX)
 Status: In progress
-Last activity: 2026-01-19 — Completed 09-02-FIX-FIX-FIX-FIX-PLAN.md (EXE issue format parsing)
+Last activity: 2026-01-19 — Completed 09-02-FIX-FIX-FIX-FIX-FIX-PLAN.md (actionable fix tasks and FIX plan test instructions)
 
 Progress: █████████████████████ 96% (8 phases + 2/3 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 52 (including FIX plans)
+- Total plans completed: 53 (including FIX plans)
 - Average duration: 6.5 min
-- Total execution time: 340 min
+- Total execution time: 343 min
 
 **By Phase:**
 
@@ -39,8 +39,8 @@ Progress: █████████████████████ 96% (8
 | 06-security-review | 4 | 19 min | 4.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 09-02 (4 min), 09-02-FIX (4 min), 09-02-FIX-FIX (1 min), 09-02-FIX-FIX-FIX (2 min), 09-02-FIX-FIX-FIX-FIX (1 min)
-- Trend: Regular plans executing efficiently (~2.4 min avg)
+- Last 5 plans: 09-02-FIX (4 min), 09-02-FIX-FIX (1 min), 09-02-FIX-FIX-FIX (2 min), 09-02-FIX-FIX-FIX-FIX (1 min), 09-02-FIX-FIX-FIX-FIX-FIX (3 min)
+- Trend: FIX plans executing efficiently (~2.2 min avg)
 
 ## Accumulated Context
 
@@ -198,6 +198,10 @@ Recent decisions affecting current work:
 | 09-02-FIX-FIX-FIX | findIssuesFile handles FIX suffixes | Regex captures full plan name including FIX suffixes |
 | 09-02-FIX-FIX-FIX-FIX | parseIssues handles UAT and EXE formats | Single regex matches UAT-XXX and EXE-XX-YY-NN |
 | 09-02-FIX-FIX-FIX-FIX | Severity fallback from Impact/Type fields | EXE issues use Impact field for severity mapping |
+| 09-02-FIX-FIX-FIX-FIX-FIX | LLM prompts with good/bad examples | Explicit examples guide better task generation |
+| 09-02-FIX-FIX-FIX-FIX-FIX | Fallback generates numbered steps from issue fields | Uses expected/actual/feature for actionable content |
+| 09-02-FIX-FIX-FIX-FIX-FIX | FIX plans load parent ISSUES.md for context | Remove one -FIX suffix to find parent's issues |
+| 09-02-FIX-FIX-FIX-FIX-FIX | generateFallbackTests creates meaningful tests | Uses issue data for test instructions without LLM |
 
 ### Deferred Issues
 
@@ -220,7 +224,7 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 09-02-FIX-FIX-FIX-FIX-PLAN.md (EXE issue format parsing)
+Stopped at: Completed 09-02-FIX-FIX-FIX-FIX-FIX-PLAN.md (actionable fix tasks and FIX plan test instructions)
 Resume file: None
 Next: Execute 09-03-PLAN.md (user input responsiveness)
 
