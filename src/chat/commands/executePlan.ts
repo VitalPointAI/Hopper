@@ -1433,10 +1433,17 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
         // Auto-commit after task completion if git is available and enabled
         let commitHash: string | undefined;
-        if (isGitRepo && autoCommitEnabled && task.files && task.files.length > 0) {
+        // Filter to only valid file paths before staging (belt and suspenders - parser also filters)
+        const validFiles = (task.files || []).filter(f =>
+          !f.startsWith('[') &&
+          !f.startsWith('{') &&
+          f.trim().length > 0
+        );
+
+        if (isGitRepo && autoCommitEnabled && validFiles.length > 0) {
           try {
             // Stage the files that were modified by this task
-            await stageFiles(workspaceUri, task.files);
+            await stageFiles(workspaceUri, validFiles);
 
             // Generate commit message
             const commitMessage = generateCommitMessage(plan.phase, plan.planNumber, task.name, task.action);
@@ -1454,7 +1461,9 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
               stream.markdown(`*Commit skipped: ${commitResult.error}*\n\n`);
             }
           } catch (gitError) {
+            // Git failures are non-fatal - warn but don't fail the task
             const gitErrorMsg = gitError instanceof Error ? gitError.message : String(gitError);
+            logger.warn(`Git commit failed for task ${task.id}: ${gitErrorMsg}`);
             stream.markdown(`*Git commit failed: ${gitErrorMsg}*\n\n`);
           }
         }
