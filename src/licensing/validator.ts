@@ -107,9 +107,15 @@ export class LicenseValidator {
     // Must be authenticated first
     const session = this.authManager.getSession();
     if (!session || !this.authManager.isAuthenticated()) {
-      console.log('License check failed: not authenticated');
+      console.log('[checkLicense] Failed: not authenticated');
       return null;
     }
+
+    console.log('[checkLicense] Session:', {
+      userId: session.userId,
+      authType: session.authType,
+      hasToken: !!session.token
+    });
 
     if (session.authType === 'wallet') {
       // ALL wallets (NEAR, EVM, Solana, etc.) use the NEAR contract
@@ -192,6 +198,7 @@ export class LicenseValidator {
       }
 
       const data = await response.json() as { isLicensed: boolean; expiresAt: number | null };
+      console.log('[checkLicenseOnApi] Response:', data);
       const status: LicenseStatus = {
         isLicensed: data.isLicensed,
         expiresAt: data.expiresAt,

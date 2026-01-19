@@ -69,6 +69,7 @@ export async function checkPhaseAccess(
 
   // Check license status
   const status = await validator.checkLicense();
+  console.log('[checkPhaseAccess] License status:', status);
 
   if (!status) {
     // Not authenticated (shouldn't reach here)
@@ -77,8 +78,22 @@ export async function checkPhaseAccess(
 
   if (status.isLicensed) {
     // Check if license is expired
-    // Note: expiresAt from contract is in nanoseconds, Date.now() is milliseconds
-    const expiresAtMs = status.expiresAt ? status.expiresAt / 1_000_000 : null;
+    // Note: expiresAt from NEAR contract is in nanoseconds, OAuth API returns milliseconds
+    // We determine which format based on auth type
+    const authType = authSession.authType;
+    let expiresAtMs: number | null = null;
+
+    if (status.expiresAt) {
+      if (authType === 'wallet') {
+        // NEAR contract returns nanoseconds - convert to milliseconds
+        expiresAtMs = status.expiresAt / 1_000_000;
+      } else {
+        // OAuth API returns milliseconds - use directly
+        expiresAtMs = status.expiresAt;
+      }
+    }
+    console.log('[checkPhaseAccess] Auth type:', authType, 'expiresAt raw:', status.expiresAt, 'expiresAtMs:', expiresAtMs, 'now:', Date.now());
+
     if (expiresAtMs && expiresAtMs < Date.now()) {
       // License expired - clear cache and recheck
       validator.clearCache(userId);
