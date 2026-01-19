@@ -1382,6 +1382,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
               taskName: task.name,
               error: `Verify step failed: ${verifyCheck.reason}`,
               phase: plan.phase,
+              planNumber: String(plan.planNumber).padStart(2, '0'),
               timestamp: new Date()
             };
 
@@ -1458,6 +1459,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
             taskName: task.name,
             error: errorMessage,
             phase: plan.phase,
+            planNumber: String(plan.planNumber).padStart(2, '0'),
             timestamp: new Date()
           };
 

@@ -9,6 +9,7 @@ export interface TaskFailure {
   taskName: string;
   error: string;
   phase: string;
+  planNumber: string;
   timestamp: Date;
 }
 
@@ -23,14 +24,14 @@ export interface AutoLogResult {
 
 /**
  * Generate a unique issue ID for an execution failure.
- * Format: EXE-{phase number}-{task id} (e.g., EXE-09-01)
+ * Format: EXE-{phase}-{plan}-{task} (e.g., EXE-09-02-01)
  */
-function generateIssueId(phase: string, taskId: number): string {
+function generateIssueId(phase: string, planNumber: string, taskId: number): string {
   // Extract phase number from phase identifier (e.g., "09-useability-and-skills" -> "09")
   const phaseMatch = phase.match(/^(\d+(?:\.\d+)*)/);
-  const phaseNum = phaseMatch ? phaseMatch[1] : '00';
+  const phaseNum = phaseMatch ? phaseMatch[1].padStart(2, '0') : '00';
   const taskNum = String(taskId).padStart(2, '0');
-  return `EXE-${phaseNum}-${taskNum}`;
+  return `EXE-${phaseNum}-${planNumber}-${taskNum}`;
 }
 
 /**
@@ -41,20 +42,24 @@ function issueExists(content: string, issueId: string): boolean {
 }
 
 /**
- * Create the ISSUES.md template if it doesn't exist.
+ * Create the plan-specific ISSUES.md template.
  */
-function createIssuesTemplate(): string {
-  return `# Project Issues Log
+function createIssuesTemplate(phase: string, planNumber: string): string {
+  const dateStr = new Date().toISOString().split('T')[0];
+  return `# Execution Issues: Phase ${phase} Plan ${planNumber}
 
-Enhancements discovered during execution. Not critical - address in future phases.
+**Created:** ${dateStr}
+**Source:** Automatic logging during /execute-plan
 
-## Open Enhancements
+## Open Issues
 
-## Closed Enhancements
+## Resolved Issues
 
 ---
 
-*Last updated: ${new Date().toISOString().split('T')[0]}*
+*Phase: ${phase}*
+*Plan: ${planNumber}*
+*Last updated: ${dateStr}*
 `;
 }
 
@@ -79,10 +84,11 @@ function formatIssueEntry(failure: TaskFailure, issueId: string): string {
 }
 
 /**
- * Log a task failure to .planning/ISSUES.md automatically.
+ * Log a task failure to plan-specific ISSUES.md file.
  *
- * Creates the file if it doesn't exist.
- * Generates a unique issue ID in EXE-{phase}-{task} format.
+ * Creates the file in the phase directory if it doesn't exist.
+ * Format: .planning/phases/{phase-dir}/{phase}-{plan}-ISSUES.md
+ * Generates a unique issue ID in EXE-{phase}-{plan}-{task} format.
  * Checks for duplicates before adding.
  *
  * @param workspaceUri The workspace root URI
@@ -93,11 +99,27 @@ export async function logTaskFailure(
   workspaceUri: vscode.Uri,
   failure: TaskFailure
 ): Promise<AutoLogResult> {
-  const issuesPath = vscode.Uri.joinPath(workspaceUri, '.planning', 'ISSUES.md');
-
   try {
+    // Extract phase directory from planPath
+    // e.g., "/path/.planning/phases/09-useability-and-skills/09-02-PLAN.md"
+    const pathParts = failure.planPath.split('/');
+    const planFile = pathParts[pathParts.length - 1]; // "09-02-PLAN.md"
+    const phaseDir = pathParts[pathParts.length - 2]; // "09-useability-and-skills"
+
+    // Extract phase-plan prefix from plan file (e.g., "09-02" from "09-02-PLAN.md")
+    const planPrefix = planFile.replace(/-PLAN\.md$/, '');
+
+    // Build issues file path: .planning/phases/{phaseDir}/{phase}-{plan}-ISSUES.md
+    const issuesPath = vscode.Uri.joinPath(
+      workspaceUri,
+      '.planning',
+      'phases',
+      phaseDir,
+      `${planPrefix}-ISSUES.md`
+    );
+
     // Generate issue ID
-    const issueId = generateIssueId(failure.phase, failure.taskId);
+    const issueId = generateIssueId(failure.phase, failure.planNumber, failure.taskId);
 
     // Try to read existing ISSUES.md
     let content: string;
@@ -106,7 +128,7 @@ export async function logTaskFailure(
       content = Buffer.from(existingContent).toString('utf-8');
     } catch {
       // File doesn't exist - create template
-      content = createIssuesTemplate();
+      content = createIssuesTemplate(failure.phase, failure.planNumber);
     }
 
     // Check for duplicate
@@ -120,14 +142,14 @@ export async function logTaskFailure(
     // Format the new issue entry
     const issueEntry = formatIssueEntry(failure, issueId);
 
-    // Insert after "## Open Enhancements" header
-    const openHeader = '## Open Enhancements';
+    // Insert after "## Open Issues" header
+    const openHeader = '## Open Issues';
     const headerIndex = content.indexOf(openHeader);
 
     if (headerIndex === -1) {
-      // Header not found - append to end (shouldn't happen with template)
-      content = content.replace(/---\s*\n\s*\*Last updated:.*$/,
-        `${issueEntry}\n---\n\n*Last updated: ${new Date().toISOString().split('T')[0]}*\n`);
+      // Header not found - append before footer
+      content = content.replace(/---\s*\n\s*\*Phase:.*$/s,
+        `${issueEntry}\n---\n\n*Phase: ${failure.phase}*\n*Plan: ${failure.planNumber}*\n*Last updated: ${new Date().toISOString().split('T')[0]}*\n`);
     } else {
       // Insert after the header line
       const insertPos = headerIndex + openHeader.length;
