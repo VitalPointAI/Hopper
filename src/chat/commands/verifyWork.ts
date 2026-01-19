@@ -234,7 +234,7 @@ async function generateTestChecklist(
 
   const model = models[0];
 
-  const prompt = `Generate detailed manual user acceptance test instructions for the following deliverables.
+  const prompt = `Generate detailed manual test instructions for verifying these deliverables.
 
 ## Deliverables
 **Plan:** ${planName}
@@ -244,24 +244,30 @@ ${deliverables.accomplishments.map(a => `- ${a}`).join('\n')}
 **Files changed:**
 ${deliverables.files.slice(0, 10).map(f => `- ${f}`).join('\n')}
 
-## Instructions
-Create 3-8 detailed test instructions that a USER can follow step-by-step. Each test MUST include:
-1. **What to do** - Specific actions (click X, type Y, navigate to Z)
-2. **How to do it** - Exact steps to reproduce
-3. **What to expect** - The expected result when the feature works correctly
+## Requirements for EACH test instruction:
+1. ACTION: Start with a verb (Run, Click, Navigate, Type, Open)
+2. STEPS: Include specific commands, URLs, or UI paths
+3. EXPECTED: Describe exactly what should happen
+4. CONFIRM: How to verify it worked (what to see/check)
 
-The test description should be detailed enough that someone unfamiliar with the code can follow along.
+## Format
+Each test must be 2-4 sentences with concrete details.
 
-Respond with a JSON array of test descriptions. Each should be a complete, actionable test instruction.
+BAD: "Verify the login works"
+GOOD: "Navigate to /login, enter email 'test@example.com' and password 'test123', click Submit. Expected: Redirect to /dashboard with 'Welcome' message. Confirm: URL changes to /dashboard and greeting shows in top-right."
 
-Example format:
+BAD: "Check the API endpoint"
+GOOD: "Run 'curl -X POST http://localhost:3000/api/users -H \"Content-Type: application/json\" -d '{\"name\":\"Test\"}'' in terminal. Expected: 201 response with JSON containing id and name fields. Confirm: Response body shows {\"id\": \"...\", \"name\": \"Test\"}."
+
+BAD: "Test the button"
+GOOD: "Open the Settings panel, click the 'Export Data' button. Expected: A file download dialog appears with filename 'data-export.json'. Confirm: Downloaded file contains JSON array of user data."
+
+Create 3-8 test instructions. Respond with a JSON array only, no other text.
+
 [
-  "Open the application in browser, navigate to Settings page via the gear icon in the top-right, then click 'Dark Mode' toggle. Expected: The entire UI should switch to dark theme with dark backgrounds and light text.",
-  "In the login form, leave the email field empty and click Submit. Expected: A red error message 'Email is required' should appear below the email field and the form should not submit.",
-  "Navigate to /dashboard after logging in. Expected: You should see a welcome message with your username and a list of recent activity items."
-]
-
-Only output the JSON array, no other text.`;
+  "Test instruction 1 with ACTION, STEPS, EXPECTED, CONFIRM...",
+  "Test instruction 2 with ACTION, STEPS, EXPECTED, CONFIRM..."
+]`;
 
   try {
     const messages = [vscode.LanguageModelChatMessage.User(prompt)];
