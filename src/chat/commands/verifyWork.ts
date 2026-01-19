@@ -413,8 +413,14 @@ function displayTestWithButtons(
     arguments: [planPath, testIndex, 'skip'],
     title: '⏭ Skip'
   });
+  stream.markdown(' ');
+  stream.button({
+    command: 'hopper.verifyWorkTestResult',
+    arguments: [planPath, testIndex, 'pause'],
+    title: '⏸ Pause'
+  });
   stream.markdown('\n\n');
-  stream.markdown('*You can type questions in the chat before clicking a button.*\n\n');
+  stream.markdown('*You can type questions in the chat before clicking a button. Choose "Pause" to save progress and continue later.*\n\n');
 }
 
 /**
@@ -818,19 +824,35 @@ export async function handleVerifyWorkResult(
 
 /**
  * Handle test result button click from verify-work UI
- * Called when user clicks Pass/Fail/Partial/Skip buttons
+ * Called when user clicks Pass/Fail/Partial/Skip/Pause buttons
  */
 export async function handleTestResultButton(
   extensionContext: vscode.ExtensionContext,
   planPath: string,
   testIndex: number,
-  result: 'pass' | 'fail' | 'partial' | 'skip'
-): Promise<{ needsSeverity: boolean; completed: boolean; message: string }> {
+  result: 'pass' | 'fail' | 'partial' | 'skip' | 'pause'
+): Promise<{ needsSeverity: boolean; completed: boolean; paused?: boolean; message: string }> {
   // Load current state
   const state = loadVerificationState(extensionContext, planPath);
 
   if (!state) {
     return { needsSeverity: false, completed: false, message: 'No verification state found. Run /verify-work to start.' };
+  }
+
+  // For pause, save state with timestamp and return early
+  if (result === 'pause') {
+    state.pausedAt = new Date().toISOString();
+    state.waitingForResult = false;
+    await saveVerificationState(extensionContext, state);
+
+    const completed = state.results.length;
+    const remaining = state.testItems.length - completed;
+    return {
+      needsSeverity: false,
+      completed: false,
+      paused: true,
+      message: `Verification paused at test ${testIndex + 1} of ${state.testItems.length}. ${completed} completed, ${remaining} remaining. Run /verify-work to resume.`
+    };
   }
 
   // For pass or skip, record result immediately
