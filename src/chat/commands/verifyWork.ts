@@ -386,8 +386,9 @@ function displayTestWithButtons(
 ): void {
   stream.markdown(`---\n\n`);
   stream.markdown(`### Test ${testIndex + 1} of ${totalTests}\n\n`);
+  stream.markdown(`**Instructions:**\n`);
   stream.markdown(`${testItem}\n\n`);
-  stream.markdown('**What is the result?**\n\n');
+  stream.markdown(`**Actions:** Select a result below, or choose "Pause" to save progress and continue later.\n\n`);
 
   // Show buttons for each result option
   stream.button({
@@ -420,7 +421,7 @@ function displayTestWithButtons(
     title: '⏸ Pause'
   });
   stream.markdown('\n\n');
-  stream.markdown('*You can type questions in the chat before clicking a button. Choose "Pause" to save progress and continue later.*\n\n');
+  stream.markdown('*You can type questions in the chat anytime. Buttons will remain active.*\n\n');
 }
 
 /**
@@ -711,18 +712,21 @@ export async function handleVerifyWork(ctx: CommandContext): Promise<IHopperResu
       stream.markdown('Click the buttons below to record your test results.\n');
       stream.markdown('**You can type questions in the chat anytime** - the buttons will still work.\n\n');
     } else {
-      // Resuming - show progress
-      stream.markdown(`## Continuing Verification\n\n`);
+      // Resuming - show detailed context
+      stream.markdown(`## Resuming Verification\n\n`);
       stream.markdown(`**Plan:** ${planName}\n`);
-      stream.markdown(`**Progress:** ${savedState.results.length} of ${savedState.testItems.length} tests completed\n\n`);
+      stream.markdown(`**Previously completed:** ${savedState.results.length} of ${savedState.testItems.length} tests\n`);
+      stream.markdown(`**Continuing from:** Test ${savedState.currentIndex + 1}\n\n`);
 
-      // Show completed results
+      // Show completed results with status
       if (savedState.results.length > 0) {
-        stream.markdown('### Completed Tests\n\n');
+        stream.markdown('### Prior Results\n\n');
         for (let i = 0; i < savedState.results.length; i++) {
           const r = savedState.results[i];
           const emoji = { pass: '✓', fail: '✗', partial: '⚠', skip: '⏭' }[r.status];
-          stream.markdown(`${emoji} Test ${i + 1}: **${r.status}**${r.severity ? ` (${r.severity})` : ''}\n`);
+          // Truncate long test descriptions
+          const truncated = r.feature.length > 60 ? r.feature.substring(0, 57) + '...' : r.feature;
+          stream.markdown(`- ${emoji} ${truncated}\n`);
         }
         stream.markdown('\n');
       }
