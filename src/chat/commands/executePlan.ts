@@ -27,6 +27,7 @@ import {
   confirmTaskExecution,
   getModeDescription
 } from '../../config';
+import { getLogger } from '../../logging';
 
 /**
  * Format a tool invocation message with contextual information.
@@ -206,10 +207,9 @@ async function executeWithTools(
         stream.markdown(`\n\n${toolMsg.start}\n\n`);
 
         try {
-          // Log tool input for debugging
-          console.log(`[Hopper] Invoking tool: ${part.name}`);
-          console.log(`[Hopper] Tool input:`, JSON.stringify(part.input, null, 2));
-          console.log(`[Hopper] Has toolInvocationToken:`, !!toolInvocationToken);
+          // Log tool invocation to output channel
+          const logger = getLogger();
+          logger.toolStart(part.name, part.input);
 
           // Invoke the tool with toolInvocationToken for proper chat UI integration
           // The token is required for file operations like copilot_createFile
@@ -222,9 +222,8 @@ async function executeWithTools(
             token
           );
 
-          // Log the result for debugging
-          console.log(`[Hopper] Tool ${part.name} result:`, result);
-          console.log(`[Hopper] Result content:`, result?.content);
+          // Log successful completion
+          logger.toolComplete(part.name, 'success');
 
           // Collect tool result for next iteration
           // invokeTool returns LanguageModelToolResult, we need its content array
@@ -235,7 +234,8 @@ async function executeWithTools(
           stream.markdown(`${toolMsg.complete}\n\n`);
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
-          console.error(`[Hopper] Tool ${part.name} error:`, err);
+          // Log error to output channel (auto-shows channel)
+          getLogger().toolError(part.name, errorMsg);
           stream.markdown(`**Failed:** ${part.name} - ${errorMsg}\n\n`);
 
           toolResults.push(
@@ -697,6 +697,10 @@ async function resolvePlanPath(
  */
 export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperResult> {
   const { request, stream, token, projectContext, licenseValidator } = ctx;
+  const logger = getLogger();
+
+  // Log execution start
+  logger.info(`Starting /execute-plan: ${ctx.request.prompt || 'auto-detect'}`);
 
   // Check for workspace
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -1162,12 +1166,12 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       // Check if this is a scaffolding task that needs special handling
       const isScaffolding = isScaffoldingTask(task.action);
-      console.log(`[Hopper] Task action: ${task.action.slice(0, 100)}...`);
-      console.log(`[Hopper] Is scaffolding task: ${isScaffolding}`);
+      logger.info(`Task action: ${task.action.slice(0, 100)}...`);
+      logger.info(`Is scaffolding task: ${isScaffolding}`);
 
       if (isScaffolding) {
         const scaffoldCommand = extractScaffoldingCommand(task.action);
-        console.log(`[Hopper] Extracted scaffold command: ${scaffoldCommand}`);
+        logger.info(`Extracted scaffold command: ${scaffoldCommand}`);
         if (scaffoldCommand) {
           stream.markdown('**Scaffolding detected** - protecting .planning/ directory\n\n');
 
@@ -1234,6 +1238,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         }
 
         stream.markdown(`**Status:** Task ${task.id}/${plan.tasks.length} completed\n\n`);
+        logger.success(`Task ${task.id} completed: ${task.name}`);
 
         // Auto-commit after task completion if git is available and enabled
         let commitHash: string | undefined;
@@ -1270,6 +1275,8 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
+        // Log error to output channel (auto-shows)
+        logger.error(`Task ${task.id} failed: ${task.name} - ${errorMessage}`);
         stream.markdown(`**Error executing task:** ${errorMessage}\n\n`);
 
         if (error instanceof vscode.LanguageModelError) {
@@ -1306,6 +1313,9 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       }
     }
   }
+
+  // Log completion to output channel
+  logger.info(`Plan execution complete: ${successCount}/${plan.tasks.length} tasks succeeded`);
 
   stream.markdown('## Execution Complete\n\n');
   stream.markdown(`**Plan:** ${plan.phase} - Plan ${plan.planNumber}\n`);
@@ -1488,7 +1498,7 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         // Clear agent ID - execution completed successfully
         await clearCurrentAgentId(projectContext.planningUri);
       } catch (stateErr) {
-        console.error('[Hopper] Failed to update STATE.md:', stateErr);
+        logger.error(`Failed to update STATE.md: ${stateErr instanceof Error ? stateErr.message : String(stateErr)}`);
         // Don't fail the overall execution, just log the error
       }
     }
