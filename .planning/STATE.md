@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 9 of 9 (Useability and Skills)
-Plan: 2 of 3 complete (+ 09-02-FIX + 09-02-FIX-FIX + 09-02-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX-FIX)
+Plan: 2 of 3 complete (+ 09-02-FIX + 09-02-FIX-FIX + 09-02-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX-FIX + 09-02-FIX-FIX-FIX-FIX-FIX-FIX)
 Status: In progress
-Last activity: 2026-01-19 — Completed 09-02-FIX-FIX-FIX-FIX-FIX-PLAN.md (actionable fix tasks and FIX plan test instructions)
+Last activity: 2026-01-19 — Completed 09-02-FIX-FIX-FIX-FIX-FIX-FIX-PLAN.md (tool diagnostics and prompt strengthening)
 
 Progress: █████████████████████ 96% (8 phases + 2/3 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 53 (including FIX plans)
-- Average duration: 6.5 min
-- Total execution time: 343 min
+- Total plans completed: 54 (including FIX plans)
+- Average duration: 6.4 min
+- Total execution time: 346 min
 
 **By Phase:**
 
@@ -39,8 +39,8 @@ Progress: █████████████████████ 96% (8
 | 06-security-review | 4 | 19 min | 4.8 min |
 
 **Recent Trend:**
-- Last 5 plans: 09-02-FIX (4 min), 09-02-FIX-FIX (1 min), 09-02-FIX-FIX-FIX (2 min), 09-02-FIX-FIX-FIX-FIX (1 min), 09-02-FIX-FIX-FIX-FIX-FIX (3 min)
-- Trend: FIX plans executing efficiently (~2.2 min avg)
+- Last 5 plans: 09-02-FIX-FIX (1 min), 09-02-FIX-FIX-FIX (2 min), 09-02-FIX-FIX-FIX-FIX (1 min), 09-02-FIX-FIX-FIX-FIX-FIX (3 min), 09-02-FIX-FIX-FIX-FIX-FIX-FIX (3 min)
+- Trend: FIX plans executing efficiently (~2.0 min avg)
 
 ## Accumulated Context
 
@@ -202,6 +202,9 @@ Recent decisions affecting current work:
 | 09-02-FIX-FIX-FIX-FIX-FIX | Fallback generates numbered steps from issue fields | Uses expected/actual/feature for actionable content |
 | 09-02-FIX-FIX-FIX-FIX-FIX | FIX plans load parent ISSUES.md for context | Remove one -FIX suffix to find parent's issues |
 | 09-02-FIX-FIX-FIX-FIX-FIX | generateFallbackTests creates meaningful tests | Uses issue data for test instructions without LLM |
+| 09-02-FIX-FIX-FIX-FIX-FIX-FIX | Tool availability logging before executeWithTools | Diagnose if tools are being passed correctly |
+| 09-02-FIX-FIX-FIX-FIX-FIX-FIX | Explicit LanguageModelChatToolMode.Auto | Being explicit helps clarify intent for tool calling |
+| 09-02-FIX-FIX-FIX-FIX-FIX-FIX | CRITICAL prompt sections for tool usage | Strongly instruct model to use tools immediately |
 
 ### Deferred Issues
 
@@ -224,9 +227,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-01-19
-Stopped at: Completed 09-02-FIX-FIX-FIX-FIX-FIX-PLAN.md (actionable fix tasks and FIX plan test instructions)
+Stopped at: Completed 09-02-FIX-FIX-FIX-FIX-FIX-FIX-PLAN.md (tool diagnostics and prompt strengthening)
 Resume file: None
-Next: Execute 09-03-PLAN.md (user input responsiveness)
+Next: Test /execute-plan to verify tool usage fix, then execute 09-03-PLAN.md
 
 ## Post-Milestone Enhancements
 
