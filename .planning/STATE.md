@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-12)
 ## Current Position
 
 Phase: 11 of 11 (Log Paste Context)
-Plan: 1 of 1
-Status: Phase complete
-Last activity: 2026-01-19 — Completed 11-01-PLAN.md
+Plan: 1 of 1 + FIX
+Status: Phase complete (with fix)
+Last activity: 2026-01-19 — Completed 11-01-FIX-PLAN.md
 
 Progress: ██████████████████████ 100% (11 of 11 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 55 (including FIX plans)
+- Total plans completed: 56 (including FIX plans)
 - Average duration: 6.4 min
-- Total execution time: 351 min
+- Total execution time: 359 min
 
 **By Phase:**
 
@@ -208,6 +208,8 @@ Recent decisions affecting current work:
 | 09-03 | ACTION_INTENT_PATTERNS for direct action | Regex patterns detect imperative user requests |
 | 09-03 | Immediate acknowledgment before action | "Got it. Working on your request..." for user feedback |
 | 09-03 | Max 20 iterations for action tool loop | Sufficient for most direct actions |
+| 11-01-FIX | 5-minute window for cancelled execution resume | Balances convenience with stale state cleanup |
+| 11-01-FIX | Auto-resume on non-command input after cancel | Simplest UX for context injection |
 
 ### Deferred Issues
 
