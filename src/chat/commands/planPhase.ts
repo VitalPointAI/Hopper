@@ -517,7 +517,30 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     baseContextParts.push('\n\n## Current State\n\n' + projectContext.stateMd);
   }
 
-  // Check for DISCOVERY.md (from /discovery-phase) and include if available
+  // Check for RESEARCH.md (from /research-phase) - comprehensive ecosystem research with live docs
+  // Extract phase number prefix from dirName (e.g., "08" from "08-fix-improperly-built-functions")
+  const phaseNumPrefix = targetPhase.dirName.split('-')[0];
+  const researchFileName = `${phaseNumPrefix}-RESEARCH.md`;
+  const researchUri = vscode.Uri.joinPath(
+    workspaceUri,
+    '.planning',
+    'phases',
+    targetPhase.dirName,
+    researchFileName
+  );
+
+  let hasResearch = false;
+  try {
+    const researchBytes = await vscode.workspace.fs.readFile(researchUri);
+    const researchContent = Buffer.from(researchBytes).toString('utf-8');
+    baseContextParts.push('\n\n## Phase Research\n\nComprehensive research was conducted for this phase:\n\n' + researchContent.slice(0, 4000));
+    stream.markdown('*Using research from RESEARCH.md*\n\n');
+    hasResearch = true;
+  } catch {
+    // No research file
+  }
+
+  // Check for DISCOVERY.md (from /discovery-phase) - quick version/syntax verification
   const discoveryUri = vscode.Uri.joinPath(
     workspaceUri,
     '.planning',
@@ -526,23 +549,39 @@ export async function handlePlanPhase(ctx: CommandContext): Promise<IHopperResul
     'DISCOVERY.md'
   );
 
+  let hasDiscovery = false;
   try {
     const discoveryBytes = await vscode.workspace.fs.readFile(discoveryUri);
     const discoveryContent = Buffer.from(discoveryBytes).toString('utf-8');
-    baseContextParts.push('\n\n## Discovery Research\n\nThe following research was conducted for this phase:\n\n' + discoveryContent.slice(0, 3000));
-    stream.markdown('*Using discovery research from DISCOVERY.md*\n\n');
+    baseContextParts.push('\n\n## Discovery Research\n\nThe following discovery was conducted for this phase:\n\n' + discoveryContent.slice(0, 3000));
+    stream.markdown('*Using discovery from DISCOVERY.md*\n\n');
+    hasDiscovery = true;
   } catch {
-    // No discovery file - suggest discovery for phases that might benefit
+    // No discovery file
+  }
+
+  // Show tips if no research exists and phase might benefit
+  if (!hasResearch && !hasDiscovery) {
     const goalLower = targetPhase.goal.toLowerCase();
-    const needsDiscovery =
+    const isSpecializedDomain =
+      goalLower.includes('3d') ||
+      goalLower.includes('audio') ||
+      goalLower.includes('game') ||
+      goalLower.includes('ml') ||
+      goalLower.includes('real-time') ||
+      goalLower.includes('graphics');
+
+    const usesExternalLibs =
       goalLower.includes('api') ||
       goalLower.includes('integration') ||
       goalLower.includes('library') ||
       goalLower.includes('framework') ||
       goalLower.includes('external');
 
-    if (needsDiscovery) {
-      stream.markdown(`*Tip: Run \`/discovery-phase ${targetPhase.number}\` for current documentation before planning.*\n\n`);
+    if (isSpecializedDomain) {
+      stream.markdown(`*Tip: Run \`/research-phase ${targetPhase.number}\` for ecosystem guidance, patterns, and pitfalls (fetches live docs).*\n\n`);
+    } else if (usesExternalLibs) {
+      stream.markdown(`*Tip: Run \`/discovery-phase ${targetPhase.number}\` to verify current library versions and syntax.*\n\n`);
     }
   }
 

@@ -184,21 +184,11 @@ No bait-and-switch. The free tier is real value, not a demo. We make money when 
 
 ---
 
-## Advanced Configuration
-
-Optional settings for power users:
-|---------|---------|-------------|
-| `hopper.license.contractId` | `license.hopper.near` | NEAR contract ID for license validation |
-| `hopper.license.nearNetwork` | `mainnet` | NEAR network (`mainnet` or `testnet`) |
-| `hopper.licenseApiUrl` | `https://hopper-license-api.vitalpointai.workers.dev` | License API URL |
-
----
-
 ## Technical Details
 
 **Requirements:** VS Code 1.104.0+, internet connection for NEAR AI integration
 
-**NEAR AI Integration:** Hopper uses NEAR AI for model-agnostic language model support. Configure via Command Palette → `Hopper: Manage NEAR AI Connection`
+**NEAR AI Integration:** Hopper can use NEAR AI for model-agnostic language model support. Configure via Command Palette → `Hopper: Manage NEAR AI Connection`
 
 **License:**  
 - Extension code: [MIT](LICENSE) — Free and open source  

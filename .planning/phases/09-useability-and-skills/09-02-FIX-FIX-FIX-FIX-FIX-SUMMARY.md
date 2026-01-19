@@ -69,7 +69,7 @@ Each task was committed atomically:
 1. **Task 1: Fix UAT-002 - Improve plan-fix task generation** - `616dd06` (fix)
 2. **Task 2: Fix UAT-001 - Improve verify-work test instructions for FIX plans** - `ba85ef3` (fix)
 
-**Plan metadata:** [pending]
+**Plan metadata:** `614b02e` (docs: complete plan)
 
 ## Files Created/Modified
 

@@ -1,5 +1,12 @@
 import * as vscode from 'vscode';
 import { CommandContext, IHopperResult } from './types';
+import {
+  fetchDocumentation,
+  getOfficialDocsUrl,
+  getPackageDocUrls,
+  summarizeDocContent,
+  DocResult
+} from '../../utils/webFetch';
 
 /**
  * System prompt for phase research domain identification
@@ -226,6 +233,101 @@ function extractJsonFromResponse(response: string): string {
  */
 function getCurrentDate(): string {
   return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Fetch live documentation for identified research domains
+ *
+ * Extracts library/framework names from domains and fetches current docs
+ * to ground LLM research in up-to-date information.
+ */
+async function fetchDocsForDomains(
+  domains: Array<{ name: string; category: string; questions: string[] }>,
+  stream: vscode.ChatResponseStream
+): Promise<{ fetchedDocs: DocResult[]; docContext: string }> {
+  const fetchedDocs: DocResult[] = [];
+
+  // Extract potential library names from domain names and questions
+  const potentialLibs = new Set<string>();
+
+  for (const domain of domains) {
+    // Extract words that look like library names (lowercase, no spaces)
+    const words = domain.name.toLowerCase().split(/[\s,/]+/);
+    for (const word of words) {
+      // Skip common non-library words
+      if (word.length > 2 &&
+          !['the', 'and', 'for', 'with', 'how', 'use', 'best', 'way', 'using', 'based', 'patterns', 'architecture', 'integration'].includes(word)) {
+        potentialLibs.add(word);
+      }
+    }
+
+    // Also check questions for library names
+    for (const q of domain.questions) {
+      const qWords = q.toLowerCase().split(/[\s,/?]+/);
+      for (const word of qWords) {
+        if (word.length > 2 &&
+            !['what', 'which', 'how', 'should', 'best', 'the', 'for', 'use', 'with', 'are', 'is'].includes(word)) {
+          potentialLibs.add(word);
+        }
+      }
+    }
+  }
+
+  // Limit to most likely library names (first 5)
+  const libsToFetch = Array.from(potentialLibs).slice(0, 5);
+
+  if (libsToFetch.length === 0) {
+    return { fetchedDocs: [], docContext: '' };
+  }
+
+  stream.progress(`Fetching current documentation for: ${libsToFetch.join(', ')}...`);
+
+  for (const lib of libsToFetch) {
+    // Try official docs first
+    const officialUrl = getOfficialDocsUrl(lib);
+    if (officialUrl) {
+      try {
+        const doc = await fetchDocumentation(officialUrl);
+        if (doc.success) {
+          fetchedDocs.push(doc);
+          stream.progress(`Fetched ${lib} docs`);
+        }
+      } catch {
+        // Skip failed fetches
+      }
+    }
+
+    // Try npm for packages (limit total docs to avoid context bloat)
+    if (fetchedDocs.length < 4) {
+      const { npm: npmUrl } = getPackageDocUrls(lib);
+      if (npmUrl) {
+        try {
+          const doc = await fetchDocumentation(npmUrl);
+          if (doc.success && doc.content.length > 100) {
+            fetchedDocs.push(doc);
+          }
+        } catch {
+          // Skip failed fetches
+        }
+      }
+    }
+  }
+
+  // Build context string from fetched docs
+  if (fetchedDocs.length === 0) {
+    return { fetchedDocs: [], docContext: '' };
+  }
+
+  const contextParts = ['', '## Live Documentation (fetched just now)', ''];
+  for (const doc of fetchedDocs) {
+    contextParts.push(summarizeDocContent(doc, 1500));
+    contextParts.push('');
+  }
+
+  return {
+    fetchedDocs,
+    docContext: contextParts.join('\n')
+  };
 }
 
 /**
@@ -740,7 +842,18 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
     }
     stream.markdown('\n');
 
-    // Step 2: Conduct comprehensive research (or merge with existing)
+    // Step 2: Fetch live documentation for identified domains
+    const { fetchedDocs, docContext } = await fetchDocsForDomains(domainAnalysis.domains, stream);
+
+    if (fetchedDocs.length > 0) {
+      stream.markdown(`**Fetched ${fetchedDocs.length} live documentation source(s):**\n`);
+      for (const doc of fetchedDocs) {
+        stream.markdown(`- ${doc.title} (${doc.source})\n`);
+      }
+      stream.markdown('\n');
+    }
+
+    // Step 3: Conduct comprehensive research (or merge with existing)
     stream.progress(isMerging ? 'Researching and merging...' : 'Conducting comprehensive research...');
 
     const researchContextParts = [
@@ -756,6 +869,11 @@ export async function handleResearchPhase(ctx: CommandContext): Promise<IHopperR
 
     if (contextContent) {
       researchContextParts.push('', 'User vision/context:', contextContent.slice(0, 1500));
+    }
+
+    // Include live documentation if fetched
+    if (docContext) {
+      researchContextParts.push(docContext);
     }
 
     // Choose prompt based on whether we're merging
