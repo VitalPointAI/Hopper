@@ -246,6 +246,17 @@ async function executeWithTools(
   toolInvocationToken?: vscode.ChatParticipantToolToken,
   workspaceRoot?: string
 ): Promise<{ toolOutput: string }> {
+  const logger = getLogger();
+
+  // Log tool availability diagnostics
+  logger.info(`executeWithTools: ${tools.length} tools available`);
+  if (tools.length > 0) {
+    const toolNames = tools.slice(0, 10).map(t => t.name).join(', ');
+    logger.info(`Available tools (first 10): ${toolNames}`);
+  } else {
+    logger.warn('WARNING: No tools passed to executeWithTools - model cannot make changes');
+  }
+
   // Allow up to 50 tool iterations per task - complex tasks may need many operations
   const MAX_ITERATIONS = 50;
   let iteration = 0;
@@ -256,9 +267,10 @@ async function executeWithTools(
   while (iteration < MAX_ITERATIONS && !token.isCancellationRequested) {
     iteration++;
 
+    // Use explicit tool mode - Auto allows model to decide when to use tools
     const response = await model.sendRequest(
       messages,
-      { tools },
+      { tools, toolMode: vscode.LanguageModelChatToolMode.Auto },
       token
     );
 
@@ -375,6 +387,15 @@ async function executeWithTools(
 
     // If no tool calls, we're done
     if (!hasToolCalls) {
+      // Log diagnostic warning on first iteration - model didn't use any tools
+      if (iteration === 1) {
+        logger.warn(`No tool calls on first iteration. Tools available: ${tools.length}`);
+        if (tools.length > 0) {
+          const firstFiveTools = tools.slice(0, 5).map(t => t.name).join(', ');
+          logger.warn(`First 5 tools: ${firstFiveTools}`);
+          logger.warn('Model may be outputting text suggestions instead of using tools.');
+        }
+      }
       break;
     }
 
@@ -565,6 +586,11 @@ function buildTaskPrompt(task: AutoExecutionTask, planContext: string, supportsT
 
   return `You are an AI assistant executing a task from a Hopper plan.
 
+**CRITICAL: YOU MUST USE TOOLS TO COMPLETE THIS TASK**
+You MUST use tools to complete this task. Do NOT just describe what to do - USE the tools to actually make changes.
+Start by using tools immediately. Do not output planning text before using tools.
+If you need to read files, use tools. If you need to edit files, use tools. If you need to run commands, use tools.
+
 **CRITICAL: File Path Requirements**
 All file paths MUST be absolute paths. The workspace root is: ${workspaceRoot}
 When creating or modifying files, always use the full absolute path.
@@ -604,7 +630,9 @@ ${task.verify}
 **Project context:**
 ${planContext}
 
-${agentInstruction}`;
+${agentInstruction}
+
+**REMINDER: USE TOOLS NOW. Do not just output text - invoke the tools to make changes.**`;
 }
 
 /**
