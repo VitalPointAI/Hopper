@@ -213,11 +213,40 @@ Use this exact format for each task:
   <name>Fix UAT-XXX: [brief description]</name>
   <files>[affected files, if known]</files>
   <action>
-[What needs to be fixed and how]
+[MUST contain specific, executable instructions - NOT just the error message]
   </action>
   <verify>[How to verify the fix works]</verify>
   <done>[Issue acceptance criteria met]</done>
 </task>
+
+## CRITICAL: Action Content Requirements
+
+The <action> tag MUST contain SPECIFIC, EXECUTABLE INSTRUCTIONS. Analyze the issue details and generate actual implementation steps.
+
+**BAD (just echoes the error):**
+<action>Fix the issue: Task failed: Verify step failed</action>
+<action>Fix the issue: Expected behavior not working</action>
+
+**GOOD (actionable instructions):**
+<action>
+1. Open the source file mentioned in the error
+2. Locate the failing function/component
+3. Fix the root cause:
+   - If Expected/Actual fields provided: implement the expected behavior
+   - If error message provided: fix the underlying bug
+4. Add/update tests to cover this case
+5. Run verification to confirm the fix
+</action>
+
+<action>
+1. Read the original PLAN.md to understand what was attempted
+2. Investigate why the verify step failed (check output, errors, missing dependencies)
+3. Identify the specific code that needs to change
+4. Implement the fix in the affected files
+5. Re-run the verify step to confirm success
+</action>
+
+Use the Issue's Expected/Actual/Description fields to determine WHAT specifically needs to change.
 
 Prioritize: Blocker → Major → Minor → Cosmetic
 
@@ -247,6 +276,7 @@ Output ONLY the task XML elements, no other text.`;
 
 /**
  * Generate basic fix tasks without LLM
+ * Creates actionable guidance based on issue fields
  */
 function generateBasicFixTasks(issues: UATIssue[]): string {
   // Sort by severity
@@ -263,17 +293,52 @@ function generateBasicFixTasks(issues: UATIssue[]): string {
     return aOrder - bOrder;
   });
 
-  return sorted.map(issue => `<task type="auto">
+  return sorted.map(issue => {
+    // Build actionable steps based on available fields
+    const steps: string[] = [];
+
+    // Step 1: Investigation
+    if (issue.feature) {
+      steps.push(`1. Investigate the ${issue.feature} functionality`);
+    } else {
+      steps.push(`1. Read the related PLAN.md to understand what was attempted`);
+    }
+
+    // Step 2: Identify the problem
+    if (issue.actual && issue.expected) {
+      steps.push(`2. The issue: Currently "${issue.actual}" but should "${issue.expected}"`);
+    } else if (issue.description) {
+      steps.push(`2. Identify the root cause: ${issue.description}`);
+    }
+
+    // Step 3: Implementation guidance
+    if (issue.expected) {
+      steps.push(`3. Implement the fix to achieve: ${issue.expected}`);
+    } else {
+      steps.push(`3. Fix the underlying code to resolve the issue`);
+    }
+
+    // Step 4: Verification
+    steps.push(`4. Test your fix by verifying the expected behavior works`);
+
+    // Build verify instruction based on available fields
+    let verifyInstruction = 'Test that the issue is resolved';
+    if (issue.expected) {
+      verifyInstruction = `Verify that: ${issue.expected}`;
+    } else if (issue.feature) {
+      verifyInstruction = `Test the ${issue.feature} functionality works correctly`;
+    }
+
+    return `<task type="auto">
   <name>Fix ${issue.id}: ${issue.title}</name>
-  <files>[Identify affected files]</files>
+  <files>[Identify affected files from the issue context]</files>
   <action>
-Fix the issue: ${issue.description}
-${issue.expected ? `Expected behavior: ${issue.expected}` : ''}
-${issue.actual ? `Actual behavior: ${issue.actual}` : ''}
+${steps.join('\n')}
   </action>
-  <verify>Test that the issue is resolved</verify>
-  <done>${issue.id} acceptance criteria met</done>
-</task>`).join('\n\n');
+  <verify>${verifyInstruction}</verify>
+  <done>${issue.id} acceptance criteria met - ${issue.expected || 'issue resolved'}</done>
+</task>`;
+  }).join('\n\n');
 }
 
 /**
