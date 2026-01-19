@@ -2,7 +2,7 @@
   "name": "hopper-velocity",
   "displayName": "Hopper Velocity",
   "description": "Ship projects faster with AI-powered planning and execution. First phase free, upgrade to continue your project.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "VitalPoint",
   "license": "MIT",
   "icon": "resources/icon.png",
