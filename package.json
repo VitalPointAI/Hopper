@@ -241,7 +241,7 @@
       "properties": {
         "hopper.license.contractId": {
           "type": "string",
-          "default": "license.hopper.near",
+          "default": "license.specflow.near",
           "description": "NEAR contract ID for license validation"
         },
         "hopper.license.nearNetwork": {
