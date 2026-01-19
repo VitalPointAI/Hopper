@@ -102,8 +102,148 @@ export function createHopperParticipant(
 
     if (hasActionIntent) {
       logger.info(`Action intent detected: "${request.prompt.slice(0, 50)}..."`);
+
+      // Acknowledge immediately and execute with tools
+      stream.markdown('**Got it.** Working on your request...\n\n');
+
+      // Build action-focused prompt
+      const actionPrompt = `You are Hopper, executing a direct user request.
+
+The user said: "${request.prompt}"
+
+INSTRUCTIONS:
+1. Acknowledge what you're going to do in one sentence
+2. Execute the action using available tools (file edits, terminal commands, etc.)
+3. Report what you did when complete
+
+Do NOT redirect to workflow commands. Do NOT ask clarifying questions unless absolutely necessary.
+The user wants action, not advice.
+
+Project context:
+${projectContext.hasPlanning ? formatContextForPrompt(projectContext) : 'No project context available.'}`;
+
+      const actionMessages = [
+        vscode.LanguageModelChatMessage.User(actionPrompt)
+      ];
+
+      // Track the action prompt as input
+      contextTracker.addInput(actionPrompt);
+
+      try {
+        // Get available tools from vscode.lm.tools
+        const tools = vscode.lm.tools.filter(tool =>
+          tool.tags.includes('workspace') ||
+          tool.tags.includes('vscode') ||
+          !tool.tags.length
+        );
+
+        logger.info(`Direct action: ${tools.length} tools available`);
+
+        // Execute with tools enabled using tool orchestration loop
+        const MAX_ITERATIONS = 20;
+        let iteration = 0;
+        let outputText = '';
+
+        while (iteration < MAX_ITERATIONS && !token.isCancellationRequested) {
+          iteration++;
+
+          const response = await request.model.sendRequest(
+            actionMessages,
+            { tools, toolMode: vscode.LanguageModelChatToolMode.Auto },
+            token
+          );
+
+          let hasToolCalls = false;
+          const toolResults: vscode.LanguageModelToolResultPart[] = [];
+          const toolCallParts: vscode.LanguageModelToolCallPart[] = [];
+
+          for await (const part of response.stream) {
+            if (part instanceof vscode.LanguageModelTextPart) {
+              stream.markdown(part.value);
+              outputText += part.value;
+            } else if (part instanceof vscode.LanguageModelToolCallPart) {
+              hasToolCalls = true;
+              toolCallParts.push(part);
+
+              // Show tool invocation
+              stream.markdown(`\n\n*Executing: ${part.name}...*\n\n`);
+              logger.toolStart(part.name, part.input);
+
+              try {
+                // Invoke the tool with toolInvocationToken for proper chat UI integration
+                const toolResult = await vscode.lm.invokeTool(
+                  part.name,
+                  {
+                    input: part.input,
+                    toolInvocationToken: request.toolInvocationToken
+                  },
+                  token
+                );
+
+                logger.toolComplete(part.name, 'success');
+                stream.markdown(`*Completed: ${part.name}*\n\n`);
+
+                // Collect tool result for next iteration
+                toolResults.push(
+                  new vscode.LanguageModelToolResultPart(part.callId, toolResult.content)
+                );
+              } catch (toolErr) {
+                const toolErrMsg = toolErr instanceof Error ? toolErr.message : String(toolErr);
+                logger.error(`Tool ${part.name} failed: ${toolErrMsg}`);
+                stream.markdown(`**Failed:** ${part.name} - ${toolErrMsg}\n\n`);
+
+                toolResults.push(
+                  new vscode.LanguageModelToolResultPart(
+                    part.callId,
+                    [new vscode.LanguageModelTextPart(`Error: ${toolErrMsg}`)]
+                  )
+                );
+              }
+            }
+          }
+
+          // If no tool calls, we're done
+          if (!hasToolCalls) {
+            break;
+          }
+
+          // Add assistant message with tool calls to history
+          // Add tool results as user message for next iteration
+          actionMessages.push(
+            vscode.LanguageModelChatMessage.Assistant(toolCallParts),
+            vscode.LanguageModelChatMessage.User(toolResults)
+          );
+        }
+
+        // Track the complete output
+        contextTracker.addOutput(outputText);
+        logger.success(`Direct action completed: "${request.prompt.slice(0, 50)}..."`);
+
+        return {
+          metadata: {
+            lastCommand: 'direct-action'
+          }
+        };
+
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        logger.error(`Direct action failed: ${errorMessage}`);
+
+        if (err instanceof vscode.LanguageModelError) {
+          stream.markdown(`\n\n**Error:** ${err.message}\n\nPlease check your model connection and try again.`);
+        } else {
+          stream.markdown(`\n\n**Error:** ${errorMessage}\n\nYou might try using a specific command like **/help** to see options.`);
+        }
+
+        return {
+          metadata: {
+            lastCommand: 'error'
+          }
+        };
+      }
     }
 
+    // Non-action prompts - general chat assistance
     // Build messages for the model with Hopper context
     const messages: vscode.LanguageModelChatMessage[] = [];
 
