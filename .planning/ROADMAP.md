@@ -180,13 +180,14 @@ Plans:
 **Goal**: Fix /verify-work command UX issues: state persistence, non-blocking UI, detailed test instructions
 **Depends on**: Phase 7
 **Research**: Unlikely (fixing existing code)
-**Plans**: 2
+**Plans**: 5
 
 Plans:
 - [x] 08-01: State persistence and non-blocking UI infrastructure
 - [x] 08-01-FIX: Button-based verify-work flow
 - [x] 08-02: Enhanced test instructions and explicit pause/resume UX
 - [x] 08-02-FIX: Fix license check and discuss-phase button-based UX
+- [x] 08-02-FIX-FIX: Fix UAT issues (output channel, cache clearing, numbered buttons)
 
 ## Progress
 
@@ -207,4 +208,4 @@ Phases execute in numeric order: 1 → 1.5 → 1.5.1 → 1.5.2 → 1.5.3 → 2 �
 | 5.1 GSD Feature Parity | 6/6 | Complete | 2026-01-18 |
 | 6. Security Review | 4/4 | Complete | 2026-01-18 |
 | 7. Planning Depth | 4/4 | Complete | 2026-01-18 |
-| 8. Fix Improperly Built Functions | 4/4 | Complete | 2026-01-19 |
+| 8. Fix Improperly Built Functions | 5/5 | Complete | 2026-01-19 |
