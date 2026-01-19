@@ -4,6 +4,7 @@ import { getCommandHandler, IHopperResult, CommandContext } from './commands';
 import { getProjectContext, formatContextForPrompt } from './context/projectContext';
 import { getContextTracker } from '../context/contextTracker';
 import { getLogger } from '../logging';
+import { getActiveExecution, storeExecutionContext } from './commands/executePlan';
 
 /**
  * Patterns that indicate the user wants direct action, not advice or workflow redirection.
@@ -70,6 +71,37 @@ export function createHopperParticipant(
     if (projectContext.hasPlanning) {
       const formattedContext = formatContextForPrompt(projectContext);
       contextTracker.addInput(formattedContext);
+    }
+
+    // Check for active execution that could receive context
+    // If user pastes content without a command during active execution,
+    // store it as execution context instead of starting a new response
+    const activeExecution = getActiveExecution(context);
+    const CONTEXT_WINDOW_MS = 60000; // 60 second window for context input
+    const isContextInput = activeExecution &&
+      !request.command &&
+      (Date.now() - activeExecution.lastActivityTimestamp) < CONTEXT_WINDOW_MS;
+
+    if (isContextInput && request.prompt.trim().length > 0) {
+      const logger = getLogger();
+      logger.info(`Mid-execution context detected for ${activeExecution.planPath}`);
+
+      // Store the pasted content as execution context
+      await storeExecutionContext(context, activeExecution.planPath, request.prompt);
+
+      // Brief acknowledgment
+      stream.markdown('**Got it.** Incorporating that context into the current task...\n\n');
+      stream.markdown('*The information you pasted will be used by the ongoing execution.*\n');
+
+      // Track that we stored context
+      contextTracker.addOutput('Context stored for active execution');
+
+      return {
+        metadata: {
+          lastCommand: 'context-input',
+          contextStoredFor: activeExecution.planPath
+        }
+      };
     }
 
     // Route slash commands to handlers
