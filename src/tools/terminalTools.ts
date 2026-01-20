@@ -10,6 +10,7 @@ interface RunInTerminalInput {
   command: string;
   name?: string;
   cwd?: string;
+  keepAlive?: boolean;  // If true, don't dispose existing terminal - create with unique suffix
 }
 
 /**
@@ -33,8 +34,19 @@ interface HttpHealthCheckInput {
   maxRetries?: number;
 }
 
-// Track created terminals for potential cleanup
-const managedTerminals: Map<string, vscode.Terminal> = new Map();
+/**
+ * Metadata for a managed terminal
+ */
+interface ManagedTerminalInfo {
+  terminal: vscode.Terminal;
+  type: 'server' | 'command';  // server = long-running, don't auto-dispose; command = one-shot
+  command: string;
+  createdAt: number;
+  keepAlive: boolean;
+}
+
+// Track created terminals with metadata for lifecycle management
+const managedTerminals: Map<string, ManagedTerminalInfo> = new Map();
 
 /**
  * Tool to run a command in a new VSCode terminal.
@@ -46,7 +58,7 @@ export class HopperRunInTerminalTool implements vscode.LanguageModelTool<RunInTe
     options: vscode.LanguageModelToolInvocationOptions<RunInTerminalInput>,
     _token: vscode.CancellationToken
   ): Promise<vscode.LanguageModelToolResult> {
-    const { command, name, cwd } = options.input;
+    const { command, name, cwd, keepAlive = false } = options.input;
 
     try {
       if (!command) {
@@ -54,16 +66,25 @@ export class HopperRunInTerminalTool implements vscode.LanguageModelTool<RunInTe
       }
 
       // Generate a terminal name if not provided
-      const terminalName = name || `Hopper: ${command.split(' ')[0]}`;
+      let terminalName = name || `Hopper: ${command.split(' ')[0]}`;
 
       // Check if a terminal with this name already exists
       const existingTerminal = vscode.window.terminals.find(t => t.name === terminalName);
+      const existingInfo = managedTerminals.get(terminalName);
+
       if (existingTerminal) {
-        // Dispose the existing terminal before creating a new one
-        existingTerminal.dispose();
-        managedTerminals.delete(terminalName);
-        // Brief delay to allow disposal
-        await new Promise(resolve => setTimeout(resolve, 100));
+        if (keepAlive || (existingInfo && existingInfo.keepAlive)) {
+          // Don't dispose - create with unique suffix instead
+          const suffix = Date.now().toString(36).slice(-4);
+          terminalName = `${terminalName} (${suffix})`;
+          console.log(`[Hopper] Existing terminal kept alive, creating new: ${terminalName}`);
+        } else {
+          // Dispose the existing terminal before creating a new one
+          existingTerminal.dispose();
+          managedTerminals.delete(terminalName);
+          // Brief delay to allow disposal
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
 
       // Determine working directory
@@ -75,14 +96,27 @@ export class HopperRunInTerminalTool implements vscode.LanguageModelTool<RunInTe
         }
       }
 
+      // Determine terminal type based on command patterns
+      // Server commands: npm run dev, npm start, yarn dev, python -m http.server, etc.
+      const isServerCommand = /\b(dev|start|serve|watch|server|listen)\b/i.test(command) ||
+        /\bpython\s+-m\s+(http\.server|flask)/i.test(command) ||
+        /\bnode\s+.*server/i.test(command);
+      const terminalType: 'server' | 'command' = keepAlive || isServerCommand ? 'server' : 'command';
+
       // Create the terminal
       const terminal = vscode.window.createTerminal({
         name: terminalName,
         cwd: workingDir,
       });
 
-      // Track the terminal
-      managedTerminals.set(terminalName, terminal);
+      // Track the terminal with metadata
+      managedTerminals.set(terminalName, {
+        terminal,
+        type: terminalType,
+        command,
+        createdAt: Date.now(),
+        keepAlive: keepAlive || isServerCommand
+      });
 
       // Show the terminal (but don't take focus away from chat)
       terminal.show(true); // preserveFocus = true
@@ -90,11 +124,16 @@ export class HopperRunInTerminalTool implements vscode.LanguageModelTool<RunInTe
       // Send the command
       terminal.sendText(command);
 
-      console.log(`[Hopper] Started terminal "${terminalName}" with command: ${command}`);
+      console.log(`[Hopper] Started terminal "${terminalName}" (type: ${terminalType}) with command: ${command}`);
+
+      const typeNote = terminalType === 'server'
+        ? `This is a long-running process that will persist across tasks.`
+        : `This is a one-shot command that can be cleaned up after execution.`;
 
       return new vscode.LanguageModelToolResult([
         new vscode.LanguageModelTextPart(
           `Terminal "${terminalName}" started with command: ${command}\n\n` +
+          `Type: ${terminalType}. ${typeNote}\n\n` +
           `The command is running in the background. Use hopper_waitForPort or hopper_httpHealthCheck ` +
           `to verify the process is ready before proceeding.`
         )
@@ -297,6 +336,127 @@ export class HopperHttpHealthCheckTool implements vscode.LanguageModelTool<HttpH
 }
 
 /**
+ * Input schema for hopper_disposeTerminal tool
+ */
+interface DisposeTerminalInput {
+  name: string;
+}
+
+/**
+ * Tool to explicitly dispose a terminal by name.
+ * Useful for cleaning up server terminals when no longer needed.
+ */
+export class HopperDisposeTerminalTool implements vscode.LanguageModelTool<DisposeTerminalInput> {
+  async invoke(
+    options: vscode.LanguageModelToolInvocationOptions<DisposeTerminalInput>,
+    _token: vscode.CancellationToken
+  ): Promise<vscode.LanguageModelToolResult> {
+    const { name } = options.input;
+
+    try {
+      if (!name) {
+        throw new Error('name is required');
+      }
+
+      // Find terminal by exact name or partial match
+      let terminalName: string | undefined;
+      let terminalInfo: ManagedTerminalInfo | undefined;
+
+      // Try exact match first
+      if (managedTerminals.has(name)) {
+        terminalName = name;
+        terminalInfo = managedTerminals.get(name);
+      } else {
+        // Try partial match
+        for (const [key, info] of managedTerminals.entries()) {
+          if (key.includes(name) || name.includes(key)) {
+            terminalName = key;
+            terminalInfo = info;
+            break;
+          }
+        }
+      }
+
+      if (!terminalName || !terminalInfo) {
+        const available = Array.from(managedTerminals.keys());
+        return new vscode.LanguageModelToolResult([
+          new vscode.LanguageModelTextPart(
+            `Terminal "${name}" not found in managed terminals.\n\n` +
+            `Available terminals: ${available.length > 0 ? available.join(', ') : 'none'}`
+          )
+        ]);
+      }
+
+      // Dispose the terminal
+      try {
+        terminalInfo.terminal.dispose();
+      } catch {
+        // Terminal may already be disposed
+      }
+      managedTerminals.delete(terminalName);
+
+      console.log(`[Hopper] Disposed terminal "${terminalName}"`);
+
+      return new vscode.LanguageModelToolResult([
+        new vscode.LanguageModelTextPart(
+          `Terminal "${terminalName}" has been disposed.\n\n` +
+          `Command that was running: ${terminalInfo.command}`
+        )
+      ]);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[Hopper] Failed to dispose terminal: ${errorMsg}`);
+      throw new Error(`Failed to dispose terminal: ${errorMsg}`);
+    }
+  }
+}
+
+/**
+ * Clean up temporary (non-keepAlive) terminals.
+ * Call this at the end of plan execution to dispose one-shot command terminals
+ * while keeping server terminals running.
+ * @returns List of terminals that were cleaned up
+ */
+export function cleanupTemporaryTerminals(): string[] {
+  const cleaned: string[] = [];
+
+  for (const [name, info] of managedTerminals.entries()) {
+    if (!info.keepAlive && info.type === 'command') {
+      try {
+        info.terminal.dispose();
+        cleaned.push(name);
+        console.log(`[Hopper] Cleaned up temporary terminal: ${name}`);
+      } catch {
+        // Terminal may already be disposed
+      }
+      managedTerminals.delete(name);
+    }
+  }
+
+  return cleaned;
+}
+
+/**
+ * Get list of active server terminals.
+ * Useful for showing which terminals remain active after plan execution.
+ */
+export function getActiveServerTerminals(): Array<{ name: string; command: string; createdAt: number }> {
+  const servers: Array<{ name: string; command: string; createdAt: number }> = [];
+
+  for (const [name, info] of managedTerminals.entries()) {
+    if (info.type === 'server' || info.keepAlive) {
+      servers.push({
+        name,
+        command: info.command,
+        createdAt: info.createdAt
+      });
+    }
+  }
+
+  return servers;
+}
+
+/**
  * Register all Hopper terminal tools
  */
 export function registerTerminalTools(context: vscode.ExtensionContext): void {
@@ -324,12 +484,20 @@ export function registerTerminalTools(context: vscode.ExtensionContext): void {
   context.subscriptions.push(healthCheckTool);
   console.log('[Hopper] Registered hopper_httpHealthCheck tool');
 
+  // Register hopper_disposeTerminal tool
+  const disposeTerminalTool = vscode.lm.registerTool(
+    'hopper_disposeTerminal',
+    new HopperDisposeTerminalTool()
+  );
+  context.subscriptions.push(disposeTerminalTool);
+  console.log('[Hopper] Registered hopper_disposeTerminal tool');
+
   // Clean up managed terminals when extension deactivates
   context.subscriptions.push({
     dispose: () => {
-      for (const terminal of managedTerminals.values()) {
+      for (const info of managedTerminals.values()) {
         try {
-          terminal.dispose();
+          info.terminal.dispose();
         } catch {
           // Ignore errors during cleanup
         }
@@ -344,4 +512,24 @@ export function registerTerminalTools(context: vscode.ExtensionContext): void {
  */
 export function getManagedTerminals(): string[] {
   return Array.from(managedTerminals.keys());
+}
+
+/**
+ * Get detailed info about all managed terminals
+ */
+export function getManagedTerminalInfo(): Array<{
+  name: string;
+  type: 'server' | 'command';
+  command: string;
+  keepAlive: boolean;
+  runningFor: number;
+}> {
+  const now = Date.now();
+  return Array.from(managedTerminals.entries()).map(([name, info]) => ({
+    name,
+    type: info.type,
+    command: info.command,
+    keepAlive: info.keepAlive,
+    runningFor: Math.round((now - info.createdAt) / 1000)  // seconds
+  }));
 }
