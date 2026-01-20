@@ -10,6 +10,7 @@ import {
   getCancelledExecution,
   clearCancelledExecution
 } from './commands/executePlan';
+import { analyzeForFollowup, buildFollowupPrompt } from './conversationalFollowup';
 
 /**
  * Patterns that indicate the user wants direct action, not advice or workflow redirection.
@@ -183,8 +184,57 @@ export function createHopperParticipant(
       return { metadata: { lastCommand: 'error' } };
     }
 
-    // No command - check for action intent
+    // No command - check for conversational follow-up first
     const logger = getLogger();
+
+    // Analyze if this is a response to a previous message (e.g., "yes" to options)
+    const followupAnalysis = analyzeForFollowup(request.prompt, chatContext.history);
+
+    if (followupAnalysis.isFollowup && followupAnalysis.previousAssistantMessage) {
+      logger.info(`Conversational follow-up (${followupAnalysis.confidence}): "${request.prompt}"`);
+
+      // Build a context-aware prompt for the LLM
+      const contextPrompt = buildFollowupPrompt(
+        followupAnalysis,
+        projectContext.hasPlanning ? formatContextForPrompt(projectContext) : 'No project context available.'
+      );
+
+      // Track the context prompt as input
+      contextTracker.addInput(contextPrompt);
+
+      const followupMessages = [
+        vscode.LanguageModelChatMessage.User(contextPrompt)
+      ];
+
+      try {
+        const response = await request.model.sendRequest(followupMessages, {}, token);
+
+        let outputText = '';
+        for await (const fragment of response.text) {
+          if (token.isCancellationRequested) {
+            break;
+          }
+          stream.markdown(fragment);
+          outputText += fragment;
+        }
+
+        contextTracker.addOutput(outputText);
+
+        return {
+          metadata: {
+            lastCommand: 'conversational-followup'
+          }
+        };
+      } catch (err) {
+        if (err instanceof vscode.LanguageModelError) {
+          stream.markdown(`**Error:** ${err.message}\n\nPlease check your model connection and try again.`);
+          return { metadata: { lastCommand: 'error' } };
+        }
+        throw err;
+      }
+    }
+
+    // Check for action intent
     const hasActionIntent = detectActionIntent(request.prompt);
 
     if (hasActionIntent) {
@@ -461,6 +511,15 @@ ${projectContext.hasPlanning ? formatContextForPrompt(projectContext) : 'No proj
         return [
           { command: 'plan-phase', prompt: 'Plan the next phase', label: 'Plan a phase' },
           { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' }
+        ];
+      }
+
+      // After conversational follow-up, offer relevant workflow commands
+      if (lastCmd === 'conversational-followup') {
+        return [
+          { command: 'progress', prompt: 'Check my project progress', label: 'Check progress' },
+          { command: 'execute-plan', prompt: 'Execute the plan', label: 'Execute plan' },
+          { command: 'help', prompt: 'Show me all commands', label: 'Show commands' }
         ];
       }
 
