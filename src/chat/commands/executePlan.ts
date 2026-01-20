@@ -1711,6 +1711,29 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Check if this is a stream closure (user clicked Stop) or cancellation
+        const isStreamClosed = errorMessage.includes('stream has been closed') ||
+          errorMessage.includes('stream closed') ||
+          token.isCancellationRequested;
+
+        if (isStreamClosed) {
+          // Save cancelled execution state for potential resume with context
+          logger.info(`Execution paused at task ${i + 1} (stream closed or cancelled)`);
+          await saveCancelledExecution(ctx.extensionContext, planPath, i);
+
+          // Clear active execution state so next input triggers resume flow
+          await clearActiveExecution(ctx.extensionContext);
+
+          // Show guidance via notification (stream is closed, can't write to it)
+          vscode.window.showInformationMessage(
+            `Execution paused at task ${i + 1}. Paste context and send to resume.`,
+            'OK'
+          );
+
+          return { metadata: { lastCommand: 'execute-plan' } };
+        }
+
         // Log error to output channel (auto-shows)
         logger.error(`Task ${task.id} failed: ${task.name} - ${errorMessage}`);
         stream.markdown(`**Error executing task:** ${errorMessage}\n\n`);
