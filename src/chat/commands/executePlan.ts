@@ -1074,8 +1074,16 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
 
   // Parse plan path from prompt or auto-detect
   stream.progress('Loading plan...');
-  const promptText = request.prompt.trim();
+  let promptText = request.prompt.trim();
   let planUri: vscode.Uri | undefined;
+
+  // Parse --from-task flag if present (used by resume-from-cancelled flow)
+  const fromTaskMatch = promptText.match(/\s+--from-task=(\d+)/);
+  const resumeFromTask = fromTaskMatch ? parseInt(fromTaskMatch[1], 10) : null;
+  if (fromTaskMatch) {
+    // Remove the flag from prompt to get clean plan path
+    promptText = promptText.replace(/\s+--from-task=\d+/, '').trim();
+  }
 
   if (promptText) {
     // User provided a path - resolve it (handles short identifiers like "04-01")
@@ -1310,7 +1318,20 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
   const resumeMatch = promptText.match(/\s+(approved|issue|decision:\w+)$/i);
   const resumeSignal = resumeMatch ? resumeMatch[1].toLowerCase() : null;
 
-  if (existingState && existingState.pausedAtCheckpoint) {
+  // Handle resume from cancelled execution (via --from-task flag)
+  if (resumeFromTask !== null) {
+    startTaskIndex = resumeFromTask;
+    logger.info(`Resuming execution from task ${resumeFromTask + 1} (cancelled execution)`);
+    stream.markdown(`**Resuming from task ${resumeFromTask + 1}...**\n\n`);
+
+    // If we have existing state, preserve completed tasks up to resumeFromTask
+    if (existingState) {
+      // Keep only tasks that were completed before the resume point
+      existingState.completedTasks = existingState.completedTasks.filter(
+        taskId => taskId < resumeFromTask + 1
+      );
+    }
+  } else if (existingState && existingState.pausedAtCheckpoint) {
     if (resumeSignal === 'approved') {
       // Checkpoint approved - resume from next task
       stream.markdown('**Checkpoint approved.** Resuming execution...\n\n');

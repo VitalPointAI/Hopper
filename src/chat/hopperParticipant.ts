@@ -104,13 +104,14 @@ export function createHopperParticipant(
       // Track the context storage
       contextTracker.addOutput(`Context stored, resuming ${cancelledExecution.planPath}`);
 
-      // Get the execute-plan handler and call it with the plan path
+      // Get the execute-plan handler and call it with the plan path and task index
+      // Use --from-task flag to signal where to resume from
       const executeHandler = getCommandHandler('execute-plan');
       if (executeHandler) {
         const resumeCtx: CommandContext = {
           request: {
             ...request,
-            prompt: cancelledExecution.planPath,
+            prompt: `${cancelledExecution.planPath} --from-task=${cancelledExecution.taskIndex}`,
             command: 'execute-plan'
           } as vscode.ChatRequest,
           context: chatContext,
