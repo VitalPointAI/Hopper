@@ -407,13 +407,13 @@ async function executeWithTools(
     );
   }
 
-  // Check if we exited due to cancellation - output guidance while stream is still open
+  // Check if we exited due to cancellation - show guidance via notification (stream may be closed)
   if (token.isCancellationRequested) {
-    stream.markdown('\n\n---\n\n');
-    stream.markdown('## Execution Paused\n\n');
-    stream.markdown('**Need to add context?** Paste your information and send it.\n');
-    stream.markdown("I'll resume execution with your context incorporated.\n\n");
-    stream.markdown('*This option is available for 5 minutes.*\n');
+    // Show guidance as information message since stream may already be closed
+    vscode.window.showInformationMessage(
+      'Execution paused. Paste context and send to resume, or start a new command.',
+      'OK'
+    );
   }
 
   if (iteration >= MAX_ITERATIONS) {
@@ -1409,19 +1409,11 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
       // Clear active execution state
       await clearActiveExecution(ctx.extensionContext);
 
-      stream.markdown('\n\n---\n\n');
-      stream.markdown('## Execution Paused\n\n');
-      stream.markdown(`Completed ${results.filter(r => r.success).length} of ${plan.tasks.length} tasks.\n\n`);
-      stream.markdown(`**Paused at:** Task ${i + 1} (${plan.tasks[i]?.name || 'unknown'})\n\n`);
-
-      for (const result of results) {
-        stream.markdown(`- **Task ${result.taskId}:** ${result.name} - ${result.success ? 'Completed' : 'Failed'}\n`);
-      }
-
-      stream.markdown('\n---\n\n');
-      stream.markdown('**Need to add context?** Paste your information and send it.\n');
-      stream.markdown('I\'ll resume execution with your context incorporated.\n\n');
-      stream.markdown('*This option is available for 5 minutes.*\n');
+      // Show guidance via notification (stream may be closed after cancellation)
+      vscode.window.showInformationMessage(
+        `Execution paused at task ${i + 1}. Paste context and send to resume.`,
+        'OK'
+      );
 
       return { metadata: { lastCommand: 'execute-plan' } };
     }
@@ -1590,7 +1582,8 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         const executionResult = await executeWithTools(model, messages, tools, stream, token, request.toolInvocationToken, workspaceUri.fsPath);
 
         // Check for cancellation immediately after tool execution
-        // Note: Guidance message is output inside executeWithTools while stream is still open
+        // NOTE: Don't try to write to stream here - it's closed after cancellation
+        // Guidance is shown via vscode.window.showInformationMessage in executeWithTools
         if (token.isCancellationRequested) {
           // Save cancelled execution state for potential resume with context
           await saveCancelledExecution(ctx.extensionContext, planPath, i);
