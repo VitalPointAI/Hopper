@@ -18,6 +18,7 @@ import {
   extractScaffoldingCommand,
   executeScaffoldingWithProtection
 } from '../executor';
+import { cleanupTemporaryTerminals, getActiveServerTerminals } from '../../tools/terminalTools';
 import { clearHandoffAfterCompletion } from './resumeWork';
 import { updateStateAfterExecution, setCurrentAgentId, clearCurrentAgentId } from '../state';
 import {
@@ -1962,6 +1963,23 @@ export async function handleExecutePlan(ctx: CommandContext): Promise<IHopperRes
         logger.error(`Failed to update STATE.md: ${stateErr instanceof Error ? stateErr.message : String(stateErr)}`);
         // Don't fail the overall execution, just log the error
       }
+    }
+
+    // Clean up temporary terminals on successful completion
+    const cleanedTerminals = cleanupTemporaryTerminals();
+    if (cleanedTerminals.length > 0) {
+      logger.info(`Cleaned up ${cleanedTerminals.length} temporary terminals: ${cleanedTerminals.join(', ')}`);
+    }
+
+    // Show active server terminals that remain running
+    const activeServers = getActiveServerTerminals();
+    if (activeServers.length > 0) {
+      stream.markdown('### Active Terminals\n\n');
+      stream.markdown('The following server terminals are still running:\n\n');
+      for (const server of activeServers) {
+        stream.markdown(`- **${server.name}:** \`${server.command}\`\n`);
+      }
+      stream.markdown('\n*Use `hopper_disposeTerminal` to stop them when no longer needed.*\n\n');
     }
   }
 
